@@ -1,0 +1,11 @@
+first drawing: root 1, left 1, right 1
+right marked a corner: root 2, left 1, right 2
+right asked to draw a small part: yes
+root drew only around it: yes
+both marked: left 2, right 3
+then settled: left 2, right 3
+window marked: root 5, left 3, right 4
+lockFocusIfCanDraw: yes, focus view is left: yes
+after unlockFocus, focus view: none
+sorted: first subview is right
+exit=0

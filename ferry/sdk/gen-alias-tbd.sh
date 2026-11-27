@@ -51,7 +51,9 @@ case $framework in
     # Core Audio's file serves AudioToolbox (with the audio objects' calls
     # its header brings in, 1.232) and AudioUnit (freemac 1.234); AUGraph and
     # MusicDevice calls join both (freemac 1.NEXT)
-    AudioToolbox) pattern='^_(AudioObject|AudioHardware|AudioComponent|AudioUnit|AudioOutputUnit|AudioQueue|AudioFormat|AudioConverter|AUGraph|NewAUGraph|DisposeAUGraph|MusicDevice)' ;;
+    AudioToolbox) pattern='^_(AudioObject|AudioHardware|AudioComponent|AudioUnit|AudioOutputUnit|AudioQueue|AudioFormat|AudioConverter|AudioServices|AU(Event|Parameter)?Listener|AUParameterSet|AUGraph|NewAUGraph|DisposeAUGraph|MusicDevice)' ;;
+    # and Core MIDI, with no devices (freemac 1.263)
+    CoreMIDI) pattern='^_(MIDI|kMIDI)' ;;
     AudioUnit) pattern='^_(AudioComponent|AudioUnit|AudioOutputUnit|MusicDevice)' ;;
     *) echo "gen-alias-tbd.sh: unknown framework $framework" >&2; exit 2 ;;
 esac

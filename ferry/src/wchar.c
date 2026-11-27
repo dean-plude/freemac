@@ -375,9 +375,18 @@ static char *mac_nl_langinfo_l(int item, locale_t loc)
 
 static char *mac_nl_langinfo(int item) { return mac_nl_langinfo_l(item, LC_GLOBAL_LOCALE); }
 
+/* number conversions under a locale (freemac 1.263) */
+static long mac_wcstol_l(const wchar_t *s, wchar_t **e, int b, locale_t loc) { UNDER(loc, wcstol(s, e, b)); }
+static unsigned long mac_wcstoul_l(const wchar_t *s, wchar_t **e, int b, locale_t loc) { UNDER(loc, wcstoul(s, e, b)); }
+static long long mac_wcstoll_l(const wchar_t *s, wchar_t **e, int b, locale_t loc) { UNDER(loc, wcstoll(s, e, b)); }
+static unsigned long long mac_wcstoull_l(const wchar_t *s, wchar_t **e, int b, locale_t loc) { UNDER(loc, wcstoull(s, e, b)); }
+static double mac_wcstod_l(const wchar_t *s, wchar_t **e, locale_t loc) { UNDER(loc, wcstod(s, e)); }
+static float mac_wcstof_l(const wchar_t *s, wchar_t **e, locale_t loc) { UNDER(loc, wcstof(s, e)); }
+
 const struct ferry_symbol ferry_wchar_symbols[] = {
     {"nl_langinfo", mac_nl_langinfo},
     {"nl_langinfo_l", mac_nl_langinfo_l},
+    MAC(wcstol_l), MAC(wcstoul_l), MAC(wcstoll_l), MAC(wcstoull_l), MAC(wcstod_l), MAC(wcstof_l),
     /* wide strings: the same calls */
     SAME(wcslen), SAME(wcsnlen), SAME(wcscpy), SAME(wcsncpy), SAME(wcscat), SAME(wcsncat), SAME(wcscmp),
     SAME(wcsncmp), SAME(wcscoll), SAME(wcsxfrm), SAME(wcschr), SAME(wcsrchr), SAME(wcsstr), SAME(wcsspn),

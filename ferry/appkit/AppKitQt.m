@@ -622,6 +622,7 @@ NSNotificationName const NSWindowDidEnterFullScreenNotification = @"NSWindowDidE
 NSNotificationName const NSWindowWillExitFullScreenNotification = @"NSWindowWillExitFullScreenNotification";
 NSNotificationName const NSWindowDidExitFullScreenNotification = @"NSWindowDidExitFullScreenNotification";
 NSNotificationName const NSWindowDidChangeScreenProfileNotification = @"NSWindowDidChangeScreenProfileNotification";
+NSNotificationName const NSWindowDidChangeScreenNotification = @"NSWindowDidChangeScreenNotification";
 
 /* ---- scroller knobs and the menu bar's height -------------------------------------- */
 

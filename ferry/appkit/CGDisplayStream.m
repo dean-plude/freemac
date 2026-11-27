@@ -94,6 +94,13 @@ uint32_t CGDisplayModeGetIOFlags(CGDisplayModeRef m)
 }
 int32_t CGDisplayModeGetIODisplayModeID(CGDisplayModeRef m) { return is_mode(m) ? 1 : 0; }
 bool CGDisplayModeIsUsableForDesktopGUI(CGDisplayModeRef m) { return is_mode(m); }
+/* The pixel layout, as IOGraphicsTypes.h names it (deprecated, but wxWidgets
+ * reads a display's depth from it): 8 bits each of red, green and blue
+ * (freemac 1.263). */
+CFStringRef CGDisplayModeCopyPixelEncoding(CGDisplayModeRef m)
+{
+    return is_mode(m) ? (CFStringRef)[@"--------RRRRRRRRGGGGGGGGBBBBBBBB" copy] : NULL;
+}
 
 /* A display's size, rotation, numbers and UUID are in CGDirectDisplay.m. */
 

@@ -10,6 +10,12 @@
 NSNotificationName const NSViewFrameDidChangeNotification = @"NSViewFrameDidChangeNotification";
 NSNotificationName const NSViewBoundsDidChangeNotification = @"NSViewBoundsDidChangeNotification";
 
+@interface NSWindow (FerryFocus)
+- (CGContextRef)_focusContext;
+- (void)_focusDrawn;
+- (void)_noteViewNeedsDisplay;
+@end
+
 @implementation NSView {
     NSRect _frame, _bounds;
     NSView *_superview;             /* not retained */
@@ -28,6 +34,7 @@ NSNotificationName const NSViewBoundsDidChangeNotification = @"NSViewBoundsDidCh
     BOOL _hostsLayer, _drawsSubviewsIntoLayer;
     NSViewLayerContentsRedrawPolicy _redrawPolicy;
     NSDictionary *_animations;
+    NSRect _dirtyRect;              /* what needs drawing, in bounds; empty: all of it */
 }
 
 /* Drag and drop: the types a view takes (NSDragging.m does the rest). */
@@ -507,6 +514,18 @@ static int layers_drawing;   /* changes made while a view draws its layer don't 
     [self setNeedsDisplay:YES];
 }
 
+// Reorders the subviews (their drawing order) by the app's own comparison,
+// which is how wxWidgets puts a view it raises on top.
+- (void)sortSubviewsUsingFunction:(NSComparisonResult (*)(__kindof NSView *, __kindof NSView *, void *))compare
+                          context:(void *)context
+{
+    if ([_subviews count] < 2 || !compare)
+        return;
+    NSArray *sorted = [_subviews sortedArrayUsingFunction:(NSInteger (*)(id, id, void *))compare context:context];
+    [_subviews setArray:sorted];
+    [self setNeedsDisplay:YES];
+}
+
 - (void)_setWindow:(NSWindow *)window
 {
     if (_window == window)
@@ -772,14 +791,25 @@ static NSSize abs_size(NSSize s) { return NSMakeSize(fabs(s.width), fabs(s.heigh
 {
     AMainThreadOnly("-[NSView setNeedsDisplay:]");
     _needsDisplay = flag;
+    _dirtyRect = NSZeroRect;
     if (flag)
-        [_window _noteNeedsDisplay];
+        [_window _noteViewNeedsDisplay];
     /* A backing layer whose delegate displays it (displayLayer:, as Qt's
      * view does) is displayed when the view is: the layer is marked too. */
     if (flag && _layer && !_hostsLayer && [[_layer delegate] respondsToSelector:@selector(displayLayer:)])
         [_layer setNeedsDisplay];
 }
-- (void)setNeedsDisplayInRect:(NSRect)rect { [self setNeedsDisplay:YES]; }
+/* Only the part asked for is drawn again (a meter's bar, a playhead's
+ * column), not the whole window, as on a Mac. */
+- (void)setNeedsDisplayInRect:(NSRect)rect
+{
+    if (NSIsEmptyRect(rect))
+        return;
+    NSRect had = _needsDisplay ? (NSIsEmptyRect(_dirtyRect) ? _bounds : _dirtyRect) : NSZeroRect;
+    [self setNeedsDisplay:YES];
+    if (_needsDisplay)
+        _dirtyRect = NSIsEmptyRect(had) ? rect : NSUnionRect(had, rect);
+}
 - (void)setKeyboardFocusRingNeedsDisplayInRect:(NSRect)rect { [self setNeedsDisplay:YES]; }
 - (BOOL)_needsDisplayAnywhere
 {
@@ -798,6 +828,51 @@ static NSSize abs_size(NSSize s) { return NSMakeSize(fabs(s.width), fabs(s.heigh
 
 - (void)drawRect:(NSRect)dirtyRect {}
 
+/* Adds the window rectangles this view and those under it need drawn to
+ * rects (merging ones that touch, all into one past max). NO when the whole
+ * window must be drawn: a layer, whose animation can show anywhere. */
+static void add_dirty(NSRect r, NSRect *rects, int *n, int max)
+{
+    r = NSInsetRect(NSIntegralRect(r), -1, -1);
+    for (;;) {
+        BOOL merged = NO;
+        for (int i = 0; i < *n; i++)
+            if (NSIntersectsRect(rects[i], r)) {
+                r = NSUnionRect(r, rects[i]);
+                rects[i] = rects[--*n];
+                merged = YES;
+                break;
+            }
+        if (!merged)
+            break;
+    }
+    if (*n == max) {
+        for (int i = 0; i < *n; i++)
+            r = NSUnionRect(r, rects[i]);
+        *n = 0;
+    }
+    rects[(*n)++] = r;
+}
+- (BOOL)_collectDirty:(NSRect *)rects count:(int *)n max:(int)max
+{
+    if (_hidden)
+        return YES;
+    if (_layer && [self _needsDisplayAnywhere])
+        return NO;
+    if (_needsDisplay) {
+        NSRect r = NSIntersectionRect(NSIsEmptyRect(_dirtyRect) ? _bounds : _dirtyRect, _bounds);
+        if (!NSIsEmptyRect(r))
+            add_dirty(CGRectApplyAffineTransform(r, [self _transformToWindow]), rects, n, max);
+        /* cleared now: a view clipped away by its superview is never reached */
+        _needsDisplay = NO;
+        _dirtyRect = NSZeroRect;
+    }
+    for (NSView *v in _subviews)
+        if (![v _collectDirty:rects count:n max:max])
+            return NO;
+    return YES;
+}
+
 /* Draws this view and its subviews; the context's CTM is already this
  * view's own coordinates, and dirty is in them too. */
 - (void)_drawContentInContext:(CGContextRef)ctx dirty:(NSRect)dirty screen:(BOOL)screen
@@ -805,6 +880,7 @@ static NSSize abs_size(NSSize s) { return NSMakeSize(fabs(s.width), fabs(s.heigh
     dirty = NSIntersectionRect(dirty, _bounds);
     BOOL wanted = _needsDisplay;
     _needsDisplay = NO;
+    _dirtyRect = NSZeroRect;
     if (_layer) {
         [self _drawLayerInContext:ctx dirty:dirty screen:screen update:wanted];
         return;
@@ -903,11 +979,57 @@ static NSSize abs_size(NSSize s) { return NSMakeSize(fabs(s.width), fabs(s.heigh
         [_window display];
 }
 
-- (void)lockFocus
+/* lockFocus: the view's drawing goes straight onto its window, in the
+ * view's own coordinates and clipped to what shows of it, until
+ * unlockFocus; the window's next full redraw draws over it, as on a Mac.
+ * Focus nests, so each lock keeps what it replaced. */
+typedef struct {
+    NSView *view;
+    CGContextRef ctx;
+    NSGraphicsContext *saved;
+} AFocus;
+static AFocus focus_stack[32];
+static int focus_depth;
+
+- (BOOL)_pushFocus:(BOOL)mustDraw
 {
-    AWarnOnce("-[NSView lockFocus] (draw in drawRect: instead)");
+    if (focus_depth >= 32 || ![NSThread isMainThread])
+        return NO;
+    CGContextRef ctx = NULL;
+    if (_window && ![self isHiddenOrHasHiddenAncestor] && !NSIsEmptyRect([self visibleRect]))
+        ctx = [_window _focusContext];
+    if (!ctx && mustDraw)
+        return NO;
+    AFocus *f = &focus_stack[focus_depth++];
+    f->view = self;
+    f->ctx = ctx;
+    f->saved = [[NSGraphicsContext currentContext] retain];
+    if (ctx) {
+        CGContextSaveGState(ctx);
+        CGContextConcatCTM(ctx, [self _transformToWindow]);
+        CGContextClipToRect(ctx, [self visibleRect]);
+        NSGraphicsContext *gc = [NSGraphicsContext graphicsContextWithCGContext:ctx flipped:[self isFlipped]];
+        [gc _setDrawingToScreen:YES];
+        [NSGraphicsContext setCurrentContext:gc];
+    }
+    return YES;
 }
-- (void)unlockFocus {}
+- (void)lockFocus { [self _pushFocus:NO]; }
+- (BOOL)lockFocusIfCanDraw { return [self _pushFocus:YES]; }
+- (void)unlockFocus
+{
+    if (focus_depth == 0 || focus_stack[focus_depth - 1].view != self)
+        return;
+    AFocus *f = &focus_stack[--focus_depth];
+    if (f->ctx) {
+        CGContextRestoreGState(f->ctx);
+        [_window _focusDrawn];
+    }
+    [NSGraphicsContext setCurrentContext:f->saved];
+    [f->saved release];
+    f->view = nil;
+}
++ (NSView *)focusView { return focus_depth ? focus_stack[focus_depth - 1].view : nil; }
 
 - (NSBitmapImageRep *)bitmapImageRepForCachingDisplayInRect:(NSRect)rect
 {

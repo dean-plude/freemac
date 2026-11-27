@@ -23,6 +23,8 @@
  * - uuid(3): new random UUIDs (version 4, from getrandom), and UUIDs
  *   written as and read from their 36-character form (freemac OBS work).
  *   uuid_generate_time gives a random one too, as a Mac does by default.
+ * - execve(2) and the exec family start a Mac program through Ferry too
+ *   (freemac 1.263, for Audacity's launcher).
  */
 #define _GNU_SOURCE
 #include <dirent.h>
@@ -34,6 +36,7 @@
 #include <pthread.h>
 #include <signal.h>
 #include <spawn.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -387,6 +390,125 @@ static int mac_posix_spawnp(pid_t *pid, const char *file, struct mac_actions *co
                             struct mac_spawnattr *const *attr, char *const argv[], char *const envp[])
 {
     return spawn(pid, file, 1, fa, attr, argv, envp);
+}
+
+/* ---- exec ------------------------------------------------------------------------ */
+
+/* execve(2) and the rest of the exec family: a Mac program becomes Ferry
+ * running it (ferry -- PROGRAM ARGS...), as posix_spawn starts one, so an
+ * app whose bundle executable is a small launcher that execs the real
+ * program (Audacity's Wrapper) carries on. Anything else is this system's
+ * exec. */
+static int mac_execve(const char *path, char *const argv[], char *const envp[])
+{
+    if (path && strchr(path, '/') && is_mach_o(path)) {
+        char self[PATH_MAX];
+        ssize_t n = readlink("/proc/self/exe", self, sizeof self - 1);
+        if (n <= 0) {
+            errno = ENOEXEC;
+            return -1;
+        }
+        self[n] = 0;
+        int argc = 0;
+        while (argv && argv[argc])
+            argc++;
+        char **av = calloc(argc + 4, sizeof *av);
+        if (!av) {
+            errno = ENOMEM;
+            return -1;
+        }
+        av[0] = "ferry";
+        av[1] = "--";
+        av[2] = (char *)path;
+        for (int i = 1; i < argc; i++)
+            av[i + 2] = argv[i];
+        fflush(NULL);
+        execve(self, av, envp);
+        int e = errno;
+        free(av);
+        errno = e;
+        return -1;
+    }
+    fflush(NULL);
+    return execve(path, argv, envp);
+}
+
+static int mac_execv(const char *path, char *const argv[])
+{
+    extern char **environ;
+    return mac_execve(path, argv, environ);
+}
+
+static int mac_execvpe(const char *file, char *const argv[], char *const envp[])
+{
+    char found[PATH_MAX];
+    if (file && !strchr(file, '/') && *file) {
+        if (!search_path(file, found, sizeof found)) {
+            errno = ENOENT;
+            return -1;
+        }
+        file = found;
+    }
+    return mac_execve(file, argv, envp);
+}
+
+static int mac_execvp(const char *file, char *const argv[])
+{
+    extern char **environ;
+    return mac_execvpe(file, argv, environ);
+}
+
+/* execl, execlp and execle: their arguments, gathered into a list */
+#define GATHER(first, ap, out, max)                          \
+    do {                                                     \
+        int n_ = 0;                                          \
+        (out)[n_++] = (char *)(first);                       \
+        while (n_ < (max) - 1 && ((out)[n_] = va_arg(ap, char *))) \
+            n_++;                                            \
+        (out)[n_] = NULL;                                    \
+    } while (0)
+
+static int mac_execl(const char *path, const char *arg, ...)
+{
+    char *av[256];
+    va_list ap;
+    va_start(ap, arg);
+    if (arg)
+        GATHER(arg, ap, av, 256);
+    else
+        av[0] = NULL;
+    va_end(ap);
+    return mac_execv(path, av);
+}
+
+static int mac_execlp(const char *file, const char *arg, ...)
+{
+    char *av[256];
+    va_list ap;
+    va_start(ap, arg);
+    if (arg)
+        GATHER(arg, ap, av, 256);
+    else
+        av[0] = NULL;
+    va_end(ap);
+    return mac_execvp(file, av);
+}
+
+static int mac_execle(const char *path, const char *arg, ...)
+{
+    char *av[256];
+    va_list ap;
+    va_start(ap, arg);
+    char **envp;
+    if (arg) {
+        GATHER(arg, ap, av, 256);
+        envp = va_arg(ap, char **);
+    } else {
+        av[0] = NULL;
+        envp = va_arg(ap, char **);
+    }
+    va_end(ap);
+    return mac_execve(path, av, envp);
 }
 
 /* ---- glob and fnmatch -------------------------------------------------------------- */
@@ -799,6 +921,12 @@ const struct ferry_symbol ferry_libc_apps_symbols[] = {
     {"tcgetsid", tcgetsid},
     {"mach_wait_until", mac_mach_wait_until},
     {"posix_spawn", mac_posix_spawn},
+    {"execve", mac_execve},
+    {"execv", mac_execv},
+    {"execvp", mac_execvp},
+    {"execl", mac_execl},
+    {"execlp", mac_execlp},
+    {"execle", mac_execle},
     {"posix_spawnp", mac_posix_spawnp},
     {"posix_spawn_file_actions_init", mac_posix_spawn_file_actions_init},
     {"posix_spawn_file_actions_destroy", mac_posix_spawn_file_actions_destroy},

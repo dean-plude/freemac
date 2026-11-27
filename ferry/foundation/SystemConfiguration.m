@@ -95,3 +95,27 @@ CFStringRef SCDynamicStoreCopyLocalHostName(SCDynamicStoreRef store)
     NSRange dot = [name rangeOfString:@"."];
     return (CFStringRef)[(dot.location == NSNotFound ? name : [name substringToIndex:dot.location]) copy];
 }
+
+/* The proxies the system is set to use (freemac 1.263, for Audacity's
+ * network code): those the environment names (http_proxy, https_proxy),
+ * as freemac's network settings set them, in SystemConfiguration's keys. */
+CFDictionaryRef SCDynamicStoreCopyProxies(SCDynamicStoreRef store)
+{
+    NSMutableDictionary *d = [NSMutableDictionary dictionary];
+    struct { const char *env; NSString *enable, *host, *port; } kinds[] = {
+        {"http_proxy", @"HTTPEnable", @"HTTPProxy", @"HTTPPort"},
+        {"https_proxy", @"HTTPSEnable", @"HTTPSProxy", @"HTTPSPort"},
+    };
+    for (size_t i = 0; i < 2; i++) {
+        const char *v = getenv(kinds[i].env);
+        if (!v || !*v)
+            continue;
+        NSURL *u = [NSURL URLWithString:[NSString stringWithUTF8String:v]];
+        if (!u.host)
+            continue;
+        d[kinds[i].enable] = @1;
+        d[kinds[i].host] = u.host;
+        d[kinds[i].port] = u.port ? u.port : @80;
+    }
+    return (CFDictionaryRef)[d copy];
+}
