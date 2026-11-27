@@ -74,11 +74,9 @@ NSString *const NSURLVolumeAvailableCapacityKey = @"NSURLVolumeAvailableCapacity
 NSString *const NSURLVolumeAvailableCapacityForImportantUsageKey = @"NSURLVolumeAvailableCapacityForImportantUsageKey";
 NSString *const NSURLVolumeAvailableCapacityForOpportunisticUsageKey =
     @"NSURLVolumeAvailableCapacityForOpportunisticUsageKey";
-NSString *const NSURLVolumeURLKey = @"NSURLVolumeURLKey";
 NSString *const NSURLVolumeNameKey = @"NSURLVolumeNameKey";
 NSString *const NSURLVolumeLocalizedNameKey = @"NSURLVolumeLocalizedNameKey";
 NSString *const NSURLVolumeIsReadOnlyKey = @"NSURLVolumeIsReadOnlyKey";
-NSString *const NSURLVolumeSupportsCaseSensitiveNamesKey = @"NSURLVolumeSupportsCaseSensitiveNamesKey";
 NSString *const NSURLVolumeIsRemovableKey = @"NSURLVolumeIsRemovableKey";
 NSString *const NSURLFileResourceTypeKey = @"NSURLFileResourceTypeKey";
 NSString *const NSURLFileResourceTypeNamedPipe = @"NSURLFileResourceTypeNamedPipe";

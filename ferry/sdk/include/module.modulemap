@@ -106,8 +106,8 @@ module ApplicationServices [system] {
 module AudioToolbox [system] {
     header "AudioToolbox/AudioToolbox.h"
     header "AudioToolbox/AUComponent.h"
-    header "AudioToolbox/AudioCodec.h"
     header "AudioToolbox/AUGraph.h"
+    header "AudioToolbox/AudioCodec.h"
     header "AudioToolbox/AudioComponent.h"
     header "AudioToolbox/AudioConverter.h"
     header "AudioToolbox/AudioFormat.h"

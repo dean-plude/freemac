@@ -442,13 +442,6 @@ kern_return_t IORegistryEntryCreateCFProperties(io_registry_entry_t entry, CFMut
 /* comparing objects, a parent and registry entry IDs (freemac Godot work):
  * with no registry the only object is the null one */
 boolean_t IOObjectIsEqualTo(io_object_t object, io_object_t anObject) { return object == anObject; }
-kern_return_t IORegistryEntryGetParentEntry(io_registry_entry_t entry, const io_name_t plane,
-                                            io_registry_entry_t *parent)
-{
-    if (parent)
-        *parent = IO_OBJECT_NULL;
-    return kIOReturnNoDevice;
-}
 kern_return_t IORegistryEntryGetRegistryEntryID(io_registry_entry_t entry, uint64_t *entryID)
 {
     if (entryID)
