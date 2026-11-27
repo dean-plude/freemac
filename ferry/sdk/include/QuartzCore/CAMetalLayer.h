@@ -1,11 +1,16 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * CAMetalLayer, from Apple's public documentation. With no Metal device
- * (Metal/Metal.h) the layer is an ordinary layer that keeps its settings,
- * and nextDrawable answers nil, as when a Mac has no drawable to give. */
+ * CAMetalLayer, from Apple's public documentation. With Ferry's Metal
+ * device the layer gives drawables whose textures, presented, become its
+ * contents; without one nextDrawable answers nil, as when a Mac has no
+ * drawable to give. */
 #ifndef FERRY_CAMETALLAYER_H
 #define FERRY_CAMETALLAYER_H
 #import <QuartzCore/CALayer.h>
-#import <Metal/Metal.h>
+#import <Metal/MTLPixelFormat.h>
+#import <Metal/MTLDrawable.h>
+
+@protocol MTLDevice;
+@protocol MTLTexture;
 
 @class CAMetalLayer;
 @protocol CAMetalDrawable <MTLDrawable>

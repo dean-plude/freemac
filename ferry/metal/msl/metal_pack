@@ -1,0 +1,3 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later
+ * Ferry's Metal Shading Language: <metal_pack> brings in the whole library. */
+#include "__metal_texture.h"
