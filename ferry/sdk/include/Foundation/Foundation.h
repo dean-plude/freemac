@@ -778,6 +778,8 @@ FOUNDATION_EXPORT NSStringTransform const NSStringTransformToXMLHex, NSStringTra
 @property (readonly, copy) NSArray<ObjectType> *allValues;
 - (NSArray<KeyType> *)allKeysForObject:(ObjectType)obj;
 - (NSArray<KeyType> *)keysSortedByValueUsingSelector:(SEL)comparator;
+- (NSArray<KeyType> *)keysSortedByValueUsingComparator:(NSComparator)cmptr;
+- (NSArray<KeyType> *)keysSortedByValueWithOptions:(NSSortOptions)opts usingComparator:(NSComparator)cmptr;
 - (BOOL)isEqualToDictionary:(NSDictionary<KeyType, ObjectType> *)other;
 - (void)enumerateKeysAndObjectsUsingBlock:(void (^)(KeyType key, ObjectType obj, BOOL *stop))block;
 - (NSEnumerator<ObjectType> *)objectEnumerator;
@@ -1789,6 +1791,7 @@ typedef NS_OPTIONS(NSUInteger, NSDateComponentsFormatterZeroFormattingBehavior) 
 @property (readonly, copy) NSString *password;
 @property (readonly) BOOL hasDirectoryPath;
 @property (readonly, copy) NSURL *URLByStandardizingPath;
+@property (readonly, copy) NSURL *standardizedURL;   /* freemac 1.262 */
 @property (readonly, copy) NSURL *URLByResolvingSymlinksInPath;
 @property (readonly, copy) NSString *absoluteString;
 @property (readonly, copy) NSString *scheme;
@@ -2284,6 +2287,8 @@ FOUNDATION_EXPORT NSURLResourceKey const NSURLNameKey, NSURLLocalizedNameKey, NS
     NSURLLocalizedTypeDescriptionKey, NSURLLinkCountKey, NSURLFileResourceIdentifierKey, NSURLFileResourceTypeKey;
 /* freemac 1.224: the volume an item is on (its device number) */
 FOUNDATION_EXPORT NSURLResourceKey const NSURLVolumeIdentifierKey;
+/* freemac 1.262: whether the volume is on this computer, not a network share */
+FOUNDATION_EXPORT NSURLResourceKey const NSURLVolumeIsLocalKey;
 /* a volume's size and free space, in bytes (freemac OBS work); the free
  * space is the same for important and opportunistic use */
 FOUNDATION_EXPORT NSURLResourceKey const NSURLVolumeTotalCapacityKey, NSURLVolumeAvailableCapacityKey,
@@ -2589,6 +2594,7 @@ typedef NSString *NSNotificationName;
 @interface NSNotification : NSObject <NSCopying>
 + (instancetype)notificationWithName:(NSNotificationName)name object:(id)object;
 + (instancetype)notificationWithName:(NSNotificationName)name object:(id)object userInfo:(NSDictionary *)info;
+- (instancetype)initWithName:(NSNotificationName)name object:(id)object userInfo:(NSDictionary *)userInfo;
 @property (readonly, copy) NSNotificationName FERRY_SWIFT_NONNULL name;
 @property (readonly, retain) id object;
 @property (readonly, copy) NSDictionary *userInfo;

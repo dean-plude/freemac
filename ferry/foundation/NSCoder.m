@@ -350,7 +350,11 @@ static void write_int(void *addr, size_t size, int64_t v)
 static BOOL private_class(id obj)
 {
     const char *n = object_getClassName(obj);
-    return (n[0] == 'F' && n[1] >= 'A' && n[1] <= 'Z') || !strncmp(n, "NSConcrete", 10) || !strncmp(n, "__NSCF", 6);
+    return (n[0] == 'F' && n[1] >= 'A' && n[1] <= 'Z') || !strncmp(n, "NSConcrete", 10) || !strncmp(n, "__NSCF", 6) ||
+           /* Swift's own storage for a bridged array, dictionary, set or
+            * string, such as _TtGCs23_ContiguousArrayStorage...: archived as
+            * the public class, as on a Mac (freemac 1.262) */
+           !strncmp(n, "_TtCs", 5) || !strncmp(n, "_TtGCs", 6) || !strncmp(n, "__Swift", 7);
 }
 
 @implementation NSObject (NSArchiving)
@@ -1154,6 +1158,10 @@ enum { UNSEEN, DECODING, DONE };
         [others addObjectsFromArray:chain];
     for (id n in others) {
         if (![n isKindOfClass:[NSString class]] || [n isEqualToString:@"NSObject"])
+            continue;
+        /* Swift's private storage classes can't be made from an archive;
+         * the public class further up the chain can (freemac 1.262) */
+        if ([n hasPrefix:@"_TtCs"] || [n hasPrefix:@"_TtGCs"] || [n hasPrefix:@"__Swift"])
             continue;
         cls = [self classForClassName:n] ?: NSClassFromString(n);
         if (cls) {

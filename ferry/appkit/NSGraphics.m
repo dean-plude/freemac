@@ -19,6 +19,19 @@ void AWarnOnce(const char *what)
     fprintf(stderr, "AppKit (Ferry): %s isn't supported yet\n", what);
 }
 
+void ANoteOnce(const char *sentence)
+{
+    static NSMutableSet *said;
+    if (!said)
+        said = [[NSMutableSet alloc] init];
+    NSString *key = @(sentence);
+    if ([said containsObject:key])
+        return;
+    [said addObject:key];
+    fflush(stdout);
+    fprintf(stderr, "AppKit (Ferry): %s\n", sentence);
+}
+
 void AMainThreadOnly(const char *what)
 {
     static int said;

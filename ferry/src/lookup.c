@@ -288,6 +288,8 @@ const struct ferry_symbol ferry_core_symbols[] = {
     {"ferry_gl_symbol", ferry_gl_symbol},
     /* Ferry's own: this system's Xlib, for screen capture (host.c, freemac 1.238) */
     {"ferry_capture_symbol", ferry_capture_symbol},
+    /* Ferry's own: this system's cameras, for AVFoundation (camera.c, freemac 1.257) */
+    {"ferry_camera_symbol", ferry_camera_symbol},
     {NULL, NULL},
 };
 
@@ -338,6 +340,8 @@ void *ferry_lookup(const char *name)
         if ((addr = find_own(base)))
             return addr;
     }
+    if ((addr = ferry_unwind_lookup(base)))
+        return addr;
     if ((addr = find_passthrough(base)))
         return addr;
     if ((addr = ferry_host_lookup(base)))

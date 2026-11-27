@@ -128,12 +128,12 @@ public struct URL: Hashable, Sendable, Codable, CustomStringConvertible, CustomD
 
     internal init(_ns url: NSURL) { _url = url }
 
-    public init?(string: String) {
+    public init?(string: __shared String) {
         guard !string.isEmpty, let u = NSURL(string: string) else { return nil }
         _url = u
     }
 
-    public init?(string: String, relativeTo base: URL?) {
+    public init?(string: __shared String, relativeTo base: __shared URL?) {
         guard !string.isEmpty else { return nil }
         let made: NSURL?
         if let base { made = NSURL(string: string, relativeTo: base) } else { made = NSURL(string: string) }
@@ -141,11 +141,7 @@ public struct URL: Hashable, Sendable, Codable, CustomStringConvertible, CustomD
         _url = u
     }
 
-    public init(fileURLWithPath path: String) { _url = NSURL(fileURLWithPath: path) }
 
-    public init(fileURLWithPath path: String, isDirectory: Bool) {
-        _url = NSURL.fileURL(withPath: path, isDirectory: isDirectory) as NSURL
-    }
 
     public init(fileURLWithPath path: String, relativeTo base: URL?) {
         if path.hasPrefix("/") || base == nil { self.init(fileURLWithPath: path) }
@@ -188,7 +184,6 @@ public struct URL: Hashable, Sendable, Codable, CustomStringConvertible, CustomD
     public var hasDirectoryPath: Bool { _url.hasDirectoryPath }
     public var standardized: URL { _url.standardizingPath ?? self }
     public var standardizedFileURL: URL { isFileURL ? standardized : self }
-    public var resolvingSymlinksInPath: URL { _url.resolvingSymlinksInPath ?? self }
 
     public func withUnsafeFileSystemRepresentation<R>(_ body: (UnsafePointer<CChar>?) throws -> R) rethrows -> R {
         try path.withCString { try body($0) }

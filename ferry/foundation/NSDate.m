@@ -394,6 +394,8 @@ static NSString *percent_encode_path(NSString *s)
 }
 - (NSURL *)URLByDeletingPathExtension { return [self withPath:[[self path] stringByDeletingPathExtension]]; }
 - (NSURL *)URLByStandardizingPath { return [self withPath:[[self path] stringByStandardizingPath]]; }
+/* freemac 1.262 (IINA): the URL with . and .. taken out of its path */
+- (NSURL *)standardizedURL { return [self path] ? [self URLByStandardizingPath] : self; }
 - (NSURL *)URLByResolvingSymlinksInPath
 {
     if (![self isFileURL])

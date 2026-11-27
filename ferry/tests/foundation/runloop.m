@@ -29,6 +29,17 @@ void FerryRunLoopRemoveDescriptor(int fd);
 }
 @end
 
+static int watched_gone;
+@interface Watched : NSObject
+@end
+@implementation Watched
+- (void)dealloc
+{
+    watched_gone = 1;
+    [super dealloc];
+}
+@end
+
 static void readable(int fd, void *ctx)
 {
     char buf[32];
@@ -110,6 +121,14 @@ int main(void)
         [nc removeObserver:t];
         [nc postNotificationName:@"Changed" object:@"sender"];
         printf("after removal: nothing above\n");
+        /* a posted notification doesn't keep its object in the pool (1.259) */
+        Watched *w = [[Watched alloc] init];
+        [nc postNotificationName:@"Changed" object:w];
+        [w release];
+        printf("object let go right after posting %d\n", watched_gone);
+        NSNotification *made_note = [[NSNotification alloc] initWithName:@"Made" object:nil userInfo:@{@"k": @"v"}];
+        printf("initWithName %s %s\n", [[made_note name] UTF8String], [made_note.userInfo[@"k"] UTF8String]);
+        [made_note release];
 
         /* toll-free bridging: CF calls on Foundation objects and back */
         CFStringRef cs = (CFStringRef)@"bridged";

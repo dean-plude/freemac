@@ -15,6 +15,7 @@ NSString *const MPMediaItemPropertyAlbumTrackCount = @"albumTrackCount";
 NSString *const MPMediaItemPropertyGenre = @"genre";
 NSString *const MPMediaItemPropertyPlaybackDuration = @"playbackDuration";
 NSString *const MPMediaItemPropertyArtwork = @"artwork";
+NSString *const MPMediaItemPropertyMediaType = @"mediaType";   /* freemac 1.262 */
 NSString *const MPNowPlayingInfoPropertyElapsedPlaybackTime = @"MPNowPlayingInfoPropertyElapsedPlaybackTime";
 NSString *const MPNowPlayingInfoPropertyPlaybackRate = @"MPNowPlayingInfoPropertyPlaybackRate";
 NSString *const MPNowPlayingInfoPropertyDefaultPlaybackRate = @"MPNowPlayingInfoPropertyDefaultPlaybackRate";
@@ -63,6 +64,12 @@ NSString *const MPNowPlayingInfoPropertyMediaType = @"MPNowPlayingInfoPropertyMe
     NSTimeInterval _interval;
 }
 - (NSTimeInterval)interval { return _interval; }
+@end
+@implementation MPChangePlaybackRateCommandEvent {
+@package
+    float _rate;
+}
+- (float)playbackRate { return _rate; }
 @end
 
 /* ---- commands ----------------------------------------------------------------------- */
@@ -164,6 +171,22 @@ NSString *const MPNowPlayingInfoPropertyMediaType = @"MPNowPlayingInfoPropertyMe
 }
 - (Class)_ferryEventClass { return [MPSkipIntervalCommandEvent class]; }
 @end
+@implementation MPChangePlaybackRateCommand {
+    NSArray *_rates;
+}
+- (void)dealloc
+{
+    [_rates release];
+    [super dealloc];
+}
+- (NSArray<NSNumber *> *)supportedPlaybackRates { return _rates ?: @[]; }
+- (void)setSupportedPlaybackRates:(NSArray<NSNumber *> *)a
+{
+    [_rates autorelease];
+    _rates = [a copy];
+}
+- (Class)_ferryEventClass { return [MPChangePlaybackRateCommandEvent class]; }
+@end
 @implementation MPChangePlaybackPositionCommand
 - (Class)_ferryEventClass { return [MPChangePlaybackPositionCommandEvent class]; }
 @end
@@ -237,7 +260,7 @@ COMMAND(seekBackwardCommand, MPRemoteCommand)
 COMMAND(skipForwardCommand, MPSkipIntervalCommand)
 COMMAND(skipBackwardCommand, MPSkipIntervalCommand)
 COMMAND(changePlaybackPositionCommand, MPChangePlaybackPositionCommand)
-COMMAND(changePlaybackRateCommand, MPRemoteCommand)
+COMMAND(changePlaybackRateCommand, MPChangePlaybackRateCommand)
 COMMAND(changeRepeatModeCommand, MPChangeRepeatModeCommand)
 COMMAND(changeShuffleModeCommand, MPChangeShuffleModeCommand)
 COMMAND(ratingCommand, MPRatingCommand)

@@ -31,7 +31,7 @@
 #define ALIGN_DOWN(x) ((x) & ~(PAGE - 1))
 #define ALIGN_UP(x) (((x) + PAGE - 1) & ~(PAGE - 1))
 #define MAX_SEGMENTS 32
-#define MAX_DYLIBS 64
+#define MAX_DYLIBS 256 /* IINA's program names 80 (freemac 1.262) */
 #define MAX_SECTIONS 128
 
 struct section {
@@ -448,11 +448,17 @@ static int is_class_symbol(const char *raw)
 static int looks_like_string_constant(const char *raw)
 {
     static const char *const ends[] = {"Key", "Notification", "Name", "Operation", "Attribute", "Identifier",
-                                       "Binding", "Option", "Domain", "AccountID", "Mode", "Type", NULL};
+                                       "Binding", "Option", "Domain", "AccountID", "Mode", "Type", "Template",
+                                       NULL};
     const char *n = raw[0] == '_' ? raw + 1 : raw;
     if (n[0] == 'k' && n[1] >= 'A' && n[1] <= 'Z')
         return 1;
-    if (strncmp(n, "NS", 2) || n[2] < 'A' || n[2] > 'Z')
+    /* a framework's prefix (NS, MP, AV...) and a word: MPMediaItemPropertyMediaType
+     * as much as NSImageNameTouchBarPlayTemplate (freemac 1.262) */
+    size_t upper = 0;
+    while (n[upper] >= 'A' && n[upper] <= 'Z')
+        upper++;
+    if (upper < 3 || upper > 4 || n[upper] < 'a' || n[upper] > 'z')
         return 0;
     size_t len = strlen(n);
     for (int i = 0; ends[i]; i++) {
@@ -941,7 +947,10 @@ static const struct { const char *name, *served_by; } framework_aliases[] = {
     {"AudioUnit", "CoreAudio"},
     {"MediaPlayer", "AppKit"},       /* remote commands and Now Playing, appkit/MediaPlayer.m (1.233) */
     {"CoreMedia", "AppKit"},         /* CMTime, appkit/CoreMedia.m (1.233) */
+    {"CoreMediaIO", "AppKit"},       /* the system object, appkit/CoreMediaIO.m (1.257) */
     {"AddressBook", "AppKit"},       /* an empty book, appkit/AddressBook.m (1.233) */
+    {"PIP", "AppKit"},               /* picture in picture (a private framework), appkit/PIP.m (1.262) */
+    {"VideoToolbox", "AppKit"},      /* no hardware codecs, appkit/VideoToolbox.m (1.262) */
     {NULL, NULL},
 };
 
@@ -1017,6 +1026,18 @@ static int expand_path(struct image *loader, const char *name, char *out, size_t
                 if (!expand_path(search[k], search[k]->rpaths[i], base, sizeof base))
                     continue;
                 snprintf(out, size, "%s/%s", base, name + 7);
+                /* /usr/lib/swift: on a Mac, the system's copy of Swift's
+                 * libraries, taken before an app's own older copies (an app
+                 * built for macOS 10.13 lists it first); here, Ferry's copy,
+                 * when Ferry has that library (freemac 1.262) */
+                if (!strcmp(base, "/usr/lib/swift") || !strcmp(base, "/usr/lib/swift/")) {
+                    char mine[4096];
+                    if (ferry_find_swift_library(out, mine, sizeof mine)) {
+                        snprintf(out, size, "%s", mine);
+                        return 1;
+                    }
+                    continue;
+                }
                 if (file_exists(out))
                     return 1;
             }

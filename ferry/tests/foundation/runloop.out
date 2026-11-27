@@ -19,6 +19,8 @@ observer got Changed from sender, info v
 block observer got Changed
 observer got Changed from other, info (null)
 after removal: nothing above
+object let go right after posting 1
+initWithName Made v
 CFStringGetLength 7, prefix 1
 NSDictionary sees 99, count 1
 CFStringGetCString n=5

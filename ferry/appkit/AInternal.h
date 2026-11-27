@@ -74,6 +74,8 @@ CGFloat AScreenScale(void);
  * an axis with neither, its place in proportion. */
 NSRect AInitialWindowRect(NSRect rect, NSRect designScreen, unsigned mask);
 void AWarnOnce(const char *what);
+/* Says a whole sentence on stderr once, as it is (AWarnOnce adds "isn't supported yet"). */
+void ANoteOnce(const char *sentence);
 
 /* An image or colour from a bundle's asset catalogue, as ferry-actool
  * compiled it (NSAssets.m); nil when the bundle has none of that name. */
@@ -404,6 +406,21 @@ void ANoteRecentDocumentsMenu(NSMenu *menu);
 + (BOOL)isNibArchive:(NSData *)data;
 - (instancetype)initForReadingWithData:(NSData *)data;
 - (NSArray *)_decodeArrayKeepingNullsForKey:(NSString *)key;
+@end
+/* Loads a nib with objects handed in from outside, by the names its
+ * NSNibExternalObjectPlaceholders give (freemac 1.260). */
+@interface NSNib (FerryExternalObjects)
+- (BOOL)_instantiateWithOwner:(id)owner
+              externalObjects:(NSDictionary *)externals
+              topLevelObjects:(NSArray **)topLevelObjects;
+@end
+/* Storyboards (NSStoryboard.m): the storyboard whose scene is being
+ * loaded, if any, and where one of its nibs is. */
+CGWindowID ACGWindowNumberForView(int64_t view); /* CGServices.m */
+NSStoryboard *AStoryboardLoading(void);
+void ALoadMainStoryboard(void);
+@interface NSStoryboard (FerryPrivate)
+- (NSString *)_pathForNibNamed:(NSString *)name;
 @end
 NSRect AViewFrameFromCoder(NSCoder *coder);
 void AViewDecode(NSView *view, NSCoder *coder);

@@ -27,4 +27,12 @@ no display, allowed: content 0, error -3814, preflight 1
 a configuration's defaults: 1920x1080 BGRA, queue 3, cursor 1, aspect 1, audio 0 at 48000 Hz, 2 channels
 a stream with no display: error -3802
 a display stream with no display: made 0, started 0
+1001/30000 at 1000, default: 33/1000
+toward zero: 33/1000
+away from zero: 34/1000
+-25/10 at 1, half away: -3/1
+toward +infinity: -2/1
+toward -infinity: -3/1
+exact: 300/1000, rounded 0; rounded one marked 1
+codec types: ap4h dvh6 rle 
 exit=0

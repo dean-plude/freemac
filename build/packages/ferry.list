@@ -1,9 +1,15 @@
 # Libraries Ferry, freemac's runner for Mac apps, loads when a Mac app needs
 # them: libc++ for apps written in C++, 7-Zip to open disk images (.dmg) and
-# libcurl for networking. Installed with Ferry's own package (FERRY_DEB);
+# libcurl for networking, libturbojpeg for cameras that send Motion JPEG,
+# and clang and lld, which build a Metal app's shaders when it runs
+# (freemac 1.262).
+# Installed with Ferry's own package (FERRY_DEB);
 # Ferry carries on without any of them, so a missing one only turns off what
 # it does.
 libc++1
 libc++abi1
 7zip
 libcurl4t64
+libturbojpeg
+clang
+lld

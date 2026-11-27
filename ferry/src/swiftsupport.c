@@ -15,6 +15,7 @@
 #include <math.h>
 #include <semaphore.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -114,6 +115,34 @@ static sem_t *mac_sem_open(const char *name, int mac_flags, ...)
  * use a system library of prespecialised generics; Ferry has none. */
 static const char *mac_progname;
 
+/* Two of the standard library's questions about the macOS version, which
+ * Swift 6.2 and later compile @available checks and the like into, and
+ * which Ferry's build of Swift's runtime doesn't have (freemac 1.260,
+ * Rectangle). They answer from the version Ferry presents (sysversion.c).
+ * The first is Swift's own function, taking the version wanted and the
+ * Mac Catalyst one (which doesn't apply here) as six machine words; Swift
+ * passes and returns those as C does. */
+struct swift_os_version { intptr_t major, minor, patch; };
+
+static struct swift_os_version mac_swift_stdlib_operatingSystemVersion(void)
+{
+    uint32_t v = ferry_macos_version_packed();
+    struct swift_os_version r = {v >> 16, v >> 8 & 0xff, v & 0xff};
+    return r;
+}
+
+static bool mac_swift_isOSVersionAtLeastOrVariant(intptr_t major, intptr_t minor, intptr_t patch, intptr_t vmajor,
+                                                  intptr_t vminor, intptr_t vpatch)
+{
+    (void)vmajor, (void)vminor, (void)vpatch;
+    struct swift_os_version os = mac_swift_stdlib_operatingSystemVersion();
+    if (os.major != major)
+        return os.major > major;
+    if (os.minor != minor)
+        return os.minor > minor;
+    return os.patch >= patch;
+}
+
 const struct ferry_symbol ferry_swift_symbols[] = {
     {"__divti3", __divti3},
     {"__modti3", __modti3},
@@ -156,5 +185,7 @@ const struct ferry_symbol ferry_swift_symbols[] = {
     {"memset_pattern4", mac_memset_pattern4},
     {"memset_pattern8", mac_memset_pattern8},
     {"memset_pattern16", mac_memset_pattern16},
+    {"_swift_stdlib_operatingSystemVersion", mac_swift_stdlib_operatingSystemVersion},
+    {"$ss042_stdlib_isOSVersionAtLeastOrVariantVersiondE0yBi1_Bw_BwBwBwBwBwtF", mac_swift_isOSVersionAtLeastOrVariant},
     {NULL, NULL},
 };

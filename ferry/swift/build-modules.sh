@@ -68,7 +68,7 @@ module() {
         $noconc $plugins -disable-implicit-string-processing-module-import \
         -disable-autolinking-runtime-compatibility-dynamic-replacements \
         -disable-autolinking-runtime-compatibility-concurrency \
-        -enable-library-evolution -emit-module-path "$mod/x86_64-apple-macos.swiftmodule" \
+        -enable-library-evolution -autolink-force-load -emit-module-path "$mod/x86_64-apple-macos.swiftmodule" \
         -emit-module-interface-path "$mod/x86_64-apple-macos.swiftinterface" \
         -o "$build/$name.o"
     # shellcheck disable=SC2086
@@ -87,6 +87,7 @@ fi
 
 o=$here/overlays
 module ObjectiveC "-lswiftCore" "$o"/ObjectiveC/*.swift
+module CoreFoundation "-lswiftCore -framework CoreFoundation" "$o"/CoreFoundation/*.swift
 module CoreGraphics "-lswiftCore -framework CoreGraphics" "$o"/CoreGraphics/*.swift
 module Dispatch "-lswiftCore -lswiftObjectiveC" "$o"/Dispatch/*.swift
 if [ -d "$o/Foundation" ] && [ -n "$(ls "$o/Foundation")" ]; then

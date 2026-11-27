@@ -1638,7 +1638,7 @@ struct _NSModalSession {
 @end
 
 /* Makes the application object (the Info.plist's NSPrincipalClass, else
- * NSApplication) and runs it. Nibs come with Ferry's next milestone. */
+ * NSApplication), loads the main nib or main storyboard, and runs it. */
 int NSApplicationMain(int argc, const char *argv[])
 {
     @autoreleasepool {
@@ -1649,8 +1649,8 @@ int NSApplicationMain(int argc, const char *argv[])
         if ([nib isKindOfClass:[NSString class]] && [nib length]) {
             if (![NSBundle loadNibNamed:nib owner:NSApp])
                 fprintf(stderr, "ferry: the app's main nib, %s, couldn't be loaded\n", [nib UTF8String]);
-        } else if (info[@"NSMainStoryboardFile"]) {
-            AWarnOnce("storyboards (the app's main storyboard isn't loaded)");
+        } else if ([info[@"NSMainStoryboardFile"] isKindOfClass:[NSString class]]) {
+            ALoadMainStoryboard();
         }
     }
     [NSApp run];

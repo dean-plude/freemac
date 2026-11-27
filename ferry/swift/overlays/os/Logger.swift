@@ -41,7 +41,7 @@ public final class OSLog: @unchecked Sendable {
     /// A log that keeps nothing.
     public static let disabled = OSLog(nil)
 
-    public func isEnabled(type: OSLogType) -> Bool { log.map { os_log_type_enabled($0, type.rawValue) } ?? false }
+    public func isEnabled(type: OSLogType) -> Bool { log.map { os_log_type_enabled($0, os_log_type_t(rawValue: type.rawValue)) } ?? false }
 }
 
 /// Logs a message given as a printf-style format, as C's os_log does.
@@ -50,7 +50,7 @@ public func os_log(_ message: StaticString, dso: UnsafeRawPointer? = nil, log: O
     message.withUTF8Buffer { buf in
         let format = String(decoding: buf, as: UTF8.self)
         guard let l = log.log else { return }
-        withVaList(args) { ferry_os_logv(l, type.rawValue, format, $0) }
+        withVaList(args) { ferry_os_logv(l, os_log_type_t(rawValue: type.rawValue), format, $0) }
     }
 }
 
@@ -59,7 +59,7 @@ public func os_log(_ type: OSLogType, dso: UnsafeRawPointer? = nil, log: OSLog =
     message.withUTF8Buffer { buf in
         let format = String(decoding: buf, as: UTF8.self)
         guard let l = log.log else { return }
-        withVaList(args) { ferry_os_logv(l, type.rawValue, format, $0) }
+        withVaList(args) { ferry_os_logv(l, os_log_type_t(rawValue: type.rawValue), format, $0) }
     }
 }
 
@@ -217,7 +217,7 @@ public struct Logger: @unchecked Sendable {
 
     public func log(level: OSLogType, _ message: OSLogMessage) {
         guard let l = log.log, log.isEnabled(type: level) else { return }
-        ferry_os_log_message(l, level.rawValue, message.interpolation.text)
+        ferry_os_log_message(l, os_log_type_t(rawValue: level.rawValue), message.interpolation.text)
     }
     public func log(_ message: OSLogMessage) { log(level: .default, message) }
     public func trace(_ message: OSLogMessage) { log(level: .debug, message) }

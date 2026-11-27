@@ -61,11 +61,14 @@ func _kvcKey<Root, Value>(_ keyPath: KeyPath<Root, Value>) -> String {
     return key
 }
 
-extension _KeyValueCodingAndObserving where Self: NSObject {
+// On the protocol itself, as on a Mac, so a Mac app's call reaches it by
+// the same name (freemac 1.260); only NSObjects take the protocol.
+extension _KeyValueCodingAndObserving {
     public func observe<Value>(_ keyPath: KeyPath<Self, Value>, options: NSKeyValueObservingOptions = [],
                                changeHandler: @escaping (Self, NSKeyValueObservedChange<Value>) -> Void)
         -> NSKeyValueObservation {
-        let o = NSKeyValueObservation(object: self, key: _kvcKey(keyPath)) { object, change in
+        let target = self as AnyObject as! NSObject
+        let o = NSKeyValueObservation(object: target, key: _kvcKey(keyPath)) { object, change in
             guard let me = object as? Self else { return }
             let raw = change[NSKeyValueChangeKindKey] as? NSNumber
             let kind = raw.flatMap { NSKeyValueChange(rawValue: $0.uintValue) } ?? .setting
@@ -84,6 +87,9 @@ extension _KeyValueCodingAndObserving where Self: NSObject {
         return o
     }
 
+}
+
+extension _KeyValueCodingAndObserving where Self: NSObject {
     public func willChangeValue<Value>(for keyPath: KeyPath<Self, Value>) { willChangeValue(forKey: _kvcKey(keyPath)) }
     public func didChangeValue<Value>(for keyPath: KeyPath<Self, Value>) { didChangeValue(forKey: _kvcKey(keyPath)) }
 }

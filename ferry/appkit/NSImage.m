@@ -439,6 +439,21 @@ static NSArray *image_extensions(void)
     return im;
 }
 
+/* For Swift's NSImage(imageLiteralResourceName:) (freemac 1.260): a new
+ * image with the representations of the image of that name, or an empty
+ * one if there is none, as a Mac gives. */
+- (instancetype)initWithFerryImageLiteralName:(NSString *)name
+{
+    NSImage *found = [NSImage imageNamed:name];
+    if (!found)
+        fprintf(stderr, "ferry: the app has no image named %s\n", [name UTF8String]);
+    if (!(self = [self initWithSize:found ? [found size] : NSMakeSize(0, 0)]))
+        return nil;
+    for (NSImageRep *rep in [found representations])
+        [self addRepresentation:rep];
+    return self;
+}
+
 + (instancetype)imageWithSize:(NSSize)size flipped:(BOOL)flipped drawingHandler:(BOOL (^)(NSRect))handler
 {
     NSImage *im = [[[self alloc] initWithSize:size] autorelease];

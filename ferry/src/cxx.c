@@ -113,7 +113,7 @@ void *ferry_cxx_symbol(const char *name)
             missing = name;                                                                                    \
     } while (0)
 
-static void open_cxx(void)
+static void open_cxx(int soft)
 {
     const char *path = getenv("FERRY_LIBCXX");
     if (!path || !*path)
@@ -124,6 +124,8 @@ static void open_cxx(void)
     if (dlsym(RTLD_DEFAULT, "__cxa_throw") && ferry_verbose)
         fprintf(stderr, "ferry: another C++ runtime is already loaded; C++ exceptions may not work\n");
     cxx_handle = dlopen(path, RTLD_NOW | RTLD_LOCAL);
+    if (!cxx_handle && soft)
+        return;
     if (!cxx_handle) {
         fflush(stdout);
         fprintf(stderr,
@@ -174,11 +176,30 @@ int ferry_cxx_library(const char *install_name)
         if (!strcmp(install_name, mac_names[i])) {
             if (!cxx_tried) {
                 cxx_tried = 1;
-                open_cxx();
+                open_cxx(0);
             }
             return 1;
         }
     return 0;
+}
+
+/* The unwinder's own calls (_Unwind_RaiseException and the rest), which a
+ * program that isn't C++ can call too: LuaJIT raises its errors with them
+ * (freemac 1.262, IINA). They have to be the unwinder Ferry has described
+ * the Mac images to, LLVM's libunwind, not this system's libgcc_s, which
+ * knows nothing of those images; so the C++ runtime is opened for them. */
+void *ferry_unwind_lookup(const char *name)
+{
+    if (strncmp(name, "_Unwind_", 8) || !strcmp(name, "_Unwind_Resume"))
+        return NULL;
+    if (!cxx_tried) {
+        cxx_tried = 1;
+        open_cxx(1);
+    }
+    if (!ferry_cxx_active)
+        return NULL;
+    void *addr = unwind_handle ? dlsym(unwind_handle, name) : NULL;
+    return addr ? addr : dlsym(cxx_handle, name);
 }
 
 /* The names this system's libc++ and libc++abi serve: mangled C++ names

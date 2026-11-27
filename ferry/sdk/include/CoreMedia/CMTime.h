@@ -27,6 +27,10 @@ typedef struct {
     CMTime start;
     CMTime duration;
 } CMTimeRange;
+typedef struct {
+    CMTimeRange source;
+    CMTimeRange target;
+} CMTimeMapping;   /* freemac 1.262 */
 extern const CMTime kCMTimeInvalid;
 extern const CMTime kCMTimeIndefinite;
 extern const CMTime kCMTimePositiveInfinity;
@@ -38,7 +42,17 @@ double CMTimeGetSeconds(CMTime time);
 int32_t CMTimeCompare(CMTime time1, CMTime time2);
 CMTime CMTimeAdd(CMTime lhs, CMTime rhs);
 CMTime CMTimeSubtract(CMTime lhs, CMTime rhs);
-CMTime CMTimeConvertScale(CMTime time, int32_t newTimescale, uint32_t method);
+typedef uint32_t CMTimeRoundingMethod;
+enum {
+    kCMTimeRoundingMethod_RoundHalfAwayFromZero = 1,
+    kCMTimeRoundingMethod_RoundTowardZero = 2,
+    kCMTimeRoundingMethod_RoundAwayFromZero = 3,
+    kCMTimeRoundingMethod_QuickTime = 4,
+    kCMTimeRoundingMethod_RoundTowardPositiveInfinity = 5,
+    kCMTimeRoundingMethod_RoundTowardNegativeInfinity = 6,
+    kCMTimeRoundingMethod_Default = kCMTimeRoundingMethod_RoundHalfAwayFromZero,
+};
+CMTime CMTimeConvertScale(CMTime time, int32_t newTimescale, CMTimeRoundingMethod method);
 CMTimeRange CMTimeRangeMake(CMTime start, CMTime duration);
 #define CMTIME_IS_VALID(t) (((t).flags & kCMTimeFlags_Valid) != 0)
 #define CMTIME_IS_INVALID(t) (!CMTIME_IS_VALID(t))

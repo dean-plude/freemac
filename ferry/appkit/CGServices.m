@@ -113,6 +113,9 @@ const CFStringRef kCGWindowBackingLocationVideoMemory = (CFStringRef)@"kCGWindow
  * meet the app's own window numbers (which count up from 1). */
 static const CGWindowID other_bit = 0x40000000;
 
+/* The number another app's window, Wayfire's view, has in the list. */
+CGWindowID ACGWindowNumberForView(int64_t view) { return other_bit | (CGWindowID)(view & 0x3fffffff); }
+
 /* One window of the list. */
 @interface ACGWindowEntry : NSObject {
 @public

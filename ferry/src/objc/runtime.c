@@ -344,6 +344,7 @@ static void realize_compiled(Class cls)
             fprintf(stderr, "ferry: moving the ivars of %s by %u bytes\n", rt->name, diff);
     }
     rt->instance_size = size + diff;
+    rt->slide = diff;
     if (il && il->count) {
         rt->ivars = calloc(il->count, sizeof *rt->ivars);
         rt->nivars = il->count;
@@ -353,6 +354,7 @@ static void realize_compiled(Class cls)
             v->offset = iv->offset ? iv->offset : &v->own_offset;
             if (iv->offset && diff)
                 *iv->offset += diff;
+            v->placed = *v->offset;
             v->name = iv->name;
             v->type = iv->type;
             v->align_log2 = iv->align_log2;
@@ -582,8 +584,44 @@ static void call_class_load(Class cls)
     }
 }
 
+/* FERRY_REPORT_SELECTORS=<part of a program's path>: list the selectors
+ * that program names which no class here implements, the messages it may
+ * send that nothing would answer (a tool for finding what a Mac app needs
+ * next; freemac 1.262). */
+static int sel_has_imp(SEL sel)
+{
+    for (struct fclass_rt *rt = all_classes; rt; rt = rt->next_all)
+        for (struct fmlist *l = rt->methods; l; l = l->next)
+            for (uint32_t i = 0; i < l->count; i++)
+                if (l->m[i].name == sel)
+                    return 1;
+    return 0;
+}
+
+static void report_selectors(struct ferry_objc_image *im)
+{
+    const char *want = getenv("FERRY_REPORT_SELECTORS");
+    if (!want || !*want || !im->path || !strstr(im->path, want))
+        return;
+    size_t n = 0;
+    LOCK();
+    for (size_t i = 0; i < im->nselrefs; i++) {
+        SEL s = im->selrefs[i];
+        int dup = 0;
+        for (size_t j = 0; j < i && !dup; j++)
+            dup = im->selrefs[j] == s;
+        if (!dup && s && !sel_has_imp(s)) {
+            fprintf(stderr, "ferry: nothing implements %s\n", sel_getName(s));
+            n++;
+        }
+    }
+    UNLOCK();
+    fprintf(stderr, "ferry: %zu of %s's selectors have no method anywhere\n", n, im->path);
+}
+
 void ferry_objc_load_image(struct ferry_objc_image *im)
 {
+    report_selectors(im);
     for (size_t i = 0; i < im->nnlcls; i++)
         call_class_load(im->nlclslist[i]);
     for (size_t i = 0; i < im->nnlcats; i++) {
@@ -760,6 +798,27 @@ Class objc_getClass(const char *name)
     return c;
 }
 
+/* A Swift class that derives from an Objective-C one, realized when its
+ * image loaded, has its metadata filled in later by Swift's runtime, which
+ * writes the ivar offsets it worked out from the superclass's compiled
+ * size into the same offset variables realizing had moved. As Apple's
+ * runtime does when Swift then hands it the class, move them again. */
+static void reslide_ivars(Class cls)
+{
+    struct fclass_rt *rt = class_rt(cls);
+    if (!rt->slide || (rt->flags & RT_META))
+        return;
+    for (uint32_t i = 0; i < rt->nivars; i++) {
+        struct fivar *v = &rt->ivars[i];
+        if (v->offset != &v->own_offset && *v->offset + rt->slide == v->placed) {
+            if (ferry_verbose)
+                fprintf(stderr, "ferry: moving %s's ivar %s again, by %u bytes\n", rt->name,
+                        v->name ? v->name : "?", rt->slide);
+            *v->offset = v->placed;
+        }
+    }
+}
+
 /* For swift.c: a class whose description Swift's runtime filled in while
  * the program runs, realized as a compiled one is. */
 Class ferry_objc_realize_runtime_class(Class cls, const char *image)
@@ -770,6 +829,8 @@ Class ferry_objc_realize_runtime_class(Class cls, const char *image)
     int fresh = !class_is_realized(cls);
     if (fresh)
         realize_class(cls);
+    else
+        reslide_ivars(cls);
     if (image && fresh) {
         class_rt(cls)->image = image;
         class_rt(cls->isa)->image = image;
@@ -1081,11 +1142,34 @@ Class objc_allocateClassPair(Class superclass, const char *name, size_t extra)
 {
     if (!name || objc_getClass(name))
         return NULL;
-    Class cls = calloc(1, sizeof *cls + extra);
+    /* A subclass of a Swift class (KVO's, for one) carries a copy of its
+     * superclass's Swift metadata, its table of methods above all, since
+     * Swift calls them through the object's class (freemac 1.262). The
+     * metadata's own words say how big it is and where the class starts
+     * in it; with no description, Swift's runtime knows the copy as a
+     * class made at run time and looks past it to the real one. */
+    Class cls = NULL;
+    int swift = superclass && (superclass->bits & 2);
+    if (swift) {
+        const uint8_t *sp = (const uint8_t *)superclass;
+        uint32_t size = *(const uint32_t *)(sp + 0x38), point = *(const uint32_t *)(sp + 0x3c);
+        if (size >= point + 0x50 && size < (1u << 20) && point <= 0x100) {
+            uint8_t *mem = calloc(1, size + extra);
+            memcpy(mem, sp - point, size);
+            cls = (Class)(mem + point);
+            *(void **)((uint8_t *)cls + 0x40) = NULL;     /* the description */
+        } else {
+            swift = 0;
+        }
+    }
+    if (!cls)
+        cls = calloc(1, sizeof *cls + extra);
     Class meta = calloc(1, sizeof *meta + extra);
     ferry_objc_make_class(cls, meta, superclass, strdup(name),
                           superclass ? class_rt(superclass)->instance_size : sizeof(Class),
                           NULL, 0, NULL, 0, RT_CONSTRUCTING);
+    if (swift)
+        cls->bits = 2;
     return cls;
 }
 
@@ -1665,4 +1749,5 @@ __attribute__((constructor)) static void objc_setup(void)
     ferry_objc_nsobject_init();
     ferry_blocks_init();
     ferry_dispatch_init();
+    ferry_oslog_init();
 }

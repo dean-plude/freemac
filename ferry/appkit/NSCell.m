@@ -23,7 +23,7 @@ enum {
     CELL_SELECTABLE = 0x00200000u,
     CELL_SCROLLABLE = 0x00100000u,
     CELL_CONTINUOUS = 0x00080000u,
-    CELL_WRAPS = 0x00000040u,
+    CELL_WRAPS = 0x00000040u, /* written for wrapping cells; read as "truncates the last line" */
     CELL_SINGLE_LINE = 0x00000200u,
 };
 
@@ -155,18 +155,19 @@ static void cell_changed(NSCell *cell, NSView *view)
         _lineBreak = (NSLineBreakMode)((f >> 9) & 7);
         _controlSize = (NSControlSize)((f >> 17) & 3);
     }
-    /* A text cell that word-wraps and neither scrolls nor keeps to a single
-     * line wraps, as a multi-line label in Interface Builder: nibs from Xcode
-     * say no more than that (Sparkle's "Check for updates automatically?"
-     * message, freemac 1.NEXT). Ferry's own ferry-ibtool also sets the
-     * 0x40 bit for these. */
-    if ([self isKindOfClass:[NSTextFieldCell class]] && [coder containsValueForKey:@"NSCellFlags"] &&
-        _lineBreak == NSLineBreakByWordWrapping && !_scrollable && !_singleLine)
-        _wraps = YES;
-    /* (in a nib from Xcode the 0x40 bit can come with any line breaking) */
-    if (_wraps && _lineBreak != NSLineBreakByWordWrapping && _lineBreak != NSLineBreakByCharWrapping)
-        _wraps = NO;
-    if (!_wraps && _lineBreak == NSLineBreakByWordWrapping)
+    /* A cell wraps when its line break mode is a wrapping one, as Apple
+     * documents wraps and lineBreakMode going together; the 0x40 bit of the
+     * first word is "truncates the last visible line" (freemac 1.260, which
+     * had taken it for wrapping until Rectangle's labels showed otherwise).
+     * A scrolling field never wraps, nor does one in single-line mode
+     * (0x200; Sparkle's "Check for updates automatically?" message,
+     * freemac 1.NEXT, is a cell with neither, which wraps). */
+    if ([coder containsValueForKey:@"NSCellFlags2"]) {
+        BOOL wrapping = _lineBreak == NSLineBreakByWordWrapping || _lineBreak == NSLineBreakByCharWrapping;
+        if (_scrollable && wrapping)
+            _lineBreak = NSLineBreakByClipping;
+        _wraps = wrapping && !_scrollable && !_singleLine;
+    } else if (!_wraps && _lineBreak == NSLineBreakByWordWrapping)
         _lineBreak = _scrollable ? NSLineBreakByClipping : NSLineBreakByTruncatingTail;
     if ([coder containsValueForKey:@"NSState"])
         _state = [coder decodeIntegerForKey:@"NSState"];

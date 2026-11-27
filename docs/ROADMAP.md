@@ -1183,6 +1183,144 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.262 "IINA plays video" (done)
+
+Ferry 0.85.0: IINA 1.3.5, the video player written in Swift, runs from its official download and plays a video, picture and sound, in its own player window. It's the second app picked because it looked likely not to work: a large Swift app built on mpv and FFmpeg. Ferry gained what it was missing: more of the Swift additions a Mac's Foundation makes (`Data` and its protocols, `CharacterSet`, `IndexSet`, `URLRequest`, `CocoaError` and `URLError`, string methods), the Mac's shape of `DispatchQueue`, VideoToolbox (no hardware codecs, so FFmpeg decodes in software), picture in picture, ColorSync and power-source calls, window aspect ratios and drags, and gesture recognizers. A Swift object watched with key-value observing no longer crashes, and Swift's array storage is saved in archives as a plain array, as on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Swift overlays: `Data` and `DataProtocol` (from the open-source swift-foundation), the bridged value types, `CocoaError` and `URLError`, more `String` methods, `DispatchQueue` made with a label, for-in over `NSArray` | Ferry Swift | done |
+| 2 | Key-value observing a Swift class: the observing subclass copies Swift's class data; instance variables keep the place realizing gave them | Ferry runtime | done |
+| 3 | VideoToolbox, served from AppKit: sessions fail as a missing codec does, so FFmpeg goes on in software | Ferry AppKit | done |
+| 4 | Picture in picture (`PIPViewController`): a small floating window that keeps the app's view, closed through the app's delegate | Ferry AppKit | done |
+| 5 | Window aspect ratios, window drags, gesture recognizers (kept, not yet fired), `NSValue` with `CMTime` | Ferry AppKit | done |
+| 6 | ColorSync's device profiles (none), power sources from this system's batteries, IOKit notification ports | Ferry | done |
+| 7 | A system framework found by bundle identifier, so mpv finds OpenGL's functions | Ferry Foundation | done |
+| 8 | Swift's private storage classes archive and unarchive as `NSArray` and the like | Ferry Foundation | done |
+| 9 | IINA 1.3.5 opens a video and plays it | Ferry / IINA | done |
+| 10 | Metal, in software (from the Blender work): shaders built when the app runs, so clang and lld are now on the ISO and in Ferry's package | Ferry Metal, packaging | done |
+
+## 1.261 "Swift apps run from the download" (done)
+
+Ferry 0.84.0: Swift's runtime and Ferry's Swift modules are now in Ferry's package, so they're on every freemac computer. Until now they were built only on the computers Ferry is made on, so a Mac app written in Swift (Rectangle, TomatoBar, apps made with SwiftUI) started there and nowhere else. The release now builds them from the open-source Swift project's source, as `swift/build-runtime.sh` always has, and the package puts them where Ferry looks. The runtime's build had stopped working with a recent change to Ferry's SDK headers; that's fixed.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `packaging/build-swift.sh`: fetches a swift.org toolchain and Swift's source, builds the runtime and Ferry's Swift modules | Ferry packaging | done |
+| 2 | The release builds them before Ferry's package; the package carries them in /usr/lib/ferry/frameworks/swift | release, Ferry packaging | done |
+| 3 | `sys/resource.h` brings in `id_t`, so the runtime builds again | Ferry SDK | done |
+| 4 | Rectangle 0.87 starts from the installed package alone | Ferry / Rectangle | done |
+
+## 1.260 "Rectangle starts" (done)
+
+Ferry 0.83.0: Rectangle 0.87, the window-snapping app, runs from its official download, not built for Ferry: a Swift app with a main storyboard, the first of the apps picked because they looked likely not to work. Ferry now opens an app's compiled storyboard (its scenes, view controllers and the nibs inside them) and starts the app from it. Swift code built on a Mac finds what Apple's Swift overlays give it: the Mac's shapes of `DispatchQueue`, `os_log` and `OSLog`, `Locale`, `TimeZone`, `URLComponents`, `Notification` and the other Foundation value types, `NSNumber` conversions, the OS version check and image literals. Objective-C code's `os_log` calls are read as clang packs them. Labels in a nib wrap as the nib says, where before a flag was misread and their text was cut off.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `NSStoryboard`: a compiled storyboard's scenes, controllers by identifier, the initial controller, the main menu, and an app started from `NSMainStoryboardFile` | Ferry AppKit | done |
+| 2 | Swift overlays with the Mac's shapes: Dispatch's queue, group and semaphore classes; `os_log` and `OSLog`; a CoreFoundation module; Foundation's value types, `NSNumber` conversions, `Date` and `URL` strings; `CGRect` from a dictionary; image literals | Ferry Swift | done |
+| 3 | `_os_log_impl` (clang's packed values), `_swift_stdlib_operatingSystemVersion` and the OS version check Swift calls | Ferry | done |
+| 4 | Accessibility window ids, pointer warping (refused, as Wayland refuses it), haptic feedback (does nothing) | Ferry AppKit | done |
+| 5 | Nib text fields wrap as their cell's line-break mode says | Ferry AppKit | done |
+| 6 | Rectangle 0.87 starts and shows its "Authorize Rectangle" window | Ferry / Rectangle | done |
+
+## 1.259 "OBS quits cleanly with a camera" (done)
+
+Ferry 0.82.0: OBS Studio's Legacy camera source no longer crashes OBS when it quits. Posting a notification kept the object it was about until the posting thread's autorelease pool drained, and OBS loads its scenes in a pool it never drains, so a capture session that OBS let go of kept running and handed pictures to a source OBS had already freed. A notification is now let go of as soon as it has been posted, as on a Mac. A capture session that its app lets go of while it runs stops, and pictures already on their way to a delegate aren't handed over once it has stopped.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Posted notifications released at once, not autoreleased; `-[NSNotification initWithName:object:userInfo:]` | Ferry Foundation | done |
+| 2 | A running capture session stops when its app lets go of it; pictures queued for a delegate dropped after stop | Ferry AVFoundation | done |
+| 3 | OBS's Legacy camera source previews, records at 30 fps and quits cleanly on the test camera | Ferry / OBS | done |
+| 4 | Tests: `foundation_runloop`, `appkit_avcapture_camera` | Ferry | done |
+
+## 1.258 "OBS's camera source builds" (done)
+
+Ferry 0.81.0: the last calls OBS Studio's camera plugin uses that Ferry didn't have: a camera's video effects (Portrait, Center Stage, Studio Light, reactions and background replacement, all off), Core Media's rounding methods for converting a time to another scale, the names of older and professional video codecs, and sorting a dictionary's keys by value with a block. The OpenGL module (and the CoreVideo and AppKit modules that bring it in) now builds on a system whose OpenGL headers weren't installed when Ferry was built.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | AVCaptureDevice video-effect properties, instance and class | Ferry AVFoundation | done |
+| 2 | `CMTimeRoundingMethod` and exact rounding in `CMTimeConvertScale` | Ferry CoreMedia | done |
+| 3 | Codec types: Animation, Cinepak, Sorenson, H.263, MPEG-1 and 2, DV and DVCPRO HD, ProRes 4444 and 422 HQ/LT/Proxy, VP9, AV1 | Ferry CoreMedia | done |
+| 4 | `keysSortedByValueUsingComparator:` and `keysSortedByValueWithOptions:usingComparator:` | Ferry Foundation | done |
+| 5 | OpenGL module without the system's OpenGL headers | Ferry SDK | done |
+| 6 | Tests: `appkit_avcapture_camera`, `screencapture_coremedia`, `foundation_collections` | Ferry | done |
+
+## 1.257 "Mac apps see your camera" (done)
+
+Ferry 0.80.0: a Mac app now sees the PC's webcams through AVFoundation, as on a Mac. AVCaptureDevice lists each camera with its formats and frame rates, and a capture session hands its pictures to the app in the pixel format the app asks for (the camera's own, 32BGRA, 420v or yuvs), at the size its preset or chosen format sets. Cameras plugged in or taken out are noticed while the app runs. Camera access goes by what the user said in Dials, Privacy & Security, Camera. This is what OBS Studio's camera source needs, and the last piece before its "Video Capture Device" works.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The PC's cameras (V4L2): list, formats, rates, start, frames, Motion JPEG through libturbojpeg; a test camera with FERRY_CAMERA_TEST=1 | Ferry (camera.c) | done |
+| 2 | AVCaptureDevice formats, frame rates, device types, discovery sessions, plug-in and unplug notifications | Ferry AVFoundation (AVCaptureDevice.m) | done |
+| 3 | AVCaptureSession, AVCaptureDeviceInput and AVCaptureVideoDataOutput with presets and pixel format conversion into IOSurface-backed pixel buffers | Ferry AVFoundation (AVCaptureSession.m) | done |
+| 4 | CoreMediaIO's system object, which OBS's camera plugin sets as it starts | Ferry CoreMediaIO | done |
+| 5 | `@import` for CoreMedia, CoreMediaIO, CoreVideo, MediaPlayer, OpenGL, ScreenCaptureKit and AddressBook | Ferry SDK | done |
+| 6 | New test `appkit_avcapture_camera` | Ferry | done |
+
+## 1.256 "Layers blend as the app asks" (done)
+
+Ferry 0.79.0: a Mac app's Core Animation layer with a blend mode as its compositing filter (multiply, screen, overlay, plus lighter and the rest) is now blended with what is under it, as on a Mac. Tinted overlays, glows and darkened artwork drew as plain opaque layers before. AppKit's notes on stderr that are whole sentences no longer get "isn't supported yet" stuck on the end.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `compositingFilter` blend modes by Core Animation's and Core Image's names, the layer blended as one at its opacity | Ferry QuartzCore (QRender.m) | done |
+| 2 | Whole-sentence notes said as they are (menus with no session bus, a status item's menu) | Ferry AppKit | done |
+| 3 | New test `quartzcore_layer_blend_modes` | Ferry | done |
+
+## 1.255 "Sprites and stretchable pictures in layers" (done)
+
+Ferry 0.78.0: a Mac app's Core Animation layers now draw only the part of their image the app asks for, and stretch a picture in nine parts. Sprite sheets and film strips showed the whole sheet before, and buttons, bubbles and panels built from one small picture had their rounded corners stretched out of shape; now they draw as on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `contentsRect` picks the part of a layer's image that is drawn, in the layer's own unit space | Ferry QuartzCore (QRender.m) | done |
+| 2 | `contentsCenter` stretches the image in nine parts, keeping its corners' size, at the image's `contentsScale` | Ferry QuartzCore | done |
+| 3 | New test `quartzcore_layer_contents_parts`, checked pixel by pixel | Ferry | done |
+
+## 1.254 "Layers keep to their masks" (done)
+
+Ferry 0.77.0: a Mac app's Core Animation layer masks are now drawn. A round profile picture, a faded list edge or a shape cut out with a mask layer showed whole before; now the layer shows only where its mask is opaque, as on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A layer, its sublayers and border show only where the mask layer, placed by its frame, is opaque, and as far as it is | Ferry QuartzCore (QRender.m) | done |
+| 2 | A shape layer masks by its path, and the shadow is cast by what the mask leaves | Ferry QuartzCore | done |
+| 3 | New test `quartzcore_layer_masks`, checked pixel by pixel | Ferry | done |
+
+## 1.253 "Layers cast their shadows" (done)
+
+Ferry 0.76.0: a Mac app's Core Animation layers now draw their shadows. Cards, popovers, buttons and panels that an app gives a soft shadow with `shadowOpacity`, `shadowRadius` and `shadowOffset` showed flat before; now they cast the shadow a Mac draws, from the layer's own shape, or from its `shadowPath`.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | A layer casts its shadow from all it draws taken as one, in its colour at its opacity, moved and blurred as on a Mac, faded with the layer's opacity | Ferry QuartzCore (QRender.m) | done |
+| 2 | A shadow path's whole shadow is drawn under the layer instead | Ferry QuartzCore, Core Graphics | done |
+| 3 | New test `quartzcore_layer_shadows`, checked pixel by pixel | Ferry | done |
+
+## 1.252 "An app's own options in the file chooser" (done)
+
+Ferry 0.75.0: a Mac app can add its own controls under an Open or Save panel, most often a Format menu in a Save panel. The file chooser freemac shows is the system's own, which can't hold an app's view, so these were left out. Now the accessory view's pop-up menus and check boxes show in the chooser as its own choices, named by the label beside each menu ("Format") or the check box's title. What is chosen goes back to the app as if its own controls were clicked, before the file is taken, so a Format menu that changes the file type gives the saved file its new extension (picture.png saved as JPEG is picture.jpg), as on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | An accessory view's enabled pop-up menus (their items that can be chosen) and check boxes become the chooser's choices, a menu named by the label on its left | Ferry AppKit (NSSavePanel.m) | done |
+| 2 | Each changed choice goes back into its control as a click would: the selection, the control's bindings and its action, before the chosen file is checked and taken | Ferry AppKit | done |
+| 3 | A Save panel's name keeps no extension of a type allowed before the format changed: it is replaced by the new type's | Ferry AppKit | done |
+| 4 | With no display, FERRY_PANEL_CHOICES answers the choices; new test `appkit_panel_accessory` | Ferry | done |
+
+## 1.251 "Auto Layout keeps the rule broken furthest" (done)
+
+Ferry 0.74.0: when a window's layout breaks several rules of one priority, Auto Layout now holds the one broken furthest first, as a Mac's solver in effect does by keeping the total error down. Holding whichever came first could leave a much bigger one broken for good: a view with a minimum width of 50, a minimum of 100 and a maximum of 90 at one priority came out 50 wide, 50 points short, where a Mac makes it 90 to 100 wide, 10 short.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | The next inequality held is the one broken furthest at the highest priority any broken one has, the first in order on a tie | Ferry AppKit (NSLayoutConstraint.m) | done |
+| 2 | A test of minimums and a maximum at one priority, in either order, and of sliders as tall as the tallest minimum | tests/appkit/equal_priority.m | done |
+
 ## 1.250 "Buttons line up as on a Mac" (done)
 
 Ferry 0.73.0: Auto Layout now lines up what a Mac lines up, a view's alignment rect, not its frame. A push button is drawn as a 22-point bezel inside a 32-point frame, and a Mac app's window spaces its buttons by their bezels; Ferry spaced them by their frames, 10 points too tall each, so a tightly laid-out window squeezed its buttons (VLC's Open dialog drew its Browse button 3 pixels tall). Buttons now sit where the window's design puts them, with their frames the size a nib gives them.

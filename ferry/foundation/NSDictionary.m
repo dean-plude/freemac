@@ -387,6 +387,31 @@ static id plist_at_url(NSURL *url, Class cls, NSError **error)
     free(k);
     return a;
 }
+/* keys in the order of their values, equal values keeping key order (freemac 1.258) */
+- (NSArray *)keysSortedByValueWithOptions:(NSSortOptions)opts usingComparator:(NSComparator)cmptr
+{
+    (void)opts;
+    NSArray *keys = [self allKeys];
+    NSUInteger n = [keys count];
+    id *k = malloc((n ? n : 1) * sizeof(id));
+    [keys getObjects:k range:NSMakeRange(0, n)];
+    for (NSUInteger i = 1; i < n; i++) {
+        id key = k[i], v = [self objectForKey:key];
+        NSUInteger j = i;
+        while (j > 0 && cmptr([self objectForKey:k[j - 1]], v) == NSOrderedDescending) {
+            k[j] = k[j - 1];
+            j--;
+        }
+        k[j] = key;
+    }
+    NSArray *a = [NSArray arrayWithObjects:k count:n];
+    free(k);
+    return a;
+}
+- (NSArray *)keysSortedByValueUsingComparator:(NSComparator)cmptr
+{
+    return [self keysSortedByValueWithOptions:0 usingComparator:cmptr];
+}
 - (BOOL)isEqualToDictionary:(NSDictionary *)other
 {
     if (other == self)

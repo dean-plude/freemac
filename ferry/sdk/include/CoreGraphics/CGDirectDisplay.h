@@ -108,6 +108,8 @@ boolean_t CGDisplayIsCaptured(CGDirectDisplayID display);
 CGError CGDisplayHideCursor(CGDirectDisplayID display);
 CGError CGDisplayShowCursor(CGDirectDisplayID display);
 CGError CGDisplayMoveCursorToPoint(CGDirectDisplayID display, CGPoint point);
+CGError CGWarpMouseCursorPosition(CGPoint newCursorPosition);
+CGError CGAssociateMouseAndMouseCursorPosition(boolean_t connected);
 CGImageRef CGDisplayCreateImage(CGDirectDisplayID display);
 CGImageRef CGDisplayCreateImageForRect(CGDirectDisplayID display, CGRect rect);
 

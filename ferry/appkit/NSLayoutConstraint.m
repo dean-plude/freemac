@@ -1528,17 +1528,37 @@ static BOOL breaks(pending *r, double *x)
     return (r->relation < 0 && v > r->rhs + 1e-6) || (r->relation > 0 && v < r->rhs - 1e-6);
 }
 
-/* The first inequality, in priority order, that x breaks and that isn't held. */
+/* How far x is past an inequality, 0 if it keeps it. */
+static double broken_by(pending *r, double *x)
+{
+    double v = evaluate(r, x);
+    if (r->relation < 0)
+        return v > r->rhs + 1e-6 ? v - r->rhs : 0;
+    return v < r->rhs - 1e-6 ? r->rhs - v : 0;
+}
+
+/* The inequality to hold next: of those x breaks that aren't held, the one
+ * broken furthest at the highest priority any of them has, the first of
+ * those in order if two are broken as far. A Mac's solver keeps the total
+ * error down; holding whichever broken rule came first could leave a far
+ * bigger one broken (at least 50, at least 100 and at most 90 at one
+ * priority came out 50, 50 short of 100, where 90 to 100 is 10 short of
+ * one), as the rounds that let rules go can't undo it (freemac 1.251). */
 static int first_broken(problem *p, char *active, double *x)
 {
+    int best = -1;
+    double most = 0;
     for (int k = 0; k < p->nrows; k++) {
         pending *r = &p->rows[k];
+        if (best >= 0 && r->priority != p->rows[best].priority)
+            break;
         if (r->relation == NSLayoutRelationEqual || active[k])
             continue;
-        if (breaks(r, x))
-            return k;
+        double d = broken_by(r, x);
+        if (d > most + 1e-9)
+            best = k, most = d;
     }
-    return -1;
+    return best;
 }
 
 static int stat_calls, stat_solves;   /* for FERRY_LAYOUT_STATS */

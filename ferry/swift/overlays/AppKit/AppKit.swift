@@ -198,3 +198,41 @@ extension NSRunLoop.Mode {
     /// The mode a run loop is in while a modal panel is up.
     public static var modalPanel: NSRunLoop.Mode { .init(rawValue: "NSModalPanelRunLoopMode") }
 }
+
+// MARK: - image literals (freemac 1.260)
+
+extension NSImage {
+    /// The image an #imageLiteral (or an image named in an asset catalog)
+    /// names, from the app's own resources.
+    public convenience init(imageLiteralResourceName name: String) {
+        self.init(ferryImageLiteralName: name)
+    }
+}
+
+// MARK: - freemac 1.262 (IINA)
+
+extension IndexPath {
+    /// The path of an item in a section of a collection view.
+    public init(item: Int, section: Int) { self.init(indexes: [section, item]) }
+
+    public var section: Int {
+        get { self[0] }
+        set { self[0] = newValue }
+    }
+
+    public var item: Int {
+        get { self[1] }
+        set { self[1] = newValue }
+    }
+}
+
+extension CGRect {
+    /// Fills the rectangle with the current color, as NSRectFillUsingOperation does.
+    public func fill(using operation: NSCompositingOperation = .sourceOver) {
+        NSRectFillUsingOperation(self, operation)
+    }
+
+    public func frame(withWidth width: CGFloat = 1, using operation: NSCompositingOperation = .sourceOver) {
+        NSFrameRectWithWidthUsingOperation(self, width, operation)
+    }
+}

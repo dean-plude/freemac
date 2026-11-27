@@ -6,7 +6,17 @@
  * with a completion handler run when the event loop next turns, as on a
  * Mac the handler is called after the begin call returns. With no display,
  * a panel answers Cancel, or with the paths in FERRY_PANEL_ANSWER (one per
- * line), for scripted runs and tests. Built without ARC. */
+ * line), for scripted runs and tests.
+ *
+ * An accessory view can't go inside the system's chooser, so its pop-up
+ * menus and check boxes go there as the chooser's own choices (a Save
+ * panel's Format menu, an Open panel's options), named by the label beside
+ * each pop-up or the check box's title. What was chosen goes back into the
+ * controls when the chooser closes, each changed one as if clicked, its
+ * bindings told and its action sent, before the chosen file is taken: a
+ * format menu's action that changes the allowed types gives the file its
+ * new extension (freemac 1.252). With no display, FERRY_PANEL_CHOICES
+ * ("Label=Option" lines) answers them. Built without ARC. */
 #import "AInternal.h"
 #include <dispatch/dispatch.h>
 
@@ -44,6 +54,7 @@ NSArray *AExtensionsForType(NSString *type)
     BOOL _otherTypes, _createDirs, _hiddenExtension, _canHide, _showHidden, _packages, _tagField;
     NSView *_accessory;
     id _panelDelegate;
+    NSArray *_startTypes;   /* the allowed types when the panel was run */
 }
 
 + (NSSavePanel *)savePanel { return [[[self alloc] init] autorelease]; }
@@ -80,6 +91,7 @@ NSArray *AExtensionsForType(NSString *type)
     [_types release];
     [_tagNames release];
     [_accessory release];
+    [_startTypes release];
     [super dealloc];
 }
 
@@ -121,8 +133,6 @@ COPY_PROPERTY(tagNames, setTagNames, _tagNames)
 - (NSView *)accessoryView { return _accessory; }
 - (void)setAccessoryView:(NSView *)v
 {
-    if (v)
-        AWarnOnce("accessory views in Open and Save panels (they are not shown)");
     [_accessory autorelease];
     _accessory = [v retain];
 }
@@ -159,7 +169,178 @@ COPY_PROPERTY(tagNames, setTagNames, _tagNames)
     if (_otherTypes && [ext length])
         return url;
     NSString *first = [AExtensionsForType([_types firstObject]) firstObject];
-    return first ? [url URLByAppendingPathExtension:first] : url;
+    if (!first)
+        return url;
+    /* the extension of a type allowed before the format was changed is
+     * replaced, as a Mac's panel changes it as the format menu does */
+    for (NSString *t in _startTypes)
+        if ([ext length] && [AExtensionsForType(t) containsObject:ext])
+            return [[url URLByDeletingPathExtension] URLByAppendingPathExtension:first];
+    return [url URLByAppendingPathExtension:first];
+}
+
+/* ---- the accessory view's controls, as the chooser's choices ---- */
+
+static void collect_controls(NSView *v, NSMutableArray *popups, NSMutableArray *boxes, NSMutableArray *labels)
+{
+    if ([v isHidden])
+        return;
+    if ([v isKindOfClass:[NSPopUpButton class]]) {
+        if ([(NSPopUpButton *)v isEnabled] && ![(NSPopUpButton *)v pullsDown])
+            [popups addObject:v];
+        return;
+    }
+    if ([v isKindOfClass:[NSButton class]]) {
+        if ([(NSButton *)v isEnabled] && [(id)v _buttonType] == NSButtonTypeSwitch && [[(NSButton *)v title] length])
+            [boxes addObject:v];
+        return;
+    }
+    if ([v isKindOfClass:[NSTextField class]]) {
+        NSTextField *t = (NSTextField *)v;
+        if (![t isEditable] && [[t stringValue] length])
+            [labels addObject:v];
+        return;
+    }
+    for (NSView *sub in [v subviews])
+        collect_controls(sub, popups, boxes, labels);
+}
+
+/* The label on a pop-up's left on its line, nearest it ("Format:"). */
+static NSString *label_for(NSView *popup, NSArray *labels, NSView *root)
+{
+    NSRect p = [root convertRect:[popup bounds] fromView:popup];
+    NSTextField *best = nil;
+    CGFloat gap = CGFLOAT_MAX;
+    for (NSTextField *t in labels) {
+        NSRect r = [root convertRect:[t bounds] fromView:t];
+        if (NSMaxY(r) <= NSMinY(p) || NSMinY(r) >= NSMaxY(p) || NSMinX(r) > NSMinX(p))
+            continue;
+        CGFloat g = NSMinX(p) - NSMaxX(r);
+        if (g < gap)
+            gap = g, best = t;
+    }
+    NSString *s = [[best stringValue] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+    if ([s hasSuffix:@":"])
+        s = [s substringToIndex:[s length] - 1];
+    return [s length] ? s : nil;
+}
+
+/* Each choice: its label, its control, and for a pop-up the indexes and
+ * titles of the items that can be chosen. */
+- (NSArray *)_choices
+{
+    if (!_accessory)
+        return @[];
+    NSMutableArray *popups = [NSMutableArray array], *boxes = [NSMutableArray array], *labels = [NSMutableArray array];
+    collect_controls(_accessory, popups, boxes, labels);
+    NSMutableArray *out = [NSMutableArray array];
+    for (NSPopUpButton *b in popups) {
+        NSMutableArray *indexes = [NSMutableArray array], *titles = [NSMutableArray array];
+        NSArray *items = [b itemArray];
+        for (NSUInteger i = 0; i < [items count]; i++) {
+            NSMenuItem *it = items[i];
+            if ([it isSeparatorItem] || ![it isEnabled] || [it isHidden] || ![[it title] length])
+                continue;
+            [indexes addObject:@(i)];
+            [titles addObject:[it title]];
+        }
+        if (![titles count])
+            continue;
+        NSString *label = label_for(b, labels, _accessory) ?: ([popups count] == 1 ? @"Format" : @"Option");
+        [out addObject:@{ @"label" : label, @"control" : b, @"indexes" : indexes, @"titles" : titles }];
+    }
+    for (NSButton *b in boxes)
+        [out addObject:@{ @"label" : [b title], @"control" : b }];
+    return out;
+}
+
+/* The choice's value as it is now: a pop-up's item index, or "true". */
+static NSString *current_value(NSDictionary *c)
+{
+    id control = c[@"control"];
+    if (c[@"titles"])
+        return [NSString stringWithFormat:@"%ld", (long)[control indexOfSelectedItem]];
+    return [(NSButton *)control state] == NSControlStateValueOn ? @"true" : @"false";
+}
+
+/* A value the chooser gave back, put into its control as a click would. */
+static void apply_value(NSDictionary *c, NSString *value)
+{
+    if (!value || [value isEqualToString:current_value(c)])
+        return;
+    id control = c[@"control"];
+    if (c[@"titles"]) {
+        NSInteger i = [value integerValue];
+        if (![c[@"indexes"] containsObject:@(i)])
+            return;
+        [[control cell] _menuView:nil didChooseItem:[control itemAtIndex:i]];
+    } else {
+        NSButton *b = control;
+        [b setState:[value isEqualToString:@"true"] ? NSControlStateValueOn : NSControlStateValueOff];
+        ABindingsPush(b, NO);
+        [b sendAction:[b action] to:[b target]];
+    }
+}
+
+static const char **cstrings(NSArray *strings)
+{
+    const char **v = calloc([strings count] + 1, sizeof *v);
+    for (NSUInteger i = 0; i < [strings count]; i++)
+        v[i] = [[strings[i] description] UTF8String];
+    return v;
+}
+
+- (void)_addChoices:(NSArray *)choices toChooser:(void *)chooser
+{
+    for (NSUInteger k = 0; k < [choices count]; k++) {
+        NSDictionary *c = choices[k];
+        char id[16];
+        snprintf(id, sizeof id, "c%lu", (unsigned long)k);
+        if (c[@"titles"]) {
+            const char **ids = cstrings(c[@"indexes"]), **titles = cstrings(c[@"titles"]);
+            gtk_file_chooser_add_choice(chooser, id, [c[@"label"] UTF8String], ids, titles);
+            free(ids);
+            free(titles);
+        } else
+            gtk_file_chooser_add_choice(chooser, id, [c[@"label"] UTF8String], NULL, NULL);
+        gtk_file_chooser_set_choice(chooser, id, [current_value(c) UTF8String]);
+    }
+}
+
+- (void)_takeChoices:(NSArray *)choices fromChooser:(void *)chooser
+{
+    for (NSUInteger k = 0; k < [choices count]; k++) {
+        char id[16];
+        snprintf(id, sizeof id, "c%lu", (unsigned long)k);
+        const char *v = gtk_file_chooser_get_choice(chooser, id);
+        apply_value(choices[k], v ? @(v) : nil);
+    }
+}
+
+/* FERRY_PANEL_CHOICES: "Label=Option" lines, an option by its title, a
+ * check box by true or false. */
+- (void)_takeScriptedChoices:(NSArray *)choices
+{
+    const char *env = getenv("FERRY_PANEL_CHOICES");
+    if (!env)
+        return;
+    for (NSString *line in [@(env) componentsSeparatedByString:@"\n"]) {
+        NSRange eq = [line rangeOfString:@"="];
+        if (eq.location == NSNotFound)
+            continue;
+        NSString *label = [line substringToIndex:eq.location], *want = [line substringFromIndex:NSMaxRange(eq)];
+        for (NSDictionary *c in choices) {
+            if (![c[@"label"] isEqualToString:label])
+                continue;
+            if (c[@"titles"]) {
+                NSUInteger i = [c[@"titles"] indexOfObject:want];
+                if (i != NSNotFound)
+                    apply_value(c, [c[@"indexes"][i] description]);
+            } else
+                apply_value(c, [want isEqualToString:@"true"] ? @"true" : @"false");
+            break;
+        }
+    }
 }
 
 - (BOOL)_accept:(NSArray *)paths
@@ -228,10 +409,13 @@ COPY_PROPERTY(tagNames, setTagNames, _tagNames)
             gtk_file_chooser_add_filter(chooser, all);
         }
     }
+    NSArray *choices = [self _choices];
+    [self _addChoices:choices toChooser:chooser];
     NSModalResponse answer = NSModalResponseCancel;
     for (;;) {
         if (gtk_native_dialog_run(chooser) != GTK_RESPONSE_ACCEPT)
             break;
+        [self _takeChoices:choices fromChooser:chooser];
         NSMutableArray *paths = [NSMutableArray array];
         GSList *names = gtk_file_chooser_get_filenames(chooser);
         for (GSList *n = names; n; n = n->next) {
@@ -253,6 +437,8 @@ COPY_PROPERTY(tagNames, setTagNames, _tagNames)
 - (NSModalResponse)runModal
 {
     [_chosen removeAllObjects];
+    [_startTypes release];
+    _startTypes = [_types copy];
     if (ADisplayAvailable())
         return [self _runChooser];
     const char *answer = getenv("FERRY_PANEL_ANSWER");
@@ -263,6 +449,7 @@ COPY_PROPERTY(tagNames, setTagNames, _tagNames)
     NSArray *paths = [[NSString stringWithUTF8String:answer] componentsSeparatedByString:@"\n"];
     if (![self _multiple] && [paths count] > 1)
         paths = [paths subarrayWithRange:NSMakeRange(0, 1)];
+    [self _takeScriptedChoices:[self _choices]];
     return [self _accept:paths] ? NSModalResponseOK : NSModalResponseCancel;
 }
 

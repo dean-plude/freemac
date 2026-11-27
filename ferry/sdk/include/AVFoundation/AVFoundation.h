@@ -3,7 +3,8 @@
  * served from Ferry's AppKit file). Written for freemac from Apple's public
  * API documentation; not Apple's header. A player plays its sound through
  * NSSound, which hands the file to the system's own player (pw-play, paplay
- * or aplay). The rest of AVFoundation (capture, video, editing, the audio
+ * or aplay). Cameras are read with capture sessions (from 1.257). The rest of
+ * AVFoundation (movie files, playback of video, editing, the audio
  * engine) isn't here. */
 #ifndef _FERRY_AVFOUNDATION_H_
 #define _FERRY_AVFOUNDATION_H_
@@ -72,7 +73,20 @@ FOUNDATION_EXPORT AVFileType const AVFileTypeAC3 _FERRY_AV_SWIFT("ac3");
 - (float)averagePowerForChannel:(NSUInteger)channelNumber;
 @end
 
-/* capture devices, listed (freemac 1.233, Ferry 0.57.0) */
+/* capture devices, listed (freemac 1.233, Ferry 0.57.0), and cameras read
+ * with capture sessions (freemac 1.257, Ferry 0.80.0) */
+/* CMTime values in an NSValue (AVTime.h on a Mac; freemac 1.262, IINA) */
+#include <CoreMedia/CoreMedia.h>
+@interface NSValue (FerryCMTime)
++ (NSValue *)valueWithCMTime:(CMTime)time;
+@property (readonly) CMTime CMTimeValue;
++ (NSValue *)valueWithCMTimeRange:(CMTimeRange)timeRange;
+@property (readonly) CMTimeRange CMTimeRangeValue;
++ (NSValue *)valueWithCMTimeMapping:(CMTimeMapping)timeMapping;
+@property (readonly) CMTimeMapping CMTimeMappingValue;
+@end
+
 #import <AVFoundation/AVCaptureDevice.h>
+#import <AVFoundation/AVCaptureSession.h>
 
 #endif

@@ -3,6 +3,7 @@
 #define _SYS_RESOURCE_H_
 #include <_ferry.h>
 #include <sys/time.h>
+#include <sys/types.h> /* id_t */
 __FERRY_BEGIN
 typedef uint64_t rlim_t;
 struct rlimit { rlim_t rlim_cur, rlim_max; };

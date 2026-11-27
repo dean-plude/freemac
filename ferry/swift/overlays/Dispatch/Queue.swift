@@ -104,7 +104,7 @@ public struct DispatchWorkItemFlags: OptionSet, Sendable {
 }
 
 /// Work to do, which can be run, waited for, told about or cancelled.
-public final class DispatchWorkItem {
+public class DispatchWorkItem {
     let work: () -> Void
     let flags: DispatchWorkItemFlags
     private let done = dispatch_group_create()!
@@ -113,8 +113,9 @@ public final class DispatchWorkItem {
     private var started = false
     public private(set) var isCancelled = false
 
-    public init(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], block: @escaping () -> Void) {
-        work = block
+    public init(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [],
+                block: @escaping @convention(block) () -> Void) {
+        work = { block() }
         self.flags = flags
         pthread_mutex_init(&lock, nil)
         dispatch_group_enter(done)

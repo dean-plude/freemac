@@ -116,10 +116,26 @@ struct work {
     struct work *next;
 };
 
-/* The classes: one for objects made at run time, and one for the main and
- * global queues, which live as long as the program and ignore retain and
- * release. */
-static struct fobjc_class dispatch_class, dispatch_meta, static_class, static_meta;
+/* The classes, by the names a Mac gives them, since a Swift app compiled
+ * on a Mac names them (DispatchQueue is OS_dispatch_queue there, freemac
+ * 1.260): OS_dispatch_object, and under it a class for each kind of object
+ * made at run time; and the main and global queues', kinds of
+ * OS_dispatch_queue which live as long as the program and ignore retain
+ * and release. */
+static struct fobjc_class static_class, static_meta;
+/* an app's references to these classes find them by name (the table at the end) */
+static struct fobjc_class dispatch_class, dispatch_meta;
+static struct fobjc_class kind_class[4], kind_meta[4];
+static struct fobjc_class global_class, global_meta;
+
+/* one of the objects made at run time, which are retained and released */
+static int counted(const struct dobj *o)
+{
+    for (int i = 0; i < 4; i++)
+        if (o->isa == (Class)&kind_class[i])
+            return 1;
+    return 0;
+}
 
 /* The main queue's symbol is a variable (dispatch_get_main_queue() is a macro
  * for its address); the global queues are returned by a call. */
@@ -179,7 +195,7 @@ static int wait_until(pthread_cond_t *c, uint64_t deadline)
 
 static struct dobj *new_object(enum kind kind)
 {
-    struct dobj *o = (struct dobj *)class_createInstance(&dispatch_class, 0);
+    struct dobj *o = (struct dobj *)class_createInstance((Class)&kind_class[kind], 0);
     o->kind = kind;
     return o;
 }
@@ -779,7 +795,7 @@ struct dobj *dispatch_queue_create(const char *label, void *attr)
 struct dobj *dispatch_queue_create_with_target(const char *label, void *attr, struct dobj *target)
 {
     struct dobj *q = dispatch_queue_create(label, attr);
-    if (target && target->isa == &dispatch_class)
+    if (target && counted(target))
         objc_retain((id)target);
     q->target = target;
     return q;
@@ -834,21 +850,21 @@ void dispatch_assert_queue_barrier(struct dobj *q) { dispatch_assert_queue(q); }
 
 void dispatch_set_target_queue(struct dobj *o, struct dobj *target)
 {
-    if (!o || o == target || o->isa != &dispatch_class)
+    if (!o || o == target || !counted(o))
         return;
-    if (target && target->isa == &dispatch_class)
+    if (target && counted(target))
         objc_retain((id)target);
     pthread_mutex_lock(&dq);
     struct dobj *old = o->target;
     o->target = target;
     pthread_mutex_unlock(&dq);
-    if (old && old->isa == &dispatch_class)
+    if (old && counted(old))
         objc_release((id)old);
 }
 
 void dispatch_suspend(struct dobj *o)
 {
-    if (!o || o->isa != &dispatch_class)
+    if (!o || !counted(o))
         return;
     pthread_mutex_lock(&dq);
     o->suspended++;
@@ -892,7 +908,7 @@ static void resume_locked(struct dobj *o, struct dobj *domain)
 
 void dispatch_resume(struct dobj *o)
 {
-    if (!o || o->isa != &dispatch_class)
+    if (!o || !counted(o))
         return;
     pthread_mutex_lock(&dq);
     resume_locked(o, o->kind == K_QUEUE ? domain_of(o) : DEFAULT_Q);
@@ -901,7 +917,7 @@ void dispatch_resume(struct dobj *o)
 
 void dispatch_activate(struct dobj *o)
 {
-    if (!o || o->isa != &dispatch_class)
+    if (!o || !counted(o))
         return;
     pthread_mutex_lock(&dq);
     if (o->kind == K_SOURCE && o->suspended > 0 && !o->armed)
@@ -1775,6 +1791,13 @@ void dispatch_source_merge_data(struct dobj *s, unsigned long value)
 
 /* ---- setup ------------------------------------------------------------------ */
 
+static id q_init_with_queue(id self, SEL _cmd, id queue)
+{
+    (void)_cmd;
+    objc_release(self);
+    return objc_retain(queue);
+}
+
 void ferry_dispatch_init(void)
 {
     static const struct fmethod methods[] = {
@@ -1782,7 +1805,20 @@ void ferry_dispatch_init(void)
     };
     ferry_objc_make_class(&dispatch_class, &dispatch_meta, &ferry_class_NSObject, "OS_dispatch_object",
                           sizeof(struct dobj), methods, 1, NULL, 0, 0);
-    ferry_objc_make_class(&static_class, &static_meta, &ferry_class_NSObject, "OS_dispatch_queue_static",
+    static const char *const kinds[4] = {"OS_dispatch_queue", "OS_dispatch_group", "OS_dispatch_semaphore",
+                                         "OS_dispatch_source"};
+    /* -initWithFerryQueue: (freemac 1.262), which Swift's DispatchQueue(label:...) on OS_dispatch_queue calls
+     * after +alloc: the queue Ferry made takes the place of the empty one */
+    static const struct fmethod queue_methods[] = {
+        M("initWithFerryQueue:", "@24@0:8@16", q_init_with_queue),
+    };
+    for (int i = 0; i < 4; i++)
+        ferry_objc_make_class(&kind_class[i], &kind_meta[i], &dispatch_class, kinds[i], sizeof(struct dobj),
+                              i == K_QUEUE ? queue_methods : NULL, i == K_QUEUE ? 1 : 0, NULL, 0, 0);
+    ferry_objc_make_class(&static_class, &static_meta, &kind_class[K_QUEUE], "OS_dispatch_queue_main",
+                          sizeof(struct dobj), ferry_static_rr_methods, ferry_static_rr_count, NULL, 0,
+                          RT_STATIC_INSTANCES);
+    ferry_objc_make_class(&global_class, &global_meta, &kind_class[K_QUEUE], "OS_dispatch_queue_global",
                           sizeof(struct dobj), ferry_static_rr_methods, ferry_static_rr_count, NULL, 0,
                           RT_STATIC_INSTANCES);
     static const char *const names[] = {"com.apple.root.user-interactive-qos", "com.apple.root.default-qos",
@@ -1790,7 +1826,7 @@ void ferry_dispatch_init(void)
     ferry_dispatch_main_q.isa = &static_class;
     snprintf(ferry_dispatch_main_q.label, sizeof ferry_dispatch_main_q.label, "com.apple.main-thread");
     for (int i = 0; i < 4; i++) {
-        global_queues[i].isa = &static_class;
+        global_queues[i].isa = (Class)&global_class;
         global_queues[i].global = 1;
         global_queues[i].concurrent = 1;
         snprintf(global_queues[i].label, sizeof global_queues[i].label, "%s", names[i]);
@@ -1811,6 +1847,16 @@ void ferry_dispatch_init(void)
 /* What libSystem exports for dispatch. */
 #define F(name) {#name, (void *)name}
 const struct ferry_symbol ferry_dispatch_symbols[] = {
+    {"OBJC_CLASS_$_OS_dispatch_object", &dispatch_class},
+    {"OBJC_METACLASS_$_OS_dispatch_object", &dispatch_meta},
+    {"OBJC_CLASS_$_OS_dispatch_queue", &kind_class[K_QUEUE]},
+    {"OBJC_METACLASS_$_OS_dispatch_queue", &kind_meta[K_QUEUE]},
+    {"OBJC_CLASS_$_OS_dispatch_group", &kind_class[K_GROUP]},
+    {"OBJC_METACLASS_$_OS_dispatch_group", &kind_meta[K_GROUP]},
+    {"OBJC_CLASS_$_OS_dispatch_semaphore", &kind_class[K_SEMAPHORE]},
+    {"OBJC_METACLASS_$_OS_dispatch_semaphore", &kind_meta[K_SEMAPHORE]},
+    {"OBJC_CLASS_$_OS_dispatch_source", &kind_class[K_SOURCE]},
+    {"OBJC_METACLASS_$_OS_dispatch_source", &kind_meta[K_SOURCE]},
     {"_dispatch_main_q", &ferry_dispatch_main_q},
     {"_dispatch_queue_attr_concurrent", ferry_dispatch_queue_attr_concurrent},
     {"_dispatch_source_type_timer", ferry_dispatch_source_type_timer},

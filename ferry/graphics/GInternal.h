@@ -168,6 +168,9 @@ void GContextEndShadow(GContext *c, BOOL began);
 /* For AppKit's focus rings: what is drawn next paints only its shadow, and
  * that only outside the shape, until the graphics state is restored. */
 void GContextSetShadowOnly(CGContextRef c, BOOL only);
+/* For Core Animation's shadow paths: what is drawn next paints only its
+ * shadow, all of it, and not itself, until this is turned off again. */
+void GContextSetDrawsShadowsOnly(CGContextRef c, BOOL only);
 
 /* Draws glyphs or a laid-out line in the context's text space, at (x, y)
  * there, following the text drawing mode. The body draws with Cairo's y

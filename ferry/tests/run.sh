@@ -94,6 +94,11 @@ run_one() {
             env -u WAYLAND_DISPLAY -u DISPLAY HOME="$build/home_$name" XDG_CONFIG_HOME= TMPDIR="$build/home_$name" \
                 FERRY_ACCESS_ASKER="$here/appkit/fake_asker.sh" "$top/ferry" "$exe" > "$build/$name.got" \
                 2> "$build/$name.err" ;;
+        appkit_avcapture_camera)
+            # Ferry's test camera, with a home of its own whose camera answer is set by the test
+            rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
+            env -u WAYLAND_DISPLAY -u DISPLAY HOME="$build/home_$name" XDG_CONFIG_HOME= TMPDIR="$build/home_$name" \
+                FERRY_CAMERA_TEST=1 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         appkit_bindings|appkit_archiver)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             env -u WAYLAND_DISPLAY -u DISPLAY HOME="$build/home_$name" XDG_CONFIG_HOME= TMPDIR="$build/home_$name" \
@@ -197,6 +202,13 @@ run_one() {
                 timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         opengl_*|corevideo_*)
             env -u WAYLAND_DISPLAY -u DISPLAY timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        # Metal turned off, as for a program that also draws with OpenGL
+        media_frameworks) FERRY_METAL=0 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        # Metal: no display, and a shader cache of its own
+        metal_*)
+            rm -rf "$build/cache_$name"
+            env -u WAYLAND_DISPLAY -u DISPLAY XDG_CACHE_HOME="$build/cache_$name" \
+                timeout 120 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         *) "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
     esac
     echo "exit=$?" >> "$build/$name.got"
@@ -615,6 +627,14 @@ run_one graphics_drawing_chained "$here/graphics/drawing.c" "$here/graphics/draw
 # the test clock.
 run_one quartzcore_layers "$here/quartzcore/layers.m" "$here/quartzcore/layers.out" -fobjc-arc \
     -framework QuartzCore -framework Foundation -framework CoreGraphics
+run_one quartzcore_layer_shadows "$here/quartzcore/layer_shadows.m" "$here/quartzcore/layer_shadows.out" -fobjc-arc \
+    -framework QuartzCore -framework Foundation -framework CoreGraphics
+run_one quartzcore_layer_masks "$here/quartzcore/layer_masks.m" "$here/quartzcore/layer_masks.out" -fobjc-arc \
+    -framework QuartzCore -framework Foundation -framework CoreGraphics
+run_one quartzcore_layer_contents_parts "$here/quartzcore/layer_contents_parts.m" "$here/quartzcore/layer_contents_parts.out" -fobjc-arc \
+    -framework QuartzCore -framework Foundation -framework CoreGraphics
+run_one quartzcore_layer_blend_modes "$here/quartzcore/layer_blend_modes.m" "$here/quartzcore/layer_blend_modes.out" -fobjc-arc \
+    -framework QuartzCore -framework Foundation -framework CoreGraphics
 run_one quartzcore_animations "$here/quartzcore/animations.m" "$here/quartzcore/animations.out" -fobjc-arc -fblocks \
     -framework QuartzCore -framework Foundation -framework CoreGraphics
 # AppKit (M4). First with no display, where windows are drawn off screen,
@@ -865,6 +885,8 @@ run_one appkit_avaudioplayer "$here/appkit/avaudioplayer.m" "$here/appkit/avaudi
 # Microphone and camera access (freemac 1.241): the user's say, as OBS asks for it.
 run_one appkit_avcapture_access "$here/appkit/avcapture_access.m" "$here/appkit/avcapture_access.out" -fobjc-arc \
     -framework Foundation -framework AVFoundation
+# Cameras (freemac 1.257): Ferry's test camera read the way OBS's camera source reads one.
+run_one appkit_avcapture_camera "$here/appkit/avcapture_camera.m" "$here/appkit/avcapture_camera.out" -fobjc-arc
 run_one appkit_carbon "$here/appkit/carbon.m" "$here/appkit/carbon.out" -fobjc-arc -framework Cocoa -framework Carbon \
     -framework SystemConfiguration
 # What Flycut calls as it starts: the Process Manager for itself, remote
@@ -893,6 +915,7 @@ run_one appkit_qt_popups "$here/appkit/qt_popups.m" "$here/appkit/qt_popups.out"
 # Auto Layout: constraints, anchors, the visual format and the solver
 run_one appkit_constraints "$here/appkit/constraints.m" "$here/appkit/constraints.out" -fobjc-arc -framework Cocoa
 run_one appkit_alignment_rects "$here/appkit/alignment_rects.m" "$here/appkit/alignment_rects.out" -fobjc-arc -framework Cocoa
+run_one appkit_equal_priority "$here/appkit/equal_priority.m" "$here/appkit/equal_priority.out" -fobjc-arc -framework Cocoa
 run_one appkit_layout_bench "$here/appkit/layout_bench.m" "$here/appkit/layout_bench.out" -fobjc-arc -framework Cocoa
 # a layout manager laying text out with no text view, as VLC wraps text
 run_one appkit_layout_alone "$here/appkit/layout_alone.m" "$here/appkit/layout_alone.out" -fobjc-arc -framework Cocoa
@@ -922,6 +945,7 @@ run_one appkit_layers "$here/appkit/layers.m" "$here/appkit/layers.out" -fobjc-a
 run_one appkit_pasteboard "$here/appkit/pasteboard.m" "$here/appkit/pasteboard.out" -fobjc-arc -framework Cocoa
 # Open and Save panels, answered from FERRY_PANEL_ANSWER with no display (M7).
 run_one appkit_panels "$here/appkit/panels.m" "$here/appkit/panels.out" -fobjc-arc -framework Cocoa
+run_one appkit_panel_accessory "$here/appkit/panel_accessory.m" "$here/appkit/panel_accessory.out" -fobjc-arc -framework Cocoa
 # Drag and drop into a window: the steps GTK's drop signals take (M7).
 run_one appkit_dragging "$here/appkit/dragging.m" "$here/appkit/dragging.out" -fobjc-arc -framework Cocoa
 # Menu bar items (after M7): read, opened and clicked over D-Bus as the
@@ -1825,6 +1849,23 @@ fi
 run_one opengl_missing "$here/opengl/missing.m" "$here/opengl/missing.out" -framework Cocoa -framework QuartzCore \
     -framework CoreVideo -framework OpenGL
 webkit_message opengl_missing "^ferry: this program draws with OpenGL, and this system's OpenGL (libEGL.so.1, Mesa) isn't installed$"
+# Metal: the shader compiler (metal/tests), then a device,
+# shaders compiled from source, drawing (a depth test, indexed drawing, a
+# sampled texture), a compute kernel and blits, read back; and a
+# CAMetalLayer view drawn from the main thread and another, read back
+metal_tools() { command -v clang && { command -v ld64.lld || ls /usr/bin/ld64.lld-* /usr/lib/llvm-*/bin/ld64.lld; }; }
+if metal_tools > /dev/null 2>&1 && \
+        sh "$top/metal/tests/run.sh" > "$build/metal_mslc.log" 2>&1; then
+    echo "ok   metal_mslc"; pass=$((pass + 1))
+    run_one metal_draw "$here/metal/draw.m" "$here/metal/draw.out" -fobjc-arc -fblocks -framework Foundation \
+        -framework Metal
+    run_one metal_layer "$here/metal/layer.m" "$here/metal/layer.out" -fobjc-arc -fblocks -framework Cocoa \
+        -framework Metal -framework QuartzCore
+elif ! metal_tools > /dev/null 2>&1; then
+    echo "skip metal_mslc, metal_draw, metal_layer (Metal's shaders need clang and lld)"
+else
+    echo "FAIL metal_mslc"; sed 's/^/    /' "$build/metal_mslc.log"; fail=$((fail + 1))
+fi
 # Screen capture (freemac 1.238, Ferry 0.62.0), as OBS Studio's
 # mac-capture plugin uses it: Core Media's sample buffers and
 # ScreenCaptureKit with no display, then ScreenCaptureKit, CGDisplayStream

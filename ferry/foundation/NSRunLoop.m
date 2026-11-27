@@ -998,11 +998,16 @@ static void cancel_performs(id target, BOOL any, SEL sel, id arg)
 }
 + (instancetype)notificationWithName:(NSNotificationName)name object:(id)object userInfo:(NSDictionary *)info
 {
-    NSNotification *n = [[[self alloc] init] autorelease];
-    n->_name = [name copy];
-    n->_object = [object retain];
-    n->_userInfo = [info copy];
-    return n;
+    return [[[self alloc] initWithName:name object:object userInfo:info] autorelease];
+}
+- (instancetype)initWithName:(NSNotificationName)name object:(id)object userInfo:(NSDictionary *)info
+{
+    if ((self = [super init])) {
+        _name = [name copy];
+        _object = [object retain];
+        _userInfo = [info copy];
+    }
+    return self;
 }
 - (void)dealloc
 {
@@ -1109,13 +1114,20 @@ static void cancel_performs(id target, BOOL any, SEL sel, id arg)
     }
     [now release];
 }
+/* As on a Mac, the notification is let go of once it has been posted, not
+ * left to an autorelease pool: a thread whose pool isn't drained for a long
+ * time (OBS loads its scenes in one) would otherwise keep the object the
+ * notification is about, like a capture session that should stop when its
+ * app lets go of it (freemac 1.259) */
 - (void)postNotificationName:(NSNotificationName)name object:(id)object
 {
-    [self postNotification:[NSNotification notificationWithName:name object:object]];
+    [self postNotificationName:name object:object userInfo:nil];
 }
 - (void)postNotificationName:(NSNotificationName)name object:(id)object userInfo:(NSDictionary *)info
 {
-    [self postNotification:[NSNotification notificationWithName:name object:object userInfo:info]];
+    NSNotification *note = [[NSNotification alloc] initWithName:name object:object userInfo:info];
+    [self postNotification:note];
+    [note release];
 }
 - (void)removeObserver:(id)observer name:(NSNotificationName)name object:(id)object
 {

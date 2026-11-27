@@ -10,6 +10,13 @@ version=$("$top/ferry" --version | awk '{print $2}')
 root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT
 make -C "$top" -s install DESTDIR="$root" PREFIX=/usr
+# Swift's runtime and Ferry's Swift modules, when packaging/build-swift.sh
+# has built them: a Mac app written in Swift needs them, and Ferry looks for
+# them in /usr/lib/ferry/frameworks/swift (freemac 1.261).
+if ls "$top"/frameworks/swift/*.dylib >/dev/null 2>&1; then
+    install -d "$root/usr/lib/ferry/frameworks/swift"
+    install -m755 "$top"/frameworks/swift/*.dylib "$root/usr/lib/ferry/frameworks/swift/"
+fi
 install -Dm644 "$top/README.md" "$root/usr/share/doc/freemac-ferry/README.md"
 install -d "$root/DEBIAN"
 size=$(du -sk "$root/usr" | cut -f1)
@@ -20,8 +27,7 @@ Architecture: amd64
 Maintainer: freemac project <noreply@freemac.invalid>
 Installed-Size: $size
 Depends: libc6
-Recommends: systemd, libcairo2, libpangocairo-1.0-0, libpango-1.0-0, libharfbuzz0b, libgtk-3-0, libgdk-pixbuf-2.0-0, libpoppler-glib8, zlib1g, libbz2-1.0, liblzma5, libxml2, libsqlite3-0, 7zip | p7zip-full, libcurl4t64 | libcurl4, libc++1-18 | libc++1, libc++abi1-18 | libc++abi1, libwebkit2gtk-4.1-0
-Suggests: clang, lld
+Recommends: systemd, libcairo2, libpangocairo-1.0-0, libpango-1.0-0, libharfbuzz0b, libgtk-3-0, libgdk-pixbuf-2.0-0, libpoppler-glib8, zlib1g, libbz2-1.0, liblzma5, libxml2, libsqlite3-0, 7zip | p7zip-full, libcurl4t64 | libcurl4, libc++1-18 | libc++1, libc++abi1-18 | libc++abi1, libwebkit2gtk-4.1-0, libturbojpeg, clang, lld
 Section: otherosfs
 Priority: optional
 Description: Ferry, runs simple Intel Mac programs

@@ -117,3 +117,23 @@ extension CGRect: CustomDebugStringConvertible {
 extension CGAffineTransform {
     public static var identity: CGAffineTransform { CGAffineTransform(a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0) }
 }
+
+// MARK: - dictionaries (freemac 1.260)
+
+extension CGRect {
+    /// The rectangle a dictionary made by dictionaryRepresentation holds.
+    public init?(dictionaryRepresentation dict: CFDictionary) {
+        var r = CGRect(x: 0, y: 0, width: 0, height: 0)
+        guard CGRectMakeWithDictionaryRepresentation(dict, &r) else { return nil }
+        self = r
+    }
+}
+
+// ---- freemac 1.262 (IINA)
+
+extension CGColor {
+    /// Core Graphics' own black, white and clear colors.
+    public static var black: CGColor { CGColorGetConstantColor(kCGColorBlack)!.takeUnretainedValue() }
+    public static var white: CGColor { CGColorGetConstantColor(kCGColorWhite)!.takeUnretainedValue() }
+    public static var clear: CGColor { CGColorGetConstantColor(kCGColorClear)!.takeUnretainedValue() }
+}
