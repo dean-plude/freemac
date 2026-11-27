@@ -412,13 +412,12 @@ Contents/Frameworks as on a Mac. Nothing of Sparkle's is built or changed.
   automatically?", and Check for Update... opens Sparkle's own windows; here
   the check ends in Sparkle's "Update Error!" alert, because this test
   machine can't reach update.videolan.org.
-- The prompt's message showed on one line, cut off. Xcode writes a
+- The prompt's message showed on one line, cut off: Xcode writes a
   multi-line label as a word-wrapping text cell that neither scrolls nor
-  keeps to one line, with no further mark; Ferry wrapped only cells that
-  carried a bit its own ferry-ibtool adds. Such cells now wrap, a cell in
+  keeps to one line, with no further mark. freemac 1.260 reads wrapping
+  from the line break mode, which fixes it; on top of that, a cell in
   single-line mode (0x200 in the cell flags, which ferry-ibtool now writes
-  too) stays on one line, and the extra bit no longer makes a clipping or
-  truncating cell report that it wraps. Test: appkit/sparkle_prompt.
+  too) stays on one line. Test: appkit/sparkle_prompt.
 - VLC's Preferences show the last check with NSDate's
   descriptionWithLocale:, which Ferry didn't have.
 - Sparkle names a few things Ferry doesn't have yet, all used only to

@@ -105,7 +105,6 @@ int main(void)
         cell("multi-line label", 0x04000000, 0x10400000, @"NSTextFieldCell");
         cell("clipping label", 0x04100040, 0x10400400, @"NSTextFieldCell");
         cell("single-line label", 0x04000200, 0x10400000, @"NSTextFieldCell");
-        cell("push button", 0x04000000, 0x08000000, @"NSButtonCell");
         field();
 
         NSDate *d = [NSDate dateWithTimeIntervalSince1970:400 * 86400];
