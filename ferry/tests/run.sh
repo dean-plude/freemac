@@ -202,6 +202,13 @@ run_one() {
                 timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         opengl_*|corevideo_*)
             env -u WAYLAND_DISPLAY -u DISPLAY timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        # Metal turned off, as for a program that also draws with OpenGL
+        media_frameworks) FERRY_METAL=0 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        # Metal: no display, and a shader cache of its own
+        metal_*)
+            rm -rf "$build/cache_$name"
+            env -u WAYLAND_DISPLAY -u DISPLAY XDG_CACHE_HOME="$build/cache_$name" \
+                timeout 120 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         *) "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
     esac
     echo "exit=$?" >> "$build/$name.got"
@@ -1841,6 +1848,23 @@ fi
 run_one opengl_missing "$here/opengl/missing.m" "$here/opengl/missing.out" -framework Cocoa -framework QuartzCore \
     -framework CoreVideo -framework OpenGL
 webkit_message opengl_missing "^ferry: this program draws with OpenGL, and this system's OpenGL (libEGL.so.1, Mesa) isn't installed$"
+# Metal: the shader compiler (metal/tests), then a device,
+# shaders compiled from source, drawing (a depth test, indexed drawing, a
+# sampled texture), a compute kernel and blits, read back; and a
+# CAMetalLayer view drawn from the main thread and another, read back
+metal_tools() { command -v clang && { command -v ld64.lld || ls /usr/bin/ld64.lld-* /usr/lib/llvm-*/bin/ld64.lld; }; }
+if metal_tools > /dev/null 2>&1 && \
+        sh "$top/metal/tests/run.sh" > "$build/metal_mslc.log" 2>&1; then
+    echo "ok   metal_mslc"; pass=$((pass + 1))
+    run_one metal_draw "$here/metal/draw.m" "$here/metal/draw.out" -fobjc-arc -fblocks -framework Foundation \
+        -framework Metal
+    run_one metal_layer "$here/metal/layer.m" "$here/metal/layer.out" -fobjc-arc -fblocks -framework Cocoa \
+        -framework Metal -framework QuartzCore
+elif ! metal_tools > /dev/null 2>&1; then
+    echo "skip metal_mslc, metal_draw, metal_layer (Metal's shaders need clang and lld)"
+else
+    echo "FAIL metal_mslc"; sed 's/^/    /' "$build/metal_mslc.log"; fail=$((fail + 1))
+fi
 # Screen capture (freemac 1.238, Ferry 0.62.0), as OBS Studio's
 # mac-capture plugin uses it: Core Media's sample buffers and
 # ScreenCaptureKit with no display, then ScreenCaptureKit, CGDisplayStream

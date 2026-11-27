@@ -448,7 +448,7 @@ $(SCK): $(SCK_OBJ) $(APPKIT) $(COREAUDIO)
 check: all
 	./tests/run.sh
 
-install: ferry $(TBD) $(TBD_ALIASES) $(TWIN_TBD) $(SDK_LIBXML2) $(SDK_CURL) $(FOUNDATION) $(GRAPHICS) $(GPU) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT) $(EVENTKIT) $(COREAUDIO) $(MEDIA) $(SCK)
+install: install-metal ferry $(TBD) $(TBD_ALIASES) $(TWIN_TBD) $(SDK_LIBXML2) $(SDK_CURL) $(FOUNDATION) $(GRAPHICS) $(GPU) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT) $(EVENTKIT) $(COREAUDIO) $(MEDIA) $(SCK)
 	install -Dm755 $(INSTALLER) $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/MacOS/Installer
 	install -Dm644 $(INSTALLER_APP)/Contents/Info.plist $(DESTDIR)$(PREFIX)/lib/ferry/Installer.app/Contents/Info.plist
 	install -Dm644 packaging/ferry-installer.desktop $(DESTDIR)$(PREFIX)/share/applications/ferry-installer.desktop
@@ -489,6 +489,6 @@ clean:
 	rm -rf sdk/usr
 	rm -rf tests/build foundation/build graphics/build quartzcore/build security/build appkit/build frameworks \
 	    installer/Installer.app coredata/build webkit/build javascriptcore/build cloudkit/build eventkit/build coreaudio/build \
-	    iosurface/build opengl/build corevideo/build media/build screencapturekit/build
+	    iosurface/build opengl/build corevideo/build media/build metal/build screencapturekit/build
 
 .PHONY: all check install clean
