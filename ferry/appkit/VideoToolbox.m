@@ -20,6 +20,7 @@ enum {
     kVTCouldNotFindVideoDecoderErr = -12906,
     kVTCouldNotFindVideoEncoderErr = -12908,
     kVTInvalidSessionErr = -12903,
+    kVTPixelTransferNotSupportedErr = -12905,
 };
 
 /* ---- decoding */
@@ -52,6 +53,40 @@ OSStatus VTDecompressionSessionWaitForAsynchronousFrames(VTSessionRef session)
 }
 
 void VTDecompressionSessionInvalidate(VTSessionRef session) { (void)session; }
+
+/* (freemac 1.NEXT, for VLC's videotoolbox module) No session opens, so
+ * none takes a new format or holds frames back. */
+Boolean VTDecompressionSessionCanAcceptFormatDescription(VTSessionRef session, const void *newFormatDesc)
+{
+    (void)session; (void)newFormatDesc;
+    return false;
+}
+
+OSStatus VTDecompressionSessionFinishDelayedFrames(VTSessionRef session)
+{
+    (void)session;
+    return kVTInvalidSessionErr;
+}
+
+/* Pixel transfer sessions (VLC's cvpx converter) convert between pixel
+ * buffer formats on a Mac; freemac has no such converter, so making one
+ * fails as Apple documents for a transfer it can't do and the program
+ * converts in software. */
+OSStatus VTPixelTransferSessionCreate(CFAllocatorRef allocator, VTSessionRef *pixelTransferSessionOut)
+{
+    (void)allocator;
+    if (pixelTransferSessionOut)
+        *pixelTransferSessionOut = NULL;
+    return kVTPixelTransferNotSupportedErr;
+}
+
+OSStatus VTPixelTransferSessionTransferImage(VTSessionRef session, void *sourceBuffer, void *destinationBuffer)
+{
+    (void)session; (void)sourceBuffer; (void)destinationBuffer;
+    return kVTInvalidSessionErr;
+}
+
+void VTPixelTransferSessionInvalidate(VTSessionRef session) { (void)session; }
 
 /* No hardware decoder takes any codec here. */
 bool VTIsHardwareDecodeSupported(FourCharCode codecType)
@@ -157,6 +192,15 @@ VT_KEY(kVTCompressionPropertyKey_RealTime)
 VT_KEY(kVTCompressionPropertyKey_TransferFunction)
 VT_KEY(kVTCompressionPropertyKey_YCbCrMatrix)
 VT_KEY(kVTDecompressionPropertyKey_RealTime)
+VT_KEY(kVTDecompressionPropertyKey_FieldMode)
+VT_KEY(kVTDecompressionProperty_FieldMode_BothFields)
+VT_KEY(kVTDecompressionProperty_FieldMode_TopFieldOnly)
+VT_KEY(kVTDecompressionProperty_FieldMode_BottomFieldOnly)
+VT_KEY(kVTDecompressionProperty_FieldMode_SingleField)
+VT_KEY(kVTDecompressionProperty_FieldMode_DeinterlaceFields)
+VT_KEY(kVTDecompressionPropertyKey_DeinterlaceMode)
+VT_KEY(kVTDecompressionProperty_DeinterlaceMode_VerticalFilter)
+VT_KEY(kVTDecompressionProperty_DeinterlaceMode_Temporal)
 VT_KEY(kVTEncodeFrameOptionKey_ForceKeyFrame)
 VT_KEY(kVTVideoDecoderSpecification_EnableHardwareAcceleratedVideoDecoder)
 VT_KEY(kVTVideoDecoderSpecification_RequireHardwareAcceleratedVideoDecoder)

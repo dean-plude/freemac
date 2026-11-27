@@ -104,10 +104,7 @@ struct in6_pktinfo { struct in6_addr ipi6_addr; unsigned int ipi6_ifindex; };
 #define IPV6_DONTFRAG 62
 #define IPV6_BOUND_IF 125
 
-/* network byte order (big-endian) on a little-endian Intel Mac */
-#define htons(x) ((uint16_t)__builtin_bswap16((uint16_t)(x)))
-#define ntohs(x) ((uint16_t)__builtin_bswap16((uint16_t)(x)))
-#define htonl(x) ((uint32_t)__builtin_bswap32((uint32_t)(x)))
-#define ntohl(x) ((uint32_t)__builtin_bswap32((uint32_t)(x)))
+/* network byte order: htons, ntohs, htonl and ntohl */
+#include <machine/endian.h>
 __FERRY_END
 #endif
