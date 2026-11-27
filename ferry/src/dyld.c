@@ -672,7 +672,77 @@ static void *ferry_dl_first_class(void *h)
     return p && p->kind == H_IMAGE ? ferry_image_first_class(p->im) : NULL;
 }
 
+/* The old NSModule calls (dyld(3), deprecated but still in macOS): a
+ * symbol by its linker name, with C's leading underscore, looked up as
+ * dlsym(RTLD_DEFAULT) would. An NSSymbol is here the symbol's address
+ * (kitty's GLFW finds its OpenGL calls so). */
+static const char *c_name(const char *linker_name)
+{
+    return linker_name && linker_name[0] == '_' ? linker_name + 1 : linker_name;
+}
+static int mac_NSIsSymbolNameDefined(const char *name)
+{
+    return mac_dlsym(MAC_RTLD_DEFAULT, c_name(name)) != NULL;
+}
+static int mac_NSIsSymbolNameDefinedWithHint(const char *name, const char *hint)
+{
+    (void)hint;
+    return mac_NSIsSymbolNameDefined(name);
+}
+static void *mac_NSLookupAndBindSymbol(const char *name)
+{
+    return mac_dlsym(MAC_RTLD_DEFAULT, c_name(name));
+}
+static void *mac_NSLookupAndBindSymbolWithHint(const char *name, const char *hint)
+{
+    (void)hint;
+    return mac_NSLookupAndBindSymbol(name);
+}
+static void *mac_NSLookupSymbolInImage(const void *image, const char *name, unsigned options)
+{
+    (void)image;
+    (void)options;
+    return mac_NSLookupAndBindSymbol(name);
+}
+static void *mac_NSAddressOfSymbol(void *symbol)
+{
+    return symbol;
+}
+/* An NSModule is the address of one of its symbols: its names are dladdr's */
+static void *mac_NSModuleForSymbol(void *symbol)
+{
+    return symbol;
+}
+static const char *mac_NSNameOfModule(void *module)
+{
+    struct mac_dl_info info;
+    return module && mac_dladdr(module, &info) ? info.dli_fname : NULL;
+}
+static const char *mac_NSLibraryNameForModule(void *module)
+{
+    return mac_NSNameOfModule(module);
+}
+static const char *mac_NSNameOfSymbol(void *symbol)
+{
+    static __thread char name[512];
+    struct mac_dl_info info;
+    if (!symbol || !mac_dladdr(symbol, &info) || !info.dli_sname)
+        return NULL;
+    snprintf(name, sizeof name, "_%s", info.dli_sname);
+    return name;
+}
+
 const struct ferry_symbol ferry_dyld_symbols[] = {
+    {"NSIsSymbolNameDefined", mac_NSIsSymbolNameDefined},
+    {"NSIsSymbolNameDefinedWithHint", mac_NSIsSymbolNameDefinedWithHint},
+    {"NSLookupAndBindSymbol", mac_NSLookupAndBindSymbol},
+    {"NSLookupAndBindSymbolWithHint", mac_NSLookupAndBindSymbolWithHint},
+    {"NSLookupSymbolInImage", mac_NSLookupSymbolInImage},
+    {"NSAddressOfSymbol", mac_NSAddressOfSymbol},
+    {"NSModuleForSymbol", mac_NSModuleForSymbol},
+    {"NSNameOfModule", mac_NSNameOfModule},
+    {"NSLibraryNameForModule", mac_NSLibraryNameForModule},
+    {"NSNameOfSymbol", mac_NSNameOfSymbol},
     {"dlopen", mac_dlopen},
     {"dlopen_preflight", mac_dlopen_preflight},
     {"dlsym", mac_dlsym},

@@ -461,6 +461,11 @@ run_one foundation_corefoundation "$here/foundation/corefoundation.c" "$here/fou
 # Run loop sources and CFSockets on 127.0.0.1, from plain C.
 run_one corefoundation_socket "$here/foundation/cfsocket.c" "$here/foundation/cfsocket.out" -framework CoreFoundation
 run_one foundation_constant_literals "$here/foundation/constant_literals.m" "$here/foundation/constant_literals.out" -framework Foundation
+# What kitty's official download asks for before its window: the old dyld
+# symbol calls, literal dictionaries and float numbers, HIToolbox's bundle
+# and Menlo among the available fonts (freemac kitty work)
+run_one foundation_kitty_calls "$here/foundation/kitty_calls.m" "$here/foundation/kitty_calls.out" -framework AppKit \
+    -framework Foundation -framework CoreText -framework CoreGraphics
 run_one foundation_arc "$here/foundation/arc.m" "$here/foundation/arc.out" -fobjc-arc -framework Foundation
 run_one foundation_dispatch "$here/foundation/dispatch.m" "$here/foundation/dispatch.out" -fobjc-arc -framework Foundation
 # The macOS version, the same in the Mac's version file, uname, NSProcessInfo
