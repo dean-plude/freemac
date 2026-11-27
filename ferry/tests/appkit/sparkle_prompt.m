@@ -3,9 +3,8 @@
  * 1.NEXT). Its "Check for updates automatically?" prompt holds the message
  * in a text field that Xcode wrote as a word-wrapping cell that neither
  * scrolls nor keeps to one line (cell flags 0x04000000, line breaking 0); a
- * Mac wraps it over two lines, and Ferry cut it off after one. Ferry's own
- * ferry-ibtool marks such cells with a further bit, which Xcode doesn't
- * write. VLC's preferences show when the updater last looked with
+ * Mac wraps it over two lines, and Ferry cut it off after one. A cell in
+ * single-line mode (0x200) keeps to one line. VLC's preferences show when the updater last looked with
  * NSDate's descriptionWithLocale:. The cells are made here with a keyed
  * archiver, under the class names a nib uses. */
 #import <Cocoa/Cocoa.h>
