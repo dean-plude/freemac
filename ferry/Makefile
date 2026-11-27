@@ -22,6 +22,9 @@ SRC += src/libc_apps.c
 SRC += src/libc_audacity.c
 # NXArchInfo, Mach clocks, regex, syslog and more, for Blender
 SRC += src/libc_blender.c
+SRC += src/mach.c
+SRC += src/notify.c
+SRC += src/libc_electron.c
 # cameras, for AVFoundation's capture (freemac 1.257)
 SRC += src/camera.c
 # AAC and other sound codecs through this system's FFmpeg, for Core Audio (freemac 1.264)

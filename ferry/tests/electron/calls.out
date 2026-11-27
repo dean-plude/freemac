@@ -1,0 +1,22 @@
+heap count 7, same type: yes
+heap order: 3 7 7 19 42 50 88
+words: [Ferry] [runs] [Mac] [apps] [It's] [free] [and] [100] [ours]
+word at 13: 11+3
+sentences: 2
+bitmap 8192 bytes, '5' in: yes, 'a' in: no
+hyphenation: no
+store key: State:/Network/Global/IPv4
+proxies is a dictionary: yes, notification keys: set
+run loop source: yes
+identity search: 0, next: -25300
+trust settings: -25263, keychain callback: 0
+policy type: yes, name: example.org, is SSL: yes
+requirement round trip: anchor apple
+vsmul 2 -8, vsub -2 3, svesq 30, maxmgv 4
+vclip 1 -1 1 -1
+fft dc 16.00, bin 2 0.00-16.00i, bin 1 0.00
+forward then inverse is 2N times: yes
+deq22D 1 0.5 0.25 0.125
+symlink resolves to real: yes
+missing path standardized: /nowhere/b
+exit=0

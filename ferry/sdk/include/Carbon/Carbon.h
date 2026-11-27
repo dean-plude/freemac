@@ -186,6 +186,40 @@ UInt32 GetEventKind(EventRef event);
 EventTime GetEventTime(EventRef event);
 EventRef RetainEvent(EventRef event);
 void ReleaseEvent(EventRef event);
+/* events a program makes and sends itself, and the main event queue
+ * (freemac 1.265; appkit/Carbon.m) */
+typedef struct OpaqueEventQueueRef *EventQueueRef;
+typedef UInt32 EventAttributes;
+typedef SInt16 EventPriority;
+typedef double EventTimeout;
+enum { kEventAttributeNone = 0, kEventAttributeUserEvent = 1 };
+enum { kEventPriorityLow = 0, kEventPriorityStandard = 1, kEventPriorityHigh = 2 };
+enum { eventLoopTimedOutErr = -9875 };
+#define kEventDurationForever (-1.0)
+#define kEventDurationNoWait 0.0
+EventTime GetCurrentEventTime(void);
+OSStatus CreateEvent(CFAllocatorRef allocator, UInt32 eventClass, UInt32 kind, EventTime when, EventAttributes flags,
+                     EventRef *outEvent);
+EventRef CopyEvent(EventRef event);
+OSStatus SetEventParameter(EventRef event, EventParamName name, EventParamType type, ByteCount size, const void *data);
+OSStatus SetEventTime(EventRef event, EventTime when);
+EventQueueRef GetMainEventQueue(void);
+EventQueueRef GetCurrentEventQueue(void);
+OSStatus PostEventToQueue(EventQueueRef queue, EventRef event, EventPriority priority);
+OSStatus SendEventToEventTarget(EventRef event, EventTargetRef target);
+OSStatus SendEventToEventTargetWithOptions(EventRef event, EventTargetRef target, OptionBits options);
+OSStatus ReceiveNextEvent(ItemCount numTypes, const EventTypeSpec *list, EventTimeout timeout, Boolean pullEvent,
+                          EventRef *outEvent);
+EventRef GetCurrentEvent(void);
+OSStatus EnableSecureEventInput(void);
+OSStatus DisableSecureEventInput(void);
+Boolean IsSecureEventInputEnabled(void);
+OSStatus SetApplicationIsDaemon(Boolean isDaemon);
+OSStatus TSMSetDocumentProperty(void *document, OSType tag, UInt32 size, void *data);
+OSStatus TSMRemoveDocumentProperty(void *document, OSType tag);
+uint8_t LMGetKbdLast(void);
+Boolean UAZoomEnabled(void);
+OSStatus UAZoomChangeFocus(const CGRect *rect, const CGRect *highlight, UInt32 type);
 
 #define InstallApplicationEventHandler(h, n, l, u, r) \
     InstallEventHandler(GetApplicationEventTarget(), (h), (n), (l), (u), (r))

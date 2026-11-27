@@ -1,0 +1,37 @@
+allocated: yes, receive only
+insert send: 0, send refs 1, send and receive yes
+construct: 0, context 1234, qlimit 16, send and receive yes
+queued: 2
+received 1 then 2, then timed out
+waited for: 7
+complex send: 0
+complex receive: 0, id 500, value 42
+reply is send-once: yes, port is b: yes, disposition send: yes
+out of line: "out of line words", a copy: yes
+trailer: 52 bytes, pid ours
+b's send refs now 1
+reply: 0, b got 9
+from the set: 0, value 3, on p2 yes
+extract twice: 1
+too large: yes, needs 36, still there 4
+no senders: 0, id 70
+dead-name request: 0, same name yes
+dead name: yes, notified 0, id 72, for it yes
+send to it: invalid
+gone: yes
+check in 0, look up 0
+through the service: 5
+unknown: Unknown service name
+nothing yet: 0
+kevent: 1, result 0, value 6, size 28
+then empty: 0
+mach_recv source: fired, got 30
+mach_send source: fired, data 1
+memory entry: 0, size rounded to a page: yes
+mapped twice: 0 0, second aligned: yes, sees the first's write: yes
+read-only entry: 0, writable map refused: yes, read map: 0, reads: yes
+unmap: 0 0 0
+entries released: 0 0
+mig reply port kept: yes
+deallocate a task port: 0
+exit=0

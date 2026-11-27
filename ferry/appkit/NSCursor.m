@@ -57,6 +57,39 @@ STANDARD(operationNotAllowedCursor, "not-allowed")
 STANDARD(dragLinkCursor, "alias")
 STANDARD(dragCopyCursor, "copy")
 STANDARD(contextualMenuCursor, "context-menu")
+/* the zoom, table and window-edge resize cursors (freemac 1.265, for Chromium) */
+STANDARD(zoomInCursor, "zoom-in")
+STANDARD(zoomOutCursor, "zoom-out")
++ (NSCursor *)columnResizeCursor { return [self resizeLeftRightCursor]; }
++ (NSCursor *)rowResizeCursor { return [self resizeUpDownCursor]; }
++ (NSCursor *)columnResizeCursorInDirections:(NSUInteger)directions { return [self resizeLeftRightCursor]; }
++ (NSCursor *)rowResizeCursorInDirections:(NSUInteger)directions { return [self resizeUpDownCursor]; }
+STANDARD(ferry_nw, "nw-resize")
+STANDARD(ferry_ne, "ne-resize")
+STANDARD(ferry_sw, "sw-resize")
+STANDARD(ferry_se, "se-resize")
+/* positions as in NSCursorFrameResizePosition: top 1, left 2, bottom 4, right 8 */
++ (NSCursor *)frameResizeCursorFromPosition:(NSUInteger)position inDirections:(NSUInteger)directions
+{
+    BOOL top = position & 1, left = position & 2, bottom = position & 4, right = position & 8;
+    if (top && left)
+        return [self ferry_nw];
+    if (top && right)
+        return [self ferry_ne];
+    if (bottom && left)
+        return [self ferry_sw];
+    if (bottom && right)
+        return [self ferry_se];
+    if (top)
+        return [self resizeUpCursor];
+    if (bottom)
+        return [self resizeDownCursor];
+    if (left)
+        return [self resizeLeftCursor];
+    if (right)
+        return [self resizeRightCursor];
+    return [self arrowCursor];
+}
 #undef STANDARD
 
 + (NSCursor *)currentCursor { return current ?: [self arrowCursor]; }

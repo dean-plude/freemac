@@ -402,6 +402,9 @@ __FERRY_END
 /* notification centers and Mach ports (foundation/CFNotificationCenter.m,
  * freemac 1.224, Ferry 0.48.0) */
 #include <CoreFoundation/CFNotificationCenter.h>
+/* allocators from a context, binary heaps, string tokenizers (freemac 1.265,
+ * Ferry 0.88.0, foundation/CFElectron.m) */
+#include <CoreFoundation/CFBinaryHeap.h>
 /* an object's type (freemac 1.215, Ferry 0.41.0) */
 #ifdef __cplusplus
 extern "C" CFTypeID CFGetTypeID(CFTypeRef cf);

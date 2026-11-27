@@ -78,6 +78,23 @@ static void fit_safe_area(NSView *v, NSLayoutGuide *g)
 {
     return [CADisplayLink displayLinkWithTarget:target selector:selector];
 }
+/* How fast the screen redraws (macOS 12): its display mode's refresh rate,
+ * 60 times a second when that isn't known. Ferry's screens have a fixed
+ * rate, so the shortest and longest intervals are the same. */
+static double ferry_screen_hz(NSScreen *screen)
+{
+    CGDirectDisplayID d = (CGDirectDisplayID)[[screen deviceDescription][@"NSScreenNumber"] unsignedIntValue];
+    CGDisplayModeRef m = CGDisplayCopyDisplayMode(d ? d : CGMainDisplayID());
+    double hz = m ? CGDisplayModeGetRefreshRate(m) : 0;
+    if (m)
+        CGDisplayModeRelease(m);
+    return hz >= 1 ? hz : 60;
+}
+- (NSInteger)maximumFramesPerSecond { return (NSInteger)(ferry_screen_hz(self) + 0.5); }
+- (NSTimeInterval)minimumRefreshInterval { return 1.0 / ferry_screen_hz(self); }
+- (NSTimeInterval)maximumRefreshInterval { return 1.0 / ferry_screen_hz(self); }
+- (NSTimeInterval)displayUpdateGranularity { return 0; }
+- (NSTimeInterval)lastDisplayUpdateTimestamp { return [[NSProcessInfo processInfo] systemUptime]; }
 @end
 
 /* ---- symbol configurations ------------------------------------------------------------------- */

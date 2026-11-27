@@ -1183,6 +1183,21 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.265 "Electron apps start" (done)
+
+Ferry 0.88.0: Obsidian 1.8.10, picked from the official download as the first Electron app (Chromium and Node.js inside), now gets through its whole start in the main process: Node.js loads the app's own code, its menus are built, and it starts its GPU, network and page helper processes. The helpers can't yet reach the main app, because Chromium passes messages between its processes over Mach ports and Ferry's ports work inside one process only; that is the next batch. Everything Electron needed on the way is in Ferry for other apps too.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Real Mach ports and messages in a process: send and receive rights, port sets, MIG replies, `kevent`'s `EVFILT_MACHPORT` and dispatch's Mach sources | Ferry | done |
+| 2 | Shared memory through Mach memory entries (`mach_make_memory_entry_64`, `mach_vm_map`), with a read-only entry refusing a writable map as on a Mac | Ferry | done |
+| 3 | Malloc zones as PartitionAlloc reorders them, `vm_region_64`, thread-local values read straight from the thread block, the commpage, notify, the Carbon event queue, sandbox checks, thread info and processor load | Ferry | done |
+| 4 | Core Foundation binary heaps, custom allocators, string tokenizers and character-set bitmaps; the network settings store (`SCDynamicStore`) with its keys and proxy settings | Ferry Foundation | done |
+| 5 | Security: identity searches, trust settings, keychain callbacks, policy properties and type IDs, code requirements as data | Ferry Security | done |
+| 6 | vDSP vector maths, filters and the real FFT in Accelerate | Ferry Accelerate | done |
+| 7 | The menu, cursor, window, spell-check, gesture and Core Animation calls Electron makes; an Electron app runs without the Mac app sandbox it asks for | Ferry AppKit / Core Animation | done |
+| 8 | Obsidian's main process starts and launches its helpers | Ferry / Obsidian | done |
+
 ## 1.264 "HandBrake converts video" (done)
 
 Ferry 0.87.0: HandBrake 1.9.2, the video converter, runs from its official download and converts a video from start to finish: it opens the file, shows its tracks and a preview, and its Start button encodes it to H.264 video with AAC sound, which plays back correctly. It was picked because it looked likely not to work: it does its encoding in separate helper programs that it talks to over XPC, which nothing in Ferry could start, and it encodes sound with Core Audio's AAC encoder, which Ferry didn't have. Both are there now. Core Audio's audio converters encode AAC, Apple Lossless, FLAC and Opus, and decode those, MP3 and AC-3, using the system's FFmpeg, so other apps that make or read compressed sound through Core Audio get them too.

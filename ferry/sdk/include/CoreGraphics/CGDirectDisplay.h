@@ -69,6 +69,8 @@ boolean_t CGDisplayIsAsleep(CGDirectDisplayID display);
 boolean_t CGDisplayIsOnline(CGDirectDisplayID display);
 boolean_t CGDisplayIsMain(CGDirectDisplayID display);
 boolean_t CGDisplayIsBuiltin(CGDirectDisplayID display);
+boolean_t CGDisplayUsesForceToGray(void);
+boolean_t CGDisplayUsesInvertedPolarity(void);
 boolean_t CGDisplayIsInMirrorSet(CGDirectDisplayID display);
 boolean_t CGDisplayIsAlwaysInMirrorSet(CGDirectDisplayID display);
 boolean_t CGDisplayIsInHWMirrorSet(CGDirectDisplayID display);

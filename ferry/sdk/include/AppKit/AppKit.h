@@ -1327,6 +1327,12 @@ APPKIT_EXTERN NSDeviceDescriptionKey const NSDeviceSize;
 - (NSRect)convertRectToBacking:(NSRect)rect;
 - (NSRect)convertRectFromBacking:(NSRect)rect;
 @end
+/* how fast the screen redraws (macOS 12; appkit/AppKitNewer.m) */
+@interface NSScreen (FerryRefresh)
+@property (readonly) NSInteger maximumFramesPerSecond;
+@property (readonly) NSTimeInterval minimumRefreshInterval, maximumRefreshInterval;
+@property (readonly) NSTimeInterval displayUpdateGranularity, lastDisplayUpdateTimestamp;
+@end
 
 /* ---- menus ------------------------------------------------------------------------ */
 
@@ -4771,6 +4777,10 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidUpdateNotification;
 /* ---- what Qt's Mac platform plugin calls besides (AppKitQt.m), for OBS */
 
 #import <AppKit/AppKitQt.h>
+
+/* ---- what Chromium and Electron call besides (AppKitElectron.m), for Obsidian */
+
+#import <AppKit/AppKitElectron.h>
 
 __FERRY_END
 #endif

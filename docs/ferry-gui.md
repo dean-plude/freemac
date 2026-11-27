@@ -3396,6 +3396,41 @@ Not there yet: IINA's images from its asset catalog (some buttons are
 blank), gesture recognizers don't fire, and picture in picture's window has
 no play and pause buttons.
 
+## Electron apps and what they needed (freemac 1.265, Ferry 0.88.0)
+
+Electron apps carry Chromium and Node.js inside, and many popular Mac apps
+are built that way. Obsidian 1.8.10, from its official download, was the
+first one tried. Its main process now runs its whole start under Ferry:
+Node.js loads the app's code, it builds its menus, and it starts its GPU,
+network and page helper processes. On the way it needed:
+
+- **Mach ports.** Chromium carries its messages on Mach ports, even inside
+  one process. Ferry now has real ports with send and receive rights, port
+  sets and messages that carry rights and memory, and `kevent` and dispatch
+  wake on them.
+- **Shared memory.** Chromium shares memory through Mach memory entries.
+  `mach_make_memory_entry_64` makes one, and `mach_vm_map` maps it; a
+  read-only entry refuses a writable map with `KERN_INVALID_RIGHT`, which
+  Chromium relies on when it checks a region is read-only.
+- **The memory allocator.** PartitionAlloc reorders the malloc zones and
+  reads the memory regions with `vm_region_64`; Chromium reads thread-local
+  values straight from the thread block, as code built for a Mac does.
+- **Core Foundation and System Configuration.** Binary heaps, allocators
+  with a context, string tokenizers (words, sentences, lines), character-set
+  bitmaps, and the network settings store with its keys and proxy settings.
+- **Security.** Identity searches (Ferry keeps no identities), trust
+  settings, keychain callbacks, policy properties and requirements as data.
+- **Accelerate.** vDSP's vector maths, its biquad filter and the real FFT.
+- **AppKit and Core Animation.** The menu, cursor, window, spell-check and
+  gesture calls Chromium makes, and transaction commit handlers.
+- **No app sandbox.** Electron asks the Mac app sandbox to confine its
+  helpers and stops if it can't. Ferry has no such sandbox, so it starts an
+  Electron app with Chromium's own `--no-sandbox` switch.
+
+Not there yet: the helpers stop because they can't reach the main app's
+Mach rendezvous service. Ferry's ports work inside one process; ports
+between processes come next.
+
 ## HandBrake and what it needed (freemac 1.264, Ferry 0.87.0)
 
 HandBrake 1.9.2, from its official download, opens a video, shows its

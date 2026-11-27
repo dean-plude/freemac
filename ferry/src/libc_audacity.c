@@ -4,13 +4,9 @@
  * Ferry 0.86.0), each written from its Mac man page or Apple's public Mach
  * and bootstrap documentation.
  *
- * - Mach ports and exception ports, and the bootstrap server. Crash
- *   reporters (Crashpad, which Audacity starts) make a receive right, check
- *   it in with launchd and catch the task's exceptions there. Ferry has no
- *   Mach IPC, so making a port fails as a Mac's does when it runs out
- *   (KERN_RESOURCE_SHORTAGE), the bootstrap server knows no service, and a
- *   task has no exception ports. A crash reporter then simply doesn't start,
- *   which every one of them allows for.
+ * - Exception ports: a task has none, and none can be set. Crash
+ *   reporters (Crashpad, which Audacity starts) then don't catch crashes,
+ *   which every one of them allows for. Mach ports themselves are in mach.c.
  * - thread_policy_set: accepted; this system's scheduler decides.
  * - audit_token_to_pid: the process id kept in an audit token.
  * - confstr(3) with the Mac's names, including the per-user folders
@@ -43,65 +39,6 @@ typedef int kern_return_t;
 #define KERN_SUCCESS 0
 #define KERN_INVALID_ARGUMENT 4
 #define KERN_FAILURE 5
-#define KERN_RESOURCE_SHORTAGE 6
-#define KERN_INVALID_NAME 15
-#define MACH_SEND_INVALID_DEST 0x10000003
-#define MACH_RCV_INVALID_NAME 0x10004002
-#define MACH_SEND_MSG 0x00000001
-#define BOOTSTRAP_NOT_PRIVILEGED 1100
-#define BOOTSTRAP_UNKNOWN_SERVICE 1102
-
-/* ---- Mach ports --------------------------------------------------------------------- */
-
-static mac_port_t mac_bootstrap_port = 0; /* MACH_PORT_NULL: there is no launchd to talk to */
-
-static kern_return_t mac_mach_port_allocate(mac_port_t task, int right, mac_port_t *name)
-{
-    if (name)
-        *name = 0;
-    return KERN_RESOURCE_SHORTAGE;
-}
-
-static kern_return_t mac_mach_port_mod_refs(mac_port_t task, mac_port_t name, int right, int delta)
-{
-    return name ? KERN_INVALID_NAME : KERN_SUCCESS;
-}
-
-static kern_return_t mac_mach_port_insert_member(mac_port_t task, mac_port_t name, mac_port_t set)
-{
-    return KERN_INVALID_NAME;
-}
-
-static kern_return_t mac_mach_port_extract_right(mac_port_t task, mac_port_t name, unsigned type, mac_port_t *out,
-                                                 unsigned *out_type)
-{
-    if (out)
-        *out = 0;
-    return KERN_INVALID_NAME;
-}
-
-static kern_return_t mac_mach_port_request_notification(mac_port_t task, mac_port_t name, int id, unsigned sync,
-                                                        mac_port_t notify, unsigned type, mac_port_t *previous)
-{
-    if (previous)
-        *previous = 0;
-    return KERN_INVALID_NAME;
-}
-
-static kern_return_t mac_mach_port_insert_right(mac_port_t task, mac_port_t name, mac_port_t poly, unsigned type)
-{
-    return KERN_INVALID_NAME;
-}
-
-static kern_return_t mac_mach_port_destroy(mac_port_t task, mac_port_t name) { return name ? KERN_INVALID_NAME : KERN_SUCCESS; }
-
-static kern_return_t mac_mach_msg(void *msg, int option, unsigned send_size, unsigned rcv_size, mac_port_t rcv_name,
-                                  unsigned timeout, mac_port_t notify)
-{
-    return option & MACH_SEND_MSG ? MACH_SEND_INVALID_DEST : MACH_RCV_INVALID_NAME;
-}
-
-static void mac_mach_msg_destroy(void *msg) {}
 
 /* ---- exception ports: none, and none can be set ---------------------------------------- */
 
@@ -126,41 +63,6 @@ static kern_return_t mac_swap_exception_ports(mac_port_t target, unsigned mask, 
     if (count)
         *count = 0;
     return port ? KERN_FAILURE : KERN_SUCCESS;
-}
-
-/* ---- the bootstrap server ------------------------------------------------------------- */
-
-static kern_return_t mac_bootstrap_look_up(mac_port_t bp, const char *name, mac_port_t *sp)
-{
-    if (sp)
-        *sp = 0;
-    return BOOTSTRAP_UNKNOWN_SERVICE;
-}
-
-static kern_return_t mac_bootstrap_check_in(mac_port_t bp, const char *name, mac_port_t *sp)
-{
-    if (sp)
-        *sp = 0;
-    return BOOTSTRAP_UNKNOWN_SERVICE;
-}
-
-static kern_return_t mac_bootstrap_register(mac_port_t bp, const char *name, mac_port_t sp)
-{
-    return BOOTSTRAP_NOT_PRIVILEGED;
-}
-
-static const char *mac_bootstrap_strerror(kern_return_t r)
-{
-    switch (r) {
-    case KERN_SUCCESS: return "Success";
-    case BOOTSTRAP_NOT_PRIVILEGED: return "Permission denied";
-    case 1101: return "Service name already exists";
-    case BOOTSTRAP_UNKNOWN_SERVICE: return "Unknown service name";
-    case 1103: return "Service is already active";
-    case 1104: return "Bad request";
-    case 1105: return "No memory";
-    default: return "Unknown error";
-    }
 }
 
 /* ---- threads and processes -------------------------------------------------------------- */
@@ -354,16 +256,6 @@ __asm__(".text\n"
 
 const struct ferry_symbol ferry_libc_audacity_symbols[] = {
     {"___chkstk_darwin", mac_chkstk_darwin},
-    {"bootstrap_port", &mac_bootstrap_port},
-    {"mach_port_allocate", mac_mach_port_allocate},
-    {"mach_port_mod_refs", mac_mach_port_mod_refs},
-    {"mach_port_insert_member", mac_mach_port_insert_member},
-    {"mach_port_extract_right", mac_mach_port_extract_right},
-    {"mach_port_request_notification", mac_mach_port_request_notification},
-    {"mach_port_insert_right", mac_mach_port_insert_right},
-    {"mach_port_destroy", mac_mach_port_destroy},
-    {"mach_msg", mac_mach_msg},
-    {"mach_msg_destroy", mac_mach_msg_destroy},
     {"task_get_exception_ports", mac_get_exception_ports},
     {"thread_get_exception_ports", mac_get_exception_ports},
     {"host_get_exception_ports", mac_get_exception_ports},
@@ -373,10 +265,6 @@ const struct ferry_symbol ferry_libc_audacity_symbols[] = {
     {"task_swap_exception_ports", mac_swap_exception_ports},
     {"thread_swap_exception_ports", mac_swap_exception_ports},
     {"host_swap_exception_ports", mac_swap_exception_ports},
-    {"bootstrap_look_up", mac_bootstrap_look_up},
-    {"bootstrap_check_in", mac_bootstrap_check_in},
-    {"bootstrap_register", mac_bootstrap_register},
-    {"bootstrap_strerror", mac_bootstrap_strerror},
     {"thread_policy_set", mac_thread_policy_set},
     {"thread_policy_get", mac_thread_policy_get},
     {"audit_token_to_pid", mac_audit_token_to_pid},

@@ -152,4 +152,6 @@ extern int vm_page_shift;
 __FERRY_END
 #include <mach/semaphore.h>
 #include <mach/vm_map.h>
+#include <mach/mach_vm.h>
+#include <mach/port.h>
 #endif

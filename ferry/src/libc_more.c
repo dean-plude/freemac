@@ -164,6 +164,9 @@ static struct mac_zone *zone_named(struct mac_zone *z)
 static struct mac_zone *mac_malloc_default_zone(void) { return zone_named(&default_zone); }
 static struct mac_zone *mac_malloc_default_purgeable_zone(void) { return zone_named(&purgeable_zone); }
 
+static void mac_malloc_zone_register(void *zone);
+static void mac_malloc_zone_unregister(void *zone);
+
 static struct mac_zone *mac_malloc_create_zone(size_t start, unsigned flags)
 {
     (void)start; (void)flags;
@@ -171,27 +174,68 @@ static struct mac_zone *mac_malloc_create_zone(size_t start, unsigned flags)
     if (z) {
         *z = (struct mac_zone)ZONE_INIT("Zone");
         z->zone_name = z->name;
+        mac_malloc_zone_register(z); /* a new zone is listed, as on a Mac */
     }
     return z;
 }
 
-/* malloc_get_all_zones: the default zone alone, which serves every block
- * here. malloc_zone_register and _unregister take note of nothing, since
- * a zone a program brings is not asked for memory (this system's malloc
- * serves it all). malloc_zone_statistics reports this system's figures
- * (freemac Blender work). */
+/* malloc_get_all_zones lists the registered zones, the default first.
+ * malloc_zone_register adds a zone at the end, and malloc_zone_unregister
+ * takes one out by moving the last zone into its place, as on a Mac: a
+ * program that wants its own zone to come first (Chromium's PartitionAlloc
+ * does, in every Electron app) registers it, then unregisters and
+ * registers the default zone again, and checks that its zone is now the
+ * first one listed. The zones are only listed: this system's malloc still
+ * serves every block, whichever zone a program puts first.
+ * malloc_zone_statistics reports this system's figures (freemac Blender
+ * work). */
+#define MAX_ZONES 64
+static uintptr_t registered_zones[MAX_ZONES];
+static unsigned registered_count;
+static pthread_mutex_t zones_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static void zones_start(void)
+{
+    if (!registered_count) {
+        registered_zones[0] = (uintptr_t)zone_named(&default_zone);
+        registered_count = 1;
+    }
+}
+
 static int mac_malloc_get_all_zones(unsigned task, void *reader, uintptr_t **addresses, unsigned *count)
 {
-    static uintptr_t zones[1];
-    zones[0] = (uintptr_t)&default_zone;
+    (void)task; (void)reader;
+    pthread_mutex_lock(&zones_lock);
+    zones_start();
     if (addresses)
-        *addresses = zones;
+        *addresses = registered_zones;
     if (count)
-        *count = 1;
+        *count = registered_count;
+    pthread_mutex_unlock(&zones_lock);
     return 0;
 }
-static void mac_malloc_zone_register(void *zone) { (void)zone; }
-static void mac_malloc_zone_unregister(void *zone) { (void)zone; }
+static void mac_malloc_zone_register(void *zone)
+{
+    if (!zone)
+        return;
+    pthread_mutex_lock(&zones_lock);
+    zones_start();
+    if (registered_count < MAX_ZONES)
+        registered_zones[registered_count++] = (uintptr_t)zone;
+    pthread_mutex_unlock(&zones_lock);
+}
+static void mac_malloc_zone_unregister(void *zone)
+{
+    pthread_mutex_lock(&zones_lock);
+    zones_start();
+    for (unsigned i = 0; i < registered_count; i++)
+        if (registered_zones[i] == (uintptr_t)zone) {
+            registered_zones[i] = registered_zones[--registered_count];
+            registered_zones[registered_count] = 0;
+            break;
+        }
+    pthread_mutex_unlock(&zones_lock);
+}
 
 struct mac_malloc_statistics {
     unsigned blocks_in_use;
@@ -211,8 +255,10 @@ static void mac_malloc_zone_statistics(void *zone, struct mac_malloc_statistics 
 
 static void mac_malloc_destroy_zone(struct mac_zone *z)
 {
-    if (z && z != &default_zone && z != &purgeable_zone)
+    if (z && z != &default_zone && z != &purgeable_zone) {
+        mac_malloc_zone_unregister(z);
         free(z);
+    }
 }
 
 static struct mac_zone *mac_malloc_zone_from_ptr(const void *p) { return p ? zone_named(&default_zone) : NULL; }
@@ -1188,7 +1234,23 @@ static size_t mac_regerror(int code, const struct mac_regex *preg, char *buf, si
     return regerror(code, re, buf, size);
 }
 
+/* The resolver state (libresolv's res_ninit and the name servers in it).
+ * A Mac's struct __res_state is laid out unlike this system's, so Ferry
+ * doesn't fill one in: res_ninit reports failure and a program falls back
+ * to getaddrinfo, which reads this system's own resolver setup. */
+static int mac_res_ninit(void *state) { (void)state; errno = ENOSYS; return -1; }
+static void mac_res_ndestroy(void *state) { (void)state; }
+static int mac_res_getservers(void *state, void *servers, int count) { (void)state; (void)servers; (void)count; return 0; }
+
+/* the process that answers for another in privacy prompts: itself here */
+static int mac_responsibility_get_pid_responsible_for_pid(int pid) { return pid; }
+
 const struct ferry_symbol ferry_libc_more_symbols[] = {
+    {"res_9_ninit", mac_res_ninit},
+    {"res_9_ndestroy", mac_res_ndestroy},
+    {"res_9_nclose", mac_res_ndestroy},
+    {"res_9_getservers", mac_res_getservers},
+    {"responsibility_get_pid_responsible_for_pid", mac_responsibility_get_pid_responsible_for_pid},
     {"malloc_good_size", mac_malloc_good_size},
     {"memset_pattern4", mac_memset_pattern4},
     {"memset_pattern8", mac_memset_pattern8},

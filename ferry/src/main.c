@@ -18,7 +18,7 @@
 
 #include "ferry.h"
 
-#define FERRY_VERSION "0.87.0"
+#define FERRY_VERSION "0.88.0"
 
 static void usage(FILE *out)
 {
@@ -165,7 +165,8 @@ int main(int argc, char **argv, char **envp)
                                                    ferry_libc_more_symbols, ferry_oslog_symbols,
                                                    ferry_swift_symbols, ferry_copyfile_symbols, ferry_libc_vlc_symbols,
                                                     ferry_libc_apps_symbols, ferry_libc_audacity_symbols,
-                                                    ferry_libc_blender_symbols};
+                                                    ferry_libc_blender_symbols, ferry_mach_symbols,
+                                                    ferry_notify_symbols, ferry_libc_electron_symbols};
             for (size_t t = 0; t < sizeof tables / sizeof tables[0]; t++)
                 for (const struct ferry_symbol *s = tables[t]; s->name; s++)
                     printf("_%s\n", s->name);
@@ -212,7 +213,29 @@ int main(int argc, char **argv, char **envp)
             fprintf(stderr, "ferry: %s isn't an app: it has no program in Contents/MacOS\n", argv[i]);
             return 126;
         }
+        /* An Electron app (Chromium inside) asks the Mac app sandbox to
+         * confine its helper processes, and stops if it can't. Ferry has no
+         * such sandbox, so the app is told plainly, with Chromium's own
+         * switch for running without it, which it passes on to its helpers
+         * (freemac 1.265). */
+        char electron[PATH_MAX];
+        snprintf(electron, sizeof electron, "%s/Contents/Frameworks/Electron Framework.framework", argv[i]);
         argv[i] = program;
+        if (is_dir(electron)) {
+            int has = 0;
+            for (int k = i + 1; k < argc; k++)
+                has |= !strcmp(argv[k], "--no-sandbox");
+            if (!has) {
+                char **args = calloc((size_t)(argc + 2), sizeof *args);
+                memcpy(args, argv, (size_t)(i + 1) * sizeof *args);
+                args[i + 1] = "--no-sandbox";
+                memcpy(args + i + 2, argv + i + 1, (size_t)(argc - i - 1) * sizeof *args);
+                argv = args;
+                argc++;
+                if (ferry_verbose)
+                    fprintf(stderr, "ferry: an Electron app; Ferry has no Mac app sandbox, so it runs without one\n");
+            }
+        }
     } else if (is_installable(argv[i])) {
         if (!find_installer(program, sizeof program)) {
             fprintf(stderr, "ferry: %s is a Mac installer or disk image, but Ferry's Installer isn't here\n", argv[i]);

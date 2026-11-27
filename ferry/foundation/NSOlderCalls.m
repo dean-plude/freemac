@@ -163,6 +163,41 @@ static NSString *base_language(NSString *tag)
         return @[ dev ];
     return @[ [localizations objectAtIndex:0] ];
 }
+/* A resource in one localization's .lproj folder, then outside any. */
+- (NSString *)pathForResource:(NSString *)name
+                       ofType:(NSString *)ext
+                  inDirectory:(NSString *)subpath
+              forLocalization:(NSString *)localization
+{
+    if ([localization length]) {
+        NSString *dir = [localization stringByAppendingPathExtension:@"lproj"];
+        NSString *in = subpath ? [subpath stringByAppendingPathComponent:dir] : dir;
+        NSString *p = [self pathForResource:name ofType:ext inDirectory:in];
+        if (p)
+            return p;
+        in = subpath ? [dir stringByAppendingPathComponent:subpath] : dir;
+        if ((p = [self pathForResource:name ofType:ext inDirectory:in]))
+            return p;
+    }
+    return [self pathForResource:name ofType:ext inDirectory:subpath];
+}
+- (NSArray *)pathsForResourcesOfType:(NSString *)ext
+                         inDirectory:(NSString *)subpath
+                     forLocalization:(NSString *)localization
+{
+    if (![localization length])
+        return [self pathsForResourcesOfType:ext inDirectory:subpath];
+    NSString *dir = [localization stringByAppendingPathExtension:@"lproj"];
+    return [self pathsForResourcesOfType:ext inDirectory:subpath ? [subpath stringByAppendingPathComponent:dir] : dir];
+}
+- (NSURL *)URLForResource:(NSString *)name
+            withExtension:(NSString *)ext
+             subdirectory:(NSString *)subpath
+             localization:(NSString *)localization
+{
+    NSString *p = [self pathForResource:name ofType:ext inDirectory:subpath forLocalization:localization];
+    return p ? [NSURL fileURLWithPath:p] : nil;
+}
 @end
 
 /* ---- strings and data ---------------------------------------------------------------- */

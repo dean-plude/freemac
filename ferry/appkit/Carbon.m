@@ -85,9 +85,15 @@
     UInt32 cls, kind;
     EventHotKeyID hotKey;
     EventTime time;
+    NSMutableDictionary *params; /* name: @[type, bytes], from SetEventParameter */
 }
 @end
 @implementation ACarbonEvent
+- (void)dealloc
+{
+    [params release];
+    [super dealloc];
+}
 @end
 
 /* What a handler is given as its call reference: where it is in the chain,
@@ -217,7 +223,7 @@ OSStatus CallNextEventHandler(EventHandlerCallRef ref, EventRef event)
 
 /* The event dispatcher's handlers see an event first, then its target's,
  * then the application's. */
-static void send_carbon_event(ACarbonEvent *event, ACarbonTarget *target)
+static OSStatus send_carbon_event(ACarbonEvent *event, ACarbonTarget *target)
 {
     NSMutableArray *chain = [NSMutableArray array];
     NSMutableArray *targets = [NSMutableArray array];
@@ -229,8 +235,7 @@ static void send_carbon_event(ACarbonEvent *event, ACarbonTarget *target)
         for (ACarbonHandler *h in t->handlers)
             if ([h wantsClass:event->cls kind:event->kind])
                 [chain addObject:h];
-    if ([chain count])
-        run_chain(chain, 0, event);
+    return [chain count] ? run_chain(chain, 0, event) : eventNotHandledErr;
 }
 
 OSStatus GetEventParameter(EventRef ref, EventParamName name, EventParamType type, EventParamType *outType,
@@ -239,6 +244,20 @@ OSStatus GetEventParameter(EventRef ref, EventParamName name, EventParamType typ
     ACarbonEvent *event = (ACarbonEvent *)ref;
     if (!event || ![(id)event isKindOfClass:[ACarbonEvent class]])
         return paramErr;
+    NSArray *set = event->params[@(name)];
+    if (set) {
+        EventParamType have = [set[0] unsignedIntValue];
+        if (type != have && type != typeWildCard)
+            return eventParameterNotFoundErr;
+        NSData *bytes = set[1];
+        if (outType)
+            *outType = have;
+        if (outSize)
+            *outSize = [bytes length];
+        if (data)
+            memcpy(data, [bytes bytes], size < [bytes length] ? size : [bytes length]);
+        return noErr;
+    }
     if (event->cls == kEventClassKeyboard && name == kEventParamDirectObject &&
         (type == typeEventHotKeyID || type == typeWildCard)) {
         if (outType)
@@ -265,6 +284,136 @@ EventTime GetEventTime(EventRef ref)
 }
 EventRef RetainEvent(EventRef ref) { return (EventRef)[(id)ref retain]; }
 void ReleaseEvent(EventRef ref) { [(id)ref release]; }
+
+/* Events a program makes itself, sent to its own handlers. There is one
+ * event queue, the main thread's; an event posted to it reaches the
+ * handlers from the main run loop. Events from the window system come
+ * through AppKit, never through ReceiveNextEvent. */
+EventTime GetCurrentEventTime(void) { return [[NSProcessInfo processInfo] systemUptime]; }
+
+static BOOL is_event(EventRef ref) { return ref && [(id)ref isKindOfClass:[ACarbonEvent class]]; }
+
+OSStatus CreateEvent(CFAllocatorRef allocator, UInt32 cls, UInt32 kind, EventTime when, EventAttributes flags,
+                     EventRef *out)
+{
+    (void)allocator;
+    (void)flags;
+    if (!out)
+        return paramErr;
+    ACarbonEvent *e = [[ACarbonEvent alloc] init];
+    e->cls = cls;
+    e->kind = kind;
+    e->time = when ? when : GetCurrentEventTime();
+    *out = (EventRef)e;
+    return noErr;
+}
+
+EventRef CopyEvent(EventRef ref)
+{
+    if (!is_event(ref))
+        return NULL;
+    ACarbonEvent *from = (ACarbonEvent *)ref, *e = [[ACarbonEvent alloc] init];
+    e->cls = from->cls;
+    e->kind = from->kind;
+    e->hotKey = from->hotKey;
+    e->time = from->time;
+    e->params = [from->params mutableCopy];
+    return (EventRef)e;
+}
+
+OSStatus SetEventParameter(EventRef ref, EventParamName name, EventParamType type, ByteCount size, const void *data)
+{
+    if (!is_event(ref) || (size && !data))
+        return paramErr;
+    ACarbonEvent *e = (ACarbonEvent *)ref;
+    if (!e->params)
+        e->params = [[NSMutableDictionary alloc] init];
+    e->params[@(name)] = @[ @(type), [NSData dataWithBytes:data length:size] ];
+    return noErr;
+}
+
+OSStatus SetEventTime(EventRef ref, EventTime when)
+{
+    if (!is_event(ref))
+        return paramErr;
+    ((ACarbonEvent *)ref)->time = when;
+    return noErr;
+}
+
+static ACarbonRef *main_queue;
+EventQueueRef GetMainEventQueue(void)
+{
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ main_queue = [[ACarbonRef alloc] init]; });
+    return (EventQueueRef)main_queue;
+}
+EventQueueRef GetCurrentEventQueue(void) { return [NSThread isMainThread] ? GetMainEventQueue() : NULL; }
+
+OSStatus PostEventToQueue(EventQueueRef queue, EventRef ref, EventPriority priority)
+{
+    (void)priority;
+    if (!queue || !is_event(ref))
+        return paramErr;
+    ACarbonEvent *e = [(id)ref retain];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        send_carbon_event(e, nil);
+        [e release];
+    });
+    return noErr;
+}
+
+OSStatus SendEventToEventTargetWithOptions(EventRef ref, EventTargetRef target, OptionBits options)
+{
+    (void)options;
+    if (!is_event(ref))
+        return paramErr;
+    return send_carbon_event((ACarbonEvent *)ref, is_target(target) ? (ACarbonTarget *)target : nil);
+}
+OSStatus SendEventToEventTarget(EventRef ref, EventTargetRef target)
+{
+    return SendEventToEventTargetWithOptions(ref, target, 0);
+}
+
+/* No Carbon events come from outside, so there is never one to receive. */
+OSStatus ReceiveNextEvent(ItemCount count, const EventTypeSpec *list, EventTimeout timeout, Boolean pull, EventRef *out)
+{
+    (void)count;
+    (void)list;
+    (void)pull;
+    if (out)
+        *out = NULL;
+    if (timeout > 0 && timeout < 1)
+        usleep((useconds_t)(timeout * 1e6));
+    return -9875; /* eventLoopTimedOutErr */
+}
+EventRef GetCurrentEvent(void) { return NULL; }
+
+/* Secure input (password fields): no other app can read keys here anyway. */
+static int secure_input;
+OSStatus EnableSecureEventInput(void) { secure_input++; return noErr; }
+OSStatus DisableSecureEventInput(void) { if (secure_input) secure_input--; return noErr; }
+Boolean IsSecureEventInputEnabled(void) { return secure_input > 0; }
+
+OSStatus SetApplicationIsDaemon(Boolean daemon) { (void)daemon; return noErr; }
+
+/* Text input documents' properties: input methods here don't read them. */
+OSStatus TSMSetDocumentProperty(void *doc, OSType tag, UInt32 size, void *data)
+{
+    (void)doc; (void)tag; (void)size; (void)data;
+    return noErr;
+}
+OSStatus TSMRemoveDocumentProperty(void *doc, OSType tag) { (void)doc; (void)tag; return noErr; }
+
+/* The last keyboard used: the same kind LMGetKbdType gives. */
+uint8_t LMGetKbdLast(void) { return 40; }
+
+/* Zoom (an accessibility feature) is never on here. */
+Boolean UAZoomEnabled(void) { return false; }
+OSStatus UAZoomChangeFocus(const CGRect *rect, const CGRect *highlight, UInt32 type)
+{
+    (void)rect; (void)highlight; (void)type;
+    return noErr;
+}
 
 OSStatus CopySymbolicHotKeys(CFArrayRef *out)
 {

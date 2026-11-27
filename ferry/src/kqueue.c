@@ -16,6 +16,9 @@
  *   EVFILT_PROC                 a pidfd, which is readable once the process
  *                               has exited (NOTE_EXIT, NOTE_EXITSTATUS)
  *   EVFILT_USER                 an eventfd that NOTE_TRIGGER sets
+ *   EVFILT_MACHPORT             the port's eventfd (src/mach.c), readable
+ *                               while messages wait; with MACH_RCV_MSG the
+ *                               message is received into the event's buffer
  *
  * EV_ONESHOT, EV_DISPATCH, EV_RECEIPT and the error events are done here.
  * Because a duplicate keeps the descriptor's file open, close() forgets the
@@ -540,12 +543,18 @@ static int knote_setup(struct kq *kq, struct knote *kn)
         return 0;
     case EVFILT_VNODE_:
         return vnode_setup(kn);
+    case EVFILT_MACHPORT_:
+        /* the port's (or port set's) eventfd from mach.c: readable while
+         * messages wait */
+        if (k->ident > UINT32_MAX || (kn->pfd = ferry_mach_port_fd((uint32_t)k->ident, 0)) < 0)
+            return EINVAL;
+        kn->events = EPOLLIN;
+        return 0;
     case EVFILT_EXCEPT_:
     case EVFILT_FS_:
-    case EVFILT_VM_:
-    case EVFILT_MACHPORT_: {
-        static const char *const names[] = {"EXCEPT", "FS", "VM", "MACHPORT"};
-        int which = k->filter == EVFILT_EXCEPT_ ? 0 : k->filter == EVFILT_FS_ ? 1 : k->filter == EVFILT_VM_ ? 2 : 3;
+    case EVFILT_VM_: {
+        static const char *const names[] = {"EXCEPT", "FS", "VM"};
+        int which = k->filter == EVFILT_EXCEPT_ ? 0 : k->filter == EVFILT_FS_ ? 1 : 2;
         if (!(__atomic_fetch_or(&once_notes, 1u << which, __ATOMIC_RELAXED) & (1u << which)))
             fprintf(stderr, "ferry: kevent's EVFILT_%s isn't supported yet; its events won't fire\n", names[which]);
         return 0;
@@ -754,6 +763,30 @@ static int knote_event(struct knote *kn, uint32_t rev, struct kevent64_s *out)
             return 0;
         out->fflags = kn->vpend;
         kn->vpend = 0;
+        break;
+    }
+    case EVFILT_MACHPORT_: {
+        /* With MACH_RCV_MSG in its fflags, the message is received into the
+         * buffer ext[0] names, of ext[1] bytes; fflags is mach_msg's result
+         * and ext[1] the size received. Otherwise data is the name of the
+         * port the message waits on. */
+        uint32_t member = 0;
+        unsigned size = ferry_mach_port_pending((uint32_t)kn->kev.ident, &member);
+        if (!size)
+            return 0;
+        out->data = member;
+        if ((kn->kev.fflags & 0x2) && kn->kev.ext[0] && kn->kev.ext[1]) {
+            int r = ferry_mach_receive((uint32_t)kn->kev.ident, (void *)(uintptr_t)kn->kev.ext[0],
+                                       (unsigned)kn->kev.ext[1], (int)kn->kev.fflags);
+            if (r == 0x10004003) /* MACH_RCV_TIMED_OUT: another thread took it */
+                return 0;
+            out->fflags = (uint32_t)r;
+            uint32_t got = 0;
+            memcpy(&got, (char *)(uintptr_t)kn->kev.ext[0] + 4, 4);
+            out->ext[1] = r == 0 ? got : 0;
+            if (r == 0x10004004) /* MACH_RCV_TOO_LARGE: the size it needs */
+                out->ext[1] = got;
+        }
         break;
     }
     case EVFILT_USER_:
