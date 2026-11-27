@@ -299,6 +299,44 @@ static NSArray *loaded_bundles(BOOL frameworks)
     }
     return out;
 }
+/* A system framework by its Mac identifier (com.apple.opengl,
+ * com.apple.audio.CoreAudio...), whose last part names the framework:
+ * Ferry's own frameworks carry no Info.plist, so the loaded one of that
+ * name answers for it, as an mpv player finds OpenGL's functions through
+ * CFBundleGetBundleWithIdentifier (freemac 1.262, IINA). */
+static NSBundle *system_framework_bundle(NSString *identifier)
+{
+    if (![identifier hasPrefix:@"com.apple."])
+        return nil;
+    NSString *name = [[identifier componentsSeparatedByString:@"."] lastObject];
+    if (![name length])
+        return nil;
+    uint32_t n = _dyld_image_count();
+    for (uint32_t i = 0; i < n; i++) {
+        const char *image = _dyld_get_image_name(i);
+        if (!image)
+            continue;
+        NSString *exe = [NSString stringWithUTF8String:image];
+        NSString *dir = [exe stringByDeletingLastPathComponent];
+        NSString *base = [[dir lastPathComponent] stringByDeletingPathExtension];
+        if (![[dir pathExtension] isEqualToString:@"framework"] ||
+            [base caseInsensitiveCompare:name] != NSOrderedSame ||
+            [[exe lastPathComponent] caseInsensitiveCompare:name] != NSOrderedSame)
+            continue;
+        NSBundle *b = [NSBundle bundleWithPath:dir];
+        if (!b)
+            return nil;
+        @synchronized([NSBundle class]) {
+            if (!b->_executable)
+                b->_executable = [exe copy];
+            if (!b->_info)
+                b->_info = [@{@"CFBundleIdentifier" : identifier, @"CFBundleExecutable" : [exe lastPathComponent],
+                              @"CFBundleName" : base} retain];
+        }
+        return b;
+    }
+    return nil;
+}
 + (NSArray *)allFrameworks { return loaded_bundles(YES); }
 + (NSArray *)allBundles { return [@[[self mainBundle]] arrayByAddingObjectsFromArray:loaded_bundles(NO)]; }
 /* A bundle made already, or the bundle of a loaded framework or bundle, as
@@ -317,7 +355,7 @@ static NSArray *loaded_bundles(BOOL frameworks)
     for (NSBundle *b in [loaded_bundles(YES) arrayByAddingObjectsFromArray:loaded_bundles(NO)])
         if ([identifier isEqualToString:[b bundleIdentifier]])
             return b;
-    return nil;
+    return system_framework_bundle(identifier);
 }
 - (instancetype)initWithURL:(NSURL *)url
 {

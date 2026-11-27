@@ -51,11 +51,11 @@ extension String {
         self = s as String
     }
 
-    public init?<S: Sequence>(bytes: S, encoding: Encoding) where S.Element == UInt8 {
+    public init?<S: Sequence>(bytes: __shared S, encoding: Encoding) where S.Element == UInt8 {
         self.init(data: Data(bytes), encoding: encoding)
     }
 
-    public init(contentsOfFile path: String, encoding: Encoding = .utf8) throws {
+    public init(contentsOfFile path: __shared String, encoding: Encoding) throws {
         let d = try Data(contentsOf: URL(fileURLWithPath: path))
         guard let s = String(data: d, encoding: encoding) else {
             throw NSError(domain: NSCocoaErrorDomain, code: NSFileReadInapplicableStringEncodingError,
@@ -64,8 +64,18 @@ extension String {
         self = s
     }
 
-    public init(contentsOf url: __shared URL, encoding: Encoding = .utf8) throws {
+    public init(contentsOf url: __shared URL, encoding: Encoding) throws {
         try self.init(contentsOfFile: url.path, encoding: encoding)
+    }
+
+    /// A file's text, read as UTF-8 (a Mac's Foundation guesses the
+    /// encoding; UTF-8 is what nearly every file is in).
+    public init(contentsOf url: __shared URL) throws {
+        try self.init(contentsOfFile: url.path, encoding: .utf8)
+    }
+
+    public init(contentsOfFile path: __shared String) throws {
+        try self.init(contentsOfFile: path, encoding: .utf8)
     }
 
     private init?(validatingUTF8Bytes d: Data) {
@@ -205,7 +215,7 @@ extension NSUserDefaults {
 // MARK: - predicates from a format with Swift arguments
 
 extension NSPredicate {
-    public convenience init(format predicateFormat: String, _ args: CVarArg...) {
+    public convenience init(format predicateFormat: __shared String, _ args: CVarArg...) {
         self.init(format: predicateFormat, arguments: getVaList(args))
     }
 }

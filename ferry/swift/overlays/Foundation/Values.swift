@@ -10,7 +10,6 @@
 // would on a Mac, while code that relies on value semantics (copying on
 // change, ==, <) doesn't compile yet. Written for Ferry.
 
-public typealias IndexSet = NSIndexSet
 public typealias ProcessInfo = NSProcessInfo
 public typealias UserDefaults = NSUserDefaults
 public typealias Bundle = NSBundle

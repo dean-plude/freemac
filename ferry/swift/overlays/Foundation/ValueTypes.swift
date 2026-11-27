@@ -25,6 +25,9 @@ public struct Notification: Hashable, CustomStringConvertible, CustomDebugString
         self.userInfo = userInfo
     }
 
+    // An app built with an older SDK passes init(name:object:userInfo:)
+    // its arguments owned, not shared: Notification._ownedInit below.
+
     public static func == (a: Notification, b: Notification) -> Bool {
         guard a.name == b.name else { return false }
         switch (a.object, b.object) {
@@ -300,4 +303,12 @@ extension URLComponents: _ObjectiveCBridgeable {
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSURLComponents?) -> URLComponents {
         URLComponents(_ns: source ?? NSURLComponents())
     }
+}
+
+/// Notification(name:object:userInfo:) as an app built with an older Mac SDK
+/// calls it, with its arguments owned (freemac 1.262, IINA).
+@_silgen_name("$s10Foundation12NotificationV4name6object8userInfoACSo18NSNotificationNamea_ypSgSDys11AnyHashableVypGSgtcfC")
+public func _ferryNotificationOwnedInit(name: __owned Notification.Name, object: __owned Any?,
+                                        userInfo: __owned [AnyHashable: Any]?) -> Notification {
+    Notification(name: name, object: object, userInfo: userInfo)
 }

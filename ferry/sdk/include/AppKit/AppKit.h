@@ -4721,6 +4721,9 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidUpdateNotification;
 
 #import <AppKit/AppKitVLC.h>
 
+/* ---- what IINA calls besides (AppKitIINA.m), (freemac 1.262, Ferry 0.85.0) */
+#import <AppKit/AppKitIINA.h>
+
 /* ---- OpenGL: NSOpenGLPixelFormat, NSOpenGLContext, NSOpenGLView (NSOpenGL.m)
  * (freemac 1.235, Ferry 0.59.0) */
 

@@ -141,11 +141,7 @@ public struct URL: Hashable, Sendable, Codable, CustomStringConvertible, CustomD
         _url = u
     }
 
-    public init(fileURLWithPath path: String) { _url = NSURL(fileURLWithPath: path) }
 
-    public init(fileURLWithPath path: String, isDirectory: Bool) {
-        _url = NSURL.fileURL(withPath: path, isDirectory: isDirectory) as NSURL
-    }
 
     public init(fileURLWithPath path: String, relativeTo base: URL?) {
         if path.hasPrefix("/") || base == nil { self.init(fileURLWithPath: path) }
@@ -188,7 +184,6 @@ public struct URL: Hashable, Sendable, Codable, CustomStringConvertible, CustomD
     public var hasDirectoryPath: Bool { _url.hasDirectoryPath }
     public var standardized: URL { _url.standardizingPath ?? self }
     public var standardizedFileURL: URL { isFileURL ? standardized : self }
-    public var resolvingSymlinksInPath: URL { _url.resolvingSymlinksInPath ?? self }
 
     public func withUnsafeFileSystemRepresentation<R>(_ body: (UnsafePointer<CChar>?) throws -> R) rethrows -> R {
         try path.withCString { try body($0) }

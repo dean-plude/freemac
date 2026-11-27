@@ -48,6 +48,10 @@ typedef NS_ENUM(NSUInteger, MPNowPlayingPlaybackState) {
 @interface MPSkipIntervalCommandEvent : MPRemoteCommandEvent
 @property (readonly) NSTimeInterval interval;
 @end
+/* freemac 1.262 (IINA) */
+@interface MPChangePlaybackRateCommandEvent : MPRemoteCommandEvent
+@property (readonly) float playbackRate;
+@end
 
 @interface MPRemoteCommand : NSObject
 @property (getter=isEnabled) BOOL enabled;
@@ -58,6 +62,10 @@ typedef NS_ENUM(NSUInteger, MPNowPlayingPlaybackState) {
 @end
 @interface MPSkipIntervalCommand : MPRemoteCommand
 @property (copy) NSArray<NSNumber *> *preferredIntervals;
+@end
+/* freemac 1.262 (IINA): the speeds a player offers */
+@interface MPChangePlaybackRateCommand : MPRemoteCommand
+@property (copy) NSArray<NSNumber *> *supportedPlaybackRates;
 @end
 @interface MPChangePlaybackPositionCommand : MPRemoteCommand
 @end
@@ -84,7 +92,7 @@ typedef NS_ENUM(NSUInteger, MPNowPlayingPlaybackState) {
 @property (readonly) MPRemoteCommand *seekForwardCommand, *seekBackwardCommand;
 @property (readonly) MPSkipIntervalCommand *skipForwardCommand, *skipBackwardCommand;
 @property (readonly) MPChangePlaybackPositionCommand *changePlaybackPositionCommand;
-@property (readonly) MPRemoteCommand *changePlaybackRateCommand;
+@property (readonly) MPChangePlaybackRateCommand *changePlaybackRateCommand;
 @property (readonly) MPChangeRepeatModeCommand *changeRepeatModeCommand;
 @property (readonly) MPChangeShuffleModeCommand *changeShuffleModeCommand;
 @property (readonly) MPRatingCommand *ratingCommand;
@@ -113,6 +121,14 @@ FOUNDATION_EXPORT NSString *const MPMediaItemPropertyAlbumTrackCount;
 FOUNDATION_EXPORT NSString *const MPMediaItemPropertyGenre;
 FOUNDATION_EXPORT NSString *const MPMediaItemPropertyPlaybackDuration;
 FOUNDATION_EXPORT NSString *const MPMediaItemPropertyArtwork;
+FOUNDATION_EXPORT NSString *const MPMediaItemPropertyMediaType;   /* an NSNumber of an MPMediaType */
+typedef NS_OPTIONS(NSUInteger, MPMediaType) {
+    MPMediaTypeMusic = 1 << 0, MPMediaTypePodcast = 1 << 1, MPMediaTypeAudioBook = 1 << 2,
+    MPMediaTypeAudioITunesU = 1 << 3, MPMediaTypeAnyAudio = 0x00ff,
+    MPMediaTypeMovie = 1 << 8, MPMediaTypeTVShow = 1 << 9, MPMediaTypeVideoPodcast = 1 << 10,
+    MPMediaTypeMusicVideo = 1 << 11, MPMediaTypeVideoITunesU = 1 << 12, MPMediaTypeHomeVideo = 1 << 13,
+    MPMediaTypeAnyVideo = 0xff00, MPMediaTypeAny = ~0UL,
+};
 FOUNDATION_EXPORT NSString *const MPNowPlayingInfoPropertyElapsedPlaybackTime;
 FOUNDATION_EXPORT NSString *const MPNowPlayingInfoPropertyPlaybackRate;
 FOUNDATION_EXPORT NSString *const MPNowPlayingInfoPropertyDefaultPlaybackRate;

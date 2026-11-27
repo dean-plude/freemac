@@ -1790,6 +1790,7 @@ typedef NS_OPTIONS(NSUInteger, NSDateComponentsFormatterZeroFormattingBehavior) 
 @property (readonly, copy) NSString *password;
 @property (readonly) BOOL hasDirectoryPath;
 @property (readonly, copy) NSURL *URLByStandardizingPath;
+@property (readonly, copy) NSURL *standardizedURL;   /* freemac 1.262 */
 @property (readonly, copy) NSURL *URLByResolvingSymlinksInPath;
 @property (readonly, copy) NSString *absoluteString;
 @property (readonly, copy) NSString *scheme;
@@ -2285,6 +2286,8 @@ FOUNDATION_EXPORT NSURLResourceKey const NSURLNameKey, NSURLLocalizedNameKey, NS
     NSURLLocalizedTypeDescriptionKey, NSURLLinkCountKey, NSURLFileResourceIdentifierKey, NSURLFileResourceTypeKey;
 /* freemac 1.224: the volume an item is on (its device number) */
 FOUNDATION_EXPORT NSURLResourceKey const NSURLVolumeIdentifierKey;
+/* freemac 1.262: whether the volume is on this computer, not a network share */
+FOUNDATION_EXPORT NSURLResourceKey const NSURLVolumeIsLocalKey;
 /* a volume's size and free space, in bytes (freemac OBS work); the free
  * space is the same for important and opportunistic use */
 FOUNDATION_EXPORT NSURLResourceKey const NSURLVolumeTotalCapacityKey, NSURLVolumeAvailableCapacityKey,

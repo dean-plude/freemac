@@ -64,6 +64,7 @@ NSString *const NSURLLocalizedTypeDescriptionKey = @"NSURLLocalizedTypeDescripti
 NSString *const NSURLLinkCountKey = @"NSURLLinkCountKey";
 NSString *const NSURLFileResourceIdentifierKey = @"NSURLFileResourceIdentifierKey";
 NSString *const NSURLVolumeIdentifierKey = @"NSURLVolumeIdentifierKey";
+NSString *const NSURLVolumeIsLocalKey = @"NSURLVolumeIsLocalKey";
 NSString *const NSURLVolumeTotalCapacityKey = @"NSURLVolumeTotalCapacityKey";
 NSString *const NSURLVolumeAvailableCapacityKey = @"NSURLVolumeAvailableCapacityKey";
 NSString *const NSURLVolumeAvailableCapacityForImportantUsageKey = @"NSURLVolumeAvailableCapacityForImportantUsageKey";
@@ -567,6 +568,16 @@ NSDictionary *FFileAttributes(NSString *path, NSError **error)
         v = [NSNumber numberWithUnsignedLong:(unsigned long)st.st_nlink];
     else if (IS(NSURLVolumeIdentifierKey))
         v = [NSNumber numberWithUnsignedLongLong:(unsigned long long)st.st_dev];
+    else if (IS(NSURLVolumeIsLocalKey)) {
+        /* freemac 1.262: a volume is local unless it is a network share */
+        struct statfs fs;
+        if (statfs([path fileSystemRepresentation], &fs) == 0) {
+            unsigned long t = (unsigned long)fs.f_type;
+            BOOL remote = t == 0x6969 /* NFS */ || t == 0xFF534D42 /* CIFS */ || t == 0xFE534D42 /* SMB2 */ ||
+                          t == 0x517B /* SMB */ || t == 0x65735546 /* FUSE */;
+            v = [NSNumber numberWithBool:!remote];
+        }
+    }
     else if (IS(NSURLVolumeTotalCapacityKey) || IS(NSURLVolumeAvailableCapacityKey) ||
              IS(NSURLVolumeAvailableCapacityForImportantUsageKey) ||
              IS(NSURLVolumeAvailableCapacityForOpportunisticUsageKey)) {

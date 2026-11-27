@@ -19,6 +19,7 @@ module AppKit [system] {
     header "AppKit/AppKit.h"
     header "AppKit/AppKitApps.h"
     header "AppKit/AppKitDocumentApps.h"
+    header "AppKit/AppKitIINA.h"
     header "AppKit/AppKitMore.h"
     header "AppKit/AppKitNewer.h"
     header "AppKit/AppKitOlder.h"

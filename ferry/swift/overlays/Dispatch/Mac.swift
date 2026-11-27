@@ -41,6 +41,42 @@ extension OS_dispatch_queue {
     }
 
     public var label: String { _queue.label }
+
+    // ---- freemac 1.262, for IINA
+
+    /// How a new queue's work runs: one at a time unless concurrent.
+    public struct Attributes: OptionSet, Sendable {
+        public let rawValue: UInt64
+        public init(rawValue: UInt64) { self.rawValue = rawValue }
+        public static let concurrent = Attributes(rawValue: 1 << 1)
+        public static let initiallyInactive = Attributes(rawValue: 1 << 2)
+    }
+
+    /// When work on a queue drains its autorelease pool.
+    public enum AutoreleaseFrequency: Sendable {
+        case inherit, workItem, never
+    }
+
+    /// A new queue.
+    public convenience init(label: String, qos: DispatchQoS = .unspecified, attributes: Attributes = [],
+                            autoreleaseFrequency: AutoreleaseFrequency = .inherit, target: OS_dispatch_queue? = nil) {
+        var a: DispatchQueue.Attributes = []
+        if attributes.contains(.concurrent) { a.insert(.concurrent) }
+        if attributes.contains(.initiallyInactive) { a.insert(.initiallyInactive) }
+        let q = DispatchQueue(label: label, qos: qos, attributes: a,
+                              target: target.map { DispatchQueue(__wrapping: $0) })
+        self.init(__ferryQueue: q.__object)
+    }
+
+    public func sync(execute block: () -> Void) { _queue.sync(execute: block) }
+
+    public func sync<T>(execute work: () throws -> T) rethrows -> T { try _queue.sync(execute: work) }
+
+    public func sync<T>(flags: DispatchWorkItemFlags, execute work: () throws -> T) rethrows -> T {
+        try _queue.sync(flags: flags, execute: work)
+    }
+
+    public func sync(execute item: DispatchWorkItem) { _queue.sync(execute: item) }
 }
 
 extension OS_dispatch_group {

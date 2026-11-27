@@ -750,6 +750,20 @@ static int mac_uuid_parse(const char *in, unsigned char *uu)
     return 0;
 }
 
+/* IINA (freemac 1.262): what its bundled libraries (glib, libarchive,
+ * gnutls) ask of a Mac's C library. issetugid(2): Ferry never runs a
+ * program set-user-ID. pthread_atfork(3) is this system's: fork in Ferry is
+ * this system's fork, so its handlers run as they would on a Mac.
+ * __mb_cur_max is the variable an older SDK's MB_CUR_MAX reads: the most
+ * bytes one character takes in the program's encoding, UTF-8, which a Mac
+ * gives as 6. */
+static int mac_issetugid(void) { return 0; }
+static int mac_pthread_atfork(void (*prepare)(void), void (*parent)(void), void (*child)(void))
+{
+    return pthread_atfork(prepare, parent, child);
+}
+static int mac_mb_cur_max_variable = 6;
+
 const struct ferry_symbol ferry_libc_apps_symbols[] = {
     {"uuid_clear", mac_uuid_clear},
     {"uuid_compare", mac_uuid_compare},
@@ -809,5 +823,8 @@ const struct ferry_symbol ferry_libc_apps_symbols[] = {
     {"glob", mac_glob},
     {"globfree", mac_globfree},
     {"fnmatch", mac_fnmatch},
+    {"issetugid", mac_issetugid},
+    {"pthread_atfork", mac_pthread_atfork},
+    {"__mb_cur_max", &mac_mb_cur_max_variable},
     {NULL, NULL},
 };

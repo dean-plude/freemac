@@ -36,6 +36,9 @@ typedef NSObject *dispatch_io_t;
 @interface OS_dispatch_object : NSObject
 @end
 @interface OS_dispatch_queue : OS_dispatch_object
+/* freemac 1.262: the queue given, in place of the one +alloc made, for
+ * Swift's DispatchQueue(label:qos:attributes:autoreleaseFrequency:target:) */
+- (instancetype)initWithFerryQueue:(NSObject *)queue __attribute__((swift_name("init(__ferryQueue:)")));
 @end
 @interface OS_dispatch_group : OS_dispatch_object
 @end

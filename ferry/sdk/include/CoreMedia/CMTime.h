@@ -27,6 +27,10 @@ typedef struct {
     CMTime start;
     CMTime duration;
 } CMTimeRange;
+typedef struct {
+    CMTimeRange source;
+    CMTimeRange target;
+} CMTimeMapping;   /* freemac 1.262 */
 extern const CMTime kCMTimeInvalid;
 extern const CMTime kCMTimeIndefinite;
 extern const CMTime kCMTimePositiveInfinity;
