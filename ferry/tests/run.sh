@@ -269,6 +269,7 @@ run_one libsystem_vlc "$here/libsystem_vlc.c" "$here/libsystem_vlc.out"
 run_one libsystem_obs "$here/libsystem_obs.c" "$here/libsystem_obs.out"
 run_one atomics "$here/atomics.c" "$here/atomics.out"
 run_one chkstk "$here/chkstk.c" "$here/chkstk.out"
+run_one half "$here/half.c" "$here/half.out"
 # mach_wait_until, posix_spawn, glob and fnmatch, for OBS and VLC, and
 # backtrace three calls deep in Mac code (freemac 1.233).
 run_one libsystem_media "$here/libsystem_media.c" "$here/libsystem_media.out"

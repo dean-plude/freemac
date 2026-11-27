@@ -215,5 +215,17 @@ int main(void)
         [NSFileCoordinator removeFilePresenter:w];
         printf("presenters after removing: %lu\n", (unsigned long)[[NSFileCoordinator filePresenters] count]);
     }
+    @autoreleasepool {
+        /* the mounted volumes, the system disk first (Godot's file dialogs) */
+        NSFileManager *fm = [NSFileManager defaultManager];
+        NSArray *all = [fm mountedVolumeURLsIncludingResourceValuesForKeys:@[ NSURLVolumeNameKey ] options:0];
+        NSArray *shown = [fm mountedVolumeURLsIncludingResourceValuesForKeys:nil
+                                                                     options:NSVolumeEnumerationSkipHiddenVolumes];
+        BOOL urls = YES;
+        for (NSURL *u in all)
+            urls = urls && [u isFileURL];
+        printf("volumes: first %s, all file URLs %s, shown ones no more than all %s\n",
+               [[all.firstObject path] UTF8String], yn(urls), yn(shown.count >= 1 && shown.count <= all.count));
+    }
     return 0;
 }

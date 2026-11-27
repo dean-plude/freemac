@@ -46,6 +46,7 @@ struct statfs {
 #define MNT_LOCAL 0x00001000
 #define MNT_QUOTA 0x00002000
 #define MNT_ROOTFS 0x00004000
+#define MNT_DONTBROWSE 0x00100000
 #define MNT_NOATIME 0x10000000
 
 #define MNT_WAIT 1
@@ -53,6 +54,8 @@ struct statfs {
 
 int statfs(const char *path, struct statfs *buf) __FERRY_INODE64(statfs);
 int fstatfs(int fd, struct statfs *buf) __FERRY_INODE64(fstatfs);
+/* the mounted volumes; with no buffer, how many */
+int getfsstat(struct statfs *buf, int bufsize, int mode) __FERRY_INODE64(getfsstat);
 
 __FERRY_END
 #endif

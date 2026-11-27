@@ -90,6 +90,31 @@ extern _Float16 __truncsfhf2(float);
 extern _Float16 __truncdfhf2(double);
 extern float __extendhfsf2(_Float16);
 
+/* Half-precision conversions as a Mac program calls them. On the Mac
+ * (x86_64), the compiler passes a half to these helpers and takes one back
+ * as a 16-bit integer, in %edi and %ax; this system's helpers use %xmm0
+ * for it. So the Mac names get these, which take and give the bits. */
+static float mac_extendhfsf2(uint16_t bits)
+{
+    _Float16 h;
+    memcpy(&h, &bits, sizeof h);
+    return __extendhfsf2(h);
+}
+static uint16_t mac_truncsfhf2(float f)
+{
+    _Float16 h = __truncsfhf2(f);
+    uint16_t bits;
+    memcpy(&bits, &h, sizeof bits);
+    return bits;
+}
+static uint16_t mac_truncdfhf2(double d)
+{
+    _Float16 h = __truncdfhf2(d);
+    uint16_t bits;
+    memcpy(&bits, &h, sizeof bits);
+    return bits;
+}
+
 /* Named semaphores (sem_open(2)), which Swift's Darwin overlay wraps: this
  * system's, with the Mac's O_CREAT and O_EXCL turned into this system's.
  * A Mac program only ever holds the pointer. */
@@ -148,9 +173,11 @@ const struct ferry_symbol ferry_swift_symbols[] = {
     {"__modti3", __modti3},
     {"__udivti3", __udivti3},
     {"__umodti3", __umodti3},
-    {"__truncsfhf2", __truncsfhf2},
-    {"__truncdfhf2", __truncdfhf2},
-    {"__extendhfsf2", __extendhfsf2},
+    {"__truncsfhf2", mac_truncsfhf2},
+    {"__truncdfhf2", mac_truncdfhf2},
+    {"__extendhfsf2", mac_extendhfsf2},
+    {"__gnu_h2f_ieee", mac_extendhfsf2},
+    {"__gnu_f2h_ieee", mac_truncsfhf2},
     {"exp2f", exp2f},
     {"fmaf", fmaf},
     {"fmal", fmal},
