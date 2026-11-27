@@ -475,8 +475,14 @@ module MediaPlayer [system] {
 
 module Metal [system] {
     header "Metal/Metal.h"
-    header "Metal/MTLDrawable.h"
-    header "Metal/MTLPixelFormat.h"
+    module MTLDrawable {
+        header "Metal/MTLDrawable.h"
+        export *
+    }
+    module MTLPixelFormat {
+        header "Metal/MTLPixelFormat.h"
+        export *
+    }
     export *
     link framework "Metal"
 }
