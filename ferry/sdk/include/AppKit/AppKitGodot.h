@@ -28,4 +28,21 @@
                    foundRange:(NSRange *)foundRange;
 @end
 
+/* ---- the title bar, the screen and opening with an application ------------------------- */
+@interface NSWindow (FerryGodot)
+@property (readonly) NSUserInterfaceLayoutDirection windowTitlebarLayoutDirection;
+@end
+@interface NSScreen (FerryGodot)
+@property (readonly) NSInteger maximumFramesPerSecond;
+@end
+@interface NSWorkspace (FerryGodot)
+- (void)openURLs:(NSArray<NSURL *> *)urls withApplicationAtURL:(NSURL *)applicationURL
+        configuration:(NSWorkspaceOpenConfiguration *)configuration
+    completionHandler:(void (^)(NSRunningApplication *app, NSError *error))handler;
+@end
+
+@interface NSMenu (FerryGodot)
+@property NSUserInterfaceLayoutDirection userInterfaceLayoutDirection;
+@end
+
 #endif

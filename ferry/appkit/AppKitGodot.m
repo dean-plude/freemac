@@ -52,3 +52,62 @@ static NSMutableArray *search_handlers;
     return YES;
 }
 @end
+
+/* ---- the title bar, the screen and opening with an application ------------------------- */
+
+@implementation NSWindow (FerryGodot)
+/* Which side the close, minimize and zoom buttons sit on: the app's
+ * reading direction, left to right unless the app is set the other way */
+- (NSUserInterfaceLayoutDirection)windowTitlebarLayoutDirection
+{
+    return [NSApp userInterfaceLayoutDirection];
+}
+@end
+
+@implementation NSScreen (FerryGodot)
+/* The most frames a second the screen shows: Ferry draws at 60 */
+- (NSInteger)maximumFramesPerSecond { return 60; }
+@end
+
+@implementation NSWorkspace (FerryGodot)
+/* Each URL is opened as openURL: opens it, as with the older form; the
+ * desktop picks the program, so there is no Mac application to answer. */
+- (void)openURLs:(NSArray<NSURL *> *)urls withApplicationAtURL:(NSURL *)applicationURL
+        configuration:(NSWorkspaceOpenConfiguration *)configuration
+    completionHandler:(void (^)(NSRunningApplication *, NSError *))handler
+{
+    NSURL *failed = nil;
+    for (NSURL *url in urls)
+        if (![self openURL:url] && !failed)
+            failed = url;
+    if (!handler)
+        return;
+    void (^h)(NSRunningApplication *, NSError *) = [handler copy];
+    NSError *error = failed ? [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadUnknownError
+                                              userInfo:@{NSURLErrorKey : failed}]
+                            : nil;
+    [error retain];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        h(nil, error);
+        [h release];
+        [error release];
+    });
+}
+@end
+
+/* ---- a menu's reading direction ------------------------------------------------------------ */
+
+static char menu_direction_key;
+
+@implementation NSMenu (FerryGodot)
+/* The menu's own direction once set, else the application's */
+- (NSUserInterfaceLayoutDirection)userInterfaceLayoutDirection
+{
+    NSNumber *d = objc_getAssociatedObject(self, &menu_direction_key);
+    return d ? (NSUserInterfaceLayoutDirection)[d integerValue] : [NSApp userInterfaceLayoutDirection];
+}
+- (void)setUserInterfaceLayoutDirection:(NSUserInterfaceLayoutDirection)direction
+{
+    objc_setAssociatedObject(self, &menu_direction_key, @(direction), OBJC_ASSOCIATION_RETAIN);
+}
+@end

@@ -28,4 +28,5 @@ write ran: yes, presenter let go 1 time(s) and heard of 1 change(s)
 its own coordinator's write isn't told to it: 1 change(s)
 read: new
 presenters after removing: 0
+volumes: first /, all file URLs yes, shown ones no more than all yes
 exit=0
