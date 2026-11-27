@@ -2,8 +2,10 @@
  * Metal: the device, a shader library compiled from source,
  * a render pipeline drawing a triangle into a cleared texture (read back
  * texel by texel), indexed drawing with a depth test and blending, a texture
- * sampled in a fragment function, fragments discarded, an argument buffer
+ * sampled in a fragment function, fragments discarded, viewports chosen by
+ * the vertex function, an argument buffer
  * holding a texture and a sampler, a compute kernel adding two buffers,
+ * texture atomics,
  * blits, and a command buffer's handlers. Written from Apple's public Metal
  * documentation; built with ARC, as most Metal programs are. */
 #import <Foundation/Foundation.h>
@@ -33,8 +35,19 @@ static NSString *const source = @
     "}\n"
     "struct Args { texture2d<float> t [[id(0)]]; sampler s [[id(1)]]; };\n"
     "fragment float4 fs_args(O in [[stage_in]], constant Args &a [[buffer(0)]]) { return a.t.sample(a.s, in.uv); }\n"
+    "struct OV { float4 position [[position]]; uint vp [[viewport_array_index]]; };\n"
+    "vertex OV vs_vp(uint vid [[vertex_id]]) {\n"
+    "  float2 c[3] = {float2(-1, -1), float2(3, -1), float2(-1, 3)};\n"
+    "  OV o; o.position = float4(c[vid % 3], 0, 1); o.vp = vid / 3; return o;\n"
+    "}\n"
+    "fragment float4 fs_vp(OV in [[stage_in]]) { return in.vp == 0 ? float4(1, 0, 0, 1) : float4(0, 0, 1, 1); }\n"
     "kernel void add(device float *a [[buffer(0)]], device const float *b [[buffer(1)]],\n"
-    "                uint gid [[thread_position_in_grid]]) { a[gid] += b[gid]; }\n";
+    "                uint gid [[thread_position_in_grid]]) { a[gid] += b[gid]; }\n"
+    "kernel void tatom(texture2d<int, access::read_write> lo [[texture(0)]],\n"
+    "                  texture2d<uint, access::read_write> n [[texture(1)]], uint gid [[thread_position_in_grid]]) {\n"
+    "  lo.atomic_fetch_min(uint2(0), int4(int(gid) - 500));\n"
+    "  n.atomic_fetch_add(uint2(0), 1u);\n"
+    "}\n";
 
 typedef struct {
     float pos[2];
@@ -72,7 +85,7 @@ int main(void)
             return 1;
         }
         NSArray *names = [lib.functionNames sortedArrayUsingSelector:@selector(compare:)];
-        check("its functions", [names isEqual:(@[ @"add", @"fs_args", @"fs_col", @"fs_cut", @"fs_tex", @"vs_tri" ])]);
+        check("its functions", [names isEqual:(@[ @"add", @"fs_args", @"fs_col", @"fs_cut", @"fs_tex", @"fs_vp", @"tatom", @"vs_tri", @"vs_vp" ])]);
         id<MTLFunction> vs = [lib newFunctionWithName:@"vs_tri"];
         check("a vertex function", vs && vs.functionType == MTLFunctionTypeVertex);
         check("a missing function is nil", [lib newFunctionWithName:@"nope"] == nil);
@@ -249,6 +262,26 @@ int main(void)
         texel(target, 28, 4, p);
         check("drawn on the right", near(p, 0, 255, 0, 255));
 
+        /* two viewports, the left and right halves, each triangle choosing one */
+        MTLRenderPipelineDescriptor *vpd = [MTLRenderPipelineDescriptor new];
+        vpd.vertexFunction = [lib newFunctionWithName:@"vs_vp"];
+        vpd.fragmentFunction = [lib newFunctionWithName:@"fs_vp"];
+        vpd.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+        id<MTLRenderPipelineState> vpPipe = [dev newRenderPipelineStateWithDescriptor:vpd error:&err];
+        MTLViewport vps[2] = {{0, 0, 16, 32, 0, 1}, {16, 0, 16, 32, 0, 1}};
+        cb = [q commandBuffer];
+        enc = [cb renderCommandEncoderWithDescriptor:rp];
+        [enc setRenderPipelineState:vpPipe];
+        [enc setViewports:vps count:2];
+        [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
+        [enc endEncoding];
+        [cb commit];
+        [cb waitUntilCompleted];
+        unsigned char p3[4];
+        texel(target, 4, 4, p);
+        texel(target, 28, 4, p3);
+        check("each triangle in its own viewport", vpPipe != nil && near(p, 0, 0, 255, 255) && near(p3, 255, 0, 0, 255));
+
         /* the texture and sampler again, through an argument buffer the
          * function's encoder fills */
         id<MTLFunction> fa_fn = [lib newFunctionWithName:@"fs_args"];
@@ -316,6 +349,34 @@ int main(void)
         check("the kernel added", ok);
         check("a filled and copied buffer", ((unsigned char *)d.contents)[63] == 7);
         check("the texture copied to a buffer", near((unsigned char *)out.contents + (4 * 32 + 4) * 4, 255, 0, 0, 255));
+
+        /* texture atomics: the smallest of 1000 values, and a count */
+        MTLTextureDescriptor *ad = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatR32Sint
+                                                                                      width:1 height:1 mipmapped:NO];
+        ad.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
+        id<MTLTexture> lo = [dev newTextureWithDescriptor:ad];
+        ad.pixelFormat = MTLPixelFormatR32Uint;
+        id<MTLTexture> cnt = [dev newTextureWithDescriptor:ad];
+        int big = 1 << 20;
+        unsigned zero = 0;
+        [lo replaceRegion:MTLRegionMake2D(0, 0, 1, 1) mipmapLevel:0 withBytes:&big bytesPerRow:4];
+        [cnt replaceRegion:MTLRegionMake2D(0, 0, 1, 1) mipmapLevel:0 withBytes:&zero bytesPerRow:4];
+        id<MTLComputePipelineState> tp = [dev newComputePipelineStateWithFunction:[lib newFunctionWithName:@"tatom"]
+                                                                            error:&err];
+        cb = [q commandBuffer];
+        ce = [cb computeCommandEncoder];
+        [ce setComputePipelineState:tp];
+        [ce setTexture:lo atIndex:0];
+        [ce setTexture:cnt atIndex:1];
+        [ce dispatchThreads:MTLSizeMake(N, 1, 1) threadsPerThreadgroup:MTLSizeMake(64, 1, 1)];
+        [ce endEncoding];
+        [cb commit];
+        [cb waitUntilCompleted];
+        int got_lo = 0;
+        unsigned got_n = 0;
+        [lo getBytes:&got_lo bytesPerRow:4 fromRegion:MTLRegionMake2D(0, 0, 1, 1) mipmapLevel:0];
+        [cnt getBytes:&got_n bytesPerRow:4 fromRegion:MTLRegionMake2D(0, 0, 1, 1) mipmapLevel:0];
+        check("texture atomics", tp != nil && got_lo == -500 && got_n == N);
     }
     return fails != 0;
 }

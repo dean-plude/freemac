@@ -35,6 +35,11 @@ import tempfile
 HERE = os.path.dirname(os.path.realpath(__file__))
 
 
+SCALAR_TYPES = {"bool", "char", "uchar", "short", "ushort", "int", "uint", "long", "ulong", "float", "half",
+                "double", "size_t", "ptrdiff_t", "int8_t", "uint8_t", "int16_t", "uint16_t", "int32_t",
+                "uint32_t", "int64_t", "uint64_t", "unsigned", "signed", "auto"}
+
+
 def find_msl_dir():
     for d in (os.environ.get("FERRY_MSL_DIR"), os.path.join(HERE, "msl"), "/usr/share/ferry/metal/msl"):
         if d and os.path.isfile(os.path.join(d, "metal_stdlib")):
@@ -318,6 +323,28 @@ class Source:
                 self.edit(t.start, toks[j].end, "__FERRY_FC_DEFINED_%s" % name)
         self.wrap_conditionals()
         self.generic_array_params()
+        self.constexpr_locals()
+
+    def constexpr_locals(self):
+        """A constexpr local of a vector or matrix type ("constexpr int2
+        corners[4] = ...") becomes const: Metal's vectors are literal types,
+        ours are built in loops, and a shader can't tell the difference."""
+        toks = self.toks
+        stack = []
+        for k, t in enumerate(toks):
+            if t.text == "{":
+                p = toks[k - 1].text if k else ""
+                stack.append("func" if p in (")", "const", "noexcept") or (p == "]]") else
+                             "init" if p in ("=", ",", "{", "(", "return") or toks[k - 1].kind == "id" and
+                             k > 1 and toks[k - 2].kind == "id" else "other")
+            elif t.text == "}":
+                if stack:
+                    stack.pop()
+            elif t.text == "constexpr" and t.user and "func" in stack and k + 1 < len(toks):
+                nxt = toks[k + 1]
+                after = toks[k + 2].text if k + 2 < len(toks) else ""
+                if nxt.text not in SCALAR_TYPES and nxt.text not in ("static", "const", "inline") and after != "(":
+                    self.edit(t.start, t.end, "const")
 
     def generic_array_params(self):
         """A parameter "float4 offset[3]" becomes "float4 __generic *offset".
@@ -434,8 +461,10 @@ class Source:
         if brace_stack and brace_stack[-1] != "struct" and "func" in brace_stack and body and \
                 body[0].text == "__local":
             texts = [t.text for t in body]
-            if not any(x in texts for x in ("*", "&", "(", "=", "&&")):
-                d = Decl(body[1:], attrs)
+            d = Decl(body[1:], attrs)
+            # (the sizes may hold calls: Blender sizes by mtl_WorkGroupSize().x)
+            head = [t.text for t in d.type_toks]
+            if "=" not in texts and not any(x in head for x in ("*", "&", "(", "&&")):
                 if d.name:
                     ty = text_of(d.type_toks)
                     dims = "".join("[%s]" % x for x in d.dims)
@@ -826,8 +855,13 @@ class Gen:
                         slots.append(("clip_distance", None, fn, "FERRY_W_CLIP_DISTANCE", 0))
                     elif f.attr("invariant") is not None and len(f.attrs) == 1:
                         pass
-                    elif any(n in ("render_target_array_index", "viewport_array_index", "primitive_id")
-                             for n, _ in f.attrs):
+                    elif f.attr("render_target_array_index") is not None:
+                        self.emit("    __ferry_entry::put(out + FERRY_VS_LAYER, uint(%s));" % fn)
+                        slots.append(("render_target_array_index", None, fn, "FERRY_W_LAYER", 0))
+                    elif f.attr("viewport_array_index") is not None:
+                        self.emit("    __ferry_entry::put(out + FERRY_VS_VIEWPORT, uint(%s));" % fn)
+                        slots.append(("viewport_array_index", None, fn, "FERRY_W_VIEWPORT", 0))
+                    elif f.attr("primitive_id") is not None:
                         pass
                     else:
                         tag = f.attr("user") or f.name

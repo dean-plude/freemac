@@ -410,6 +410,17 @@ static NSString *compile(NSString *source, MTLCompileOptions *options, NSArray *
         fnv(&h, &st.st_mtime, sizeof st.st_mtime);
         fnv(&h, &st.st_size, sizeof st.st_size);
     }
+    /* and on the headers it compiles against, so a changed header rebuilds */
+    NSString *mslc_dir = [mslc stringByDeletingLastPathComponent];
+    for (NSString *d in @[ [mslc_dir stringByAppendingPathComponent:@"msl"], @"/usr/share/ferry/metal/msl" ]) {
+        NSArray *names = [[[NSFileManager defaultManager] contentsOfDirectoryAtPath:d error:NULL]
+            sortedArrayUsingSelector:@selector(compare:)];
+        for (NSString *n in names) {
+            if (stat([[d stringByAppendingPathComponent:n] fileSystemRepresentation], &st) != 0) continue;
+            fnv(&h, &st.st_mtime, sizeof st.st_mtime);
+            fnv(&h, &st.st_size, sizeof st.st_size);
+        }
+    }
     const char *src = [source UTF8String];
     fnv(&h, src, strlen(src) + 1);
     for (NSString *a in args) {
@@ -964,6 +975,8 @@ id<MTLRenderPipelineState> FerryMTLNewRenderPipeline(MTLRenderPipelineDescriptor
                     if (k >= FERRY_VS_VARYINGS) p->interp[k - FERRY_VS_VARYINGS] = FERRY_I_FLAT;
             break;
         case FERRY_W_POINT_SIZE: p->has_point_size = 1; break;
+        case FERRY_W_LAYER: p->writes_layer = 1; break;
+        case FERRY_W_VIEWPORT: p->writes_viewport = 1; break;
         case FERRY_W_CLIP_DISTANCE:
             if (end - FERRY_VS_CLIP > p->nclip) p->nclip = end - FERRY_VS_CLIP;
             break;

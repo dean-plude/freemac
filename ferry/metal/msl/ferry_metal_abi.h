@@ -67,11 +67,13 @@ struct ferry_arg { int id, offset, count, stride, type; };
 enum { FERRY_A_DATA = 0, FERRY_A_BUFFER, FERRY_A_TEXTURE, FERRY_A_SAMPLER };
 enum { FERRY_W_VARYING = 0, FERRY_W_POSITION, FERRY_W_POINT_SIZE, FERRY_W_CLIP_DISTANCE, FERRY_W_COLOR,
        FERRY_W_DEPTH, FERRY_W_SAMPLE_MASK, FERRY_W_STENCIL, FERRY_W_ATTRIBUTE, FERRY_W_INPUT,
-       FERRY_W_BUILTIN_INPUT };
+       FERRY_W_BUILTIN_INPUT, FERRY_W_LAYER, FERRY_W_VIEWPORT };
 enum { FERRY_I_PERSPECTIVE = 0, FERRY_I_FLAT = 1, FERRY_I_NO_PERSPECTIVE = 2 };
 /* Where a vertex function's results go: position first, then the point
- * size and up to eight clip distances, then the varyings. */
-enum { FERRY_VS_POSITION = 0, FERRY_VS_POINT_SIZE = 4, FERRY_VS_CLIP = 5, FERRY_VS_VARYINGS = 16 };
+ * size, up to eight clip distances, the render target array index and the
+ * viewport index, then the varyings. */
+enum { FERRY_VS_POSITION = 0, FERRY_VS_POINT_SIZE = 4, FERRY_VS_CLIP = 5, FERRY_VS_LAYER = 13,
+       FERRY_VS_VIEWPORT = 14, FERRY_VS_VARYINGS = 16 };
 /* A fragment function's results: eight colors of four, then depth, the
  * sample mask and the stencil reference. */
 enum { FERRY_FS_DEPTH = 32, FERRY_FS_SAMPLE_MASK = 33, FERRY_FS_STENCIL = 34, FERRY_FS_RESULTS = 36 };
