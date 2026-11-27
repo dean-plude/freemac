@@ -430,6 +430,18 @@ Contents/Frameworks as on a Mac. Nothing of Sparkle's is built or changed.
 - freemac's own VLC build (ferry/apps/vlc.sh) still configures with
   --disable-sparkle.
 
+## Dropping files on VLC, and its Dock menu while it plays (freemac 1.NEXT)
+
+Checked with no changes needed, on the test display with a GTK drag source
+standing in for the file manager:
+
+- A video dropped on "Drop media here" goes into the playlist and starts
+  playing, as on a Mac (VLC's macosx-autoplay is on by default).
+- A subtitle file dropped on the playing video is added to it as a
+  subtitle track, through the video view's own drop handling, and shows.
+- The Dock menu reads Pause while a video plays; choosing it pauses the
+  video and the item turns back into Play.
+
 ## Still to do
 
 - The MIDI module (AudioToolbox's AUGraph) doesn't build yet.
