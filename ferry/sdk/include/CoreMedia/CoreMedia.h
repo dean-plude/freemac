@@ -15,4 +15,5 @@
 #include <CoreMedia/CMBlockBuffer.h>
 #include <CoreMedia/CMFormatDescription.h>
 #include <CoreMedia/CMSampleBuffer.h>
+#include <CoreMedia/CMSimpleQueue.h>
 #endif

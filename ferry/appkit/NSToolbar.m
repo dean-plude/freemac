@@ -85,6 +85,8 @@ static BOOL is_space(NSString *ident)
     NSView *_view;
     NSSize _minSize, _maxSize;
     NSToolbarItemVisibilityPriority _priority;
+    NSSet<NSString *> *_possibleLabels;
+    BOOL _hidden;
 }
 
 - (instancetype)init { return [self initWithItemIdentifier:@""]; }
@@ -154,6 +156,7 @@ static BOOL is_space(NSString *ident)
     [_menuForm release];
     [_image release];
     [_view release];
+    [_possibleLabels release];
     [super dealloc];
 }
 - (id)copyWithZone:(NSZone *)zone
@@ -176,6 +179,8 @@ static BOOL is_space(NSString *ident)
     c->_minSize = _minSize;
     c->_maxSize = _maxSize;
     c->_priority = _priority;
+    c->_possibleLabels = [_possibleLabels copy];
+    c->_hidden = _hidden;
     return c;
 }
 - (NSString *)description
@@ -306,6 +311,23 @@ static BOOL is_space(NSString *ident)
 - (BOOL)allowsDuplicatesInToolbar { return is_space(_identifier); }
 - (BOOL)isVisible { return _visible; }
 - (void)_setVisible:(BOOL)v { _visible = v; }
+/* macOS 13: the labels the item may show, so the toolbar can keep room for
+ * the longest; Ferry's toolbar sizes to the label shown, so it only keeps
+ * them. macOS 15: an item can be hidden without leaving the toolbar. */
+- (NSSet<NSString *> *)possibleLabels { return _possibleLabels ?: [NSSet set]; }
+- (void)setPossibleLabels:(NSSet<NSString *> *)labels
+{
+    [_possibleLabels autorelease];
+    _possibleLabels = [labels copy];
+}
+- (BOOL)isHidden { return _hidden; }
+- (void)setHidden:(BOOL)h
+{
+    if (h == _hidden)
+        return;
+    _hidden = h;
+    [self _changed];
+}
 
 /* Enabled when something takes the action and, if it validates toolbar
  * items, says yes. Items with a view, and items without an action, are
@@ -324,6 +346,90 @@ static BOOL is_space(NSString *ident)
 
 @implementation NSToolbarItemGroup {
     NSArray *_subitems;
+    NSSegmentedControl *_control; /* for a group made from titles or images */
+    NSToolbarItemGroupSelectionMode _selectionMode;
+    NSToolbarItemGroupControlRepresentation _representation;
+}
+
+/* macOS 10.15: a group shown as one segmented control, a segment for each
+ * title or image, that sends the group's action with the group as sender
+ * (freemac 1.264, HandBrake's queue window) */
++ (instancetype)_groupWithItemIdentifier:(NSToolbarItemIdentifier)identifier titles:(NSArray *)titles
+                                  images:(NSArray *)images selectionMode:(NSToolbarItemGroupSelectionMode)mode
+                                  labels:(NSArray *)labels target:(id)target action:(SEL)action
+{
+    NSToolbarItemGroup *g = [[[self alloc] initWithItemIdentifier:identifier] autorelease];
+    NSUInteger n = MAX([titles count], [images count]);
+    NSSegmentedControl *c = [[[NSSegmentedControl alloc] initWithFrame:NSMakeRect(0, 0, 40 * (n ?: 1), 24)] autorelease];
+    [c setSegmentCount:(NSInteger)n];
+    [c setTrackingMode:mode == NSToolbarItemGroupSelectionModeSelectAny ? NSSegmentSwitchTrackingSelectAny
+                       : mode == NSToolbarItemGroupSelectionModeMomentary ? NSSegmentSwitchTrackingMomentary
+                                                                           : NSSegmentSwitchTrackingSelectOne];
+    NSMutableArray *items = [NSMutableArray array];
+    for (NSUInteger i = 0; i < n; i++) {
+        if (i < [titles count])
+            [c setLabel:titles[i] forSegment:(NSInteger)i];
+        if (i < [images count])
+            [c setImage:images[i] forSegment:(NSInteger)i];
+        NSToolbarItem *part = [[[NSToolbarItem alloc]
+            initWithItemIdentifier:[NSString stringWithFormat:@"%@.%lu", identifier, (unsigned long)i]] autorelease];
+        NSString *label = i < [labels count] ? labels[i] : i < [titles count] ? titles[i] : @"";
+        [part setLabel:label];
+        [part setPaletteLabel:label];
+        if (i < [images count])
+            [part setImage:images[i]];
+        [items addObject:part];
+    }
+    [c sizeToFit];
+    [c setTarget:g];
+    [c setAction:@selector(_segmentChosen:)];
+    g->_control = [c retain];
+    g->_selectionMode = mode;
+    [g setTarget:target];
+    [g setAction:action];
+    [g setView:c];
+    [g setMinSize:[c frame].size];
+    [g setMaxSize:[c frame].size];
+    g->_subitems = [items copy];
+    return g;
+}
++ (instancetype)groupWithItemIdentifier:(NSToolbarItemIdentifier)identifier titles:(NSArray<NSString *> *)titles
+                          selectionMode:(NSToolbarItemGroupSelectionMode)mode labels:(NSArray<NSString *> *)labels
+                                 target:(id)target action:(SEL)action
+{
+    return [self _groupWithItemIdentifier:identifier titles:titles images:nil selectionMode:mode labels:labels
+                                   target:target action:action];
+}
++ (instancetype)groupWithItemIdentifier:(NSToolbarItemIdentifier)identifier images:(NSArray<NSImage *> *)images
+                          selectionMode:(NSToolbarItemGroupSelectionMode)mode labels:(NSArray<NSString *> *)labels
+                                 target:(id)target action:(SEL)action
+{
+    return [self _groupWithItemIdentifier:identifier titles:nil images:images selectionMode:mode labels:labels
+                                   target:target action:action];
+}
+- (void)_segmentChosen:(id)sender
+{
+    if ([self action])
+        [NSApp sendAction:[self action] to:[self target] from:self];
+}
+- (NSToolbarItemGroupSelectionMode)selectionMode { return _selectionMode; }
+- (void)setSelectionMode:(NSToolbarItemGroupSelectionMode)mode
+{
+    _selectionMode = mode;
+    [_control setTrackingMode:mode == NSToolbarItemGroupSelectionModeSelectAny ? NSSegmentSwitchTrackingSelectAny
+                              : mode == NSToolbarItemGroupSelectionModeMomentary ? NSSegmentSwitchTrackingMomentary
+                                                                                  : NSSegmentSwitchTrackingSelectOne];
+}
+- (NSToolbarItemGroupControlRepresentation)controlRepresentation { return _representation; }
+- (void)setControlRepresentation:(NSToolbarItemGroupControlRepresentation)r { _representation = r; }
+- (NSInteger)selectedIndex { return _control ? [_control selectedSegment] : -1; }
+- (void)setSelectedIndex:(NSInteger)i { [_control setSelectedSegment:i]; }
+- (void)setSelected:(BOOL)selected atIndex:(NSInteger)i { [_control setSelected:selected forSegment:i]; }
+- (BOOL)isSelectedAtIndex:(NSInteger)i { return [_control isSelectedForSegment:i]; }
+- (void)setEnabled:(BOOL)enabled
+{
+    [super setEnabled:enabled];
+    [_control setEnabled:enabled];
 }
 - (instancetype)initWithCoder:(NSCoder *)c
 {
@@ -334,6 +440,7 @@ static BOOL is_space(NSString *ident)
 - (void)dealloc
 {
     [_subitems release];
+    [_control release];
     [super dealloc];
 }
 - (NSArray *)subitems { return _subitems ?: @[]; }
@@ -1056,6 +1163,11 @@ static NSSize view_size(NSToolbarItem *item, NSView *v)
 {
     NSMutableArray *a = [NSMutableArray array];
     for (NSToolbarItem *i in [toolbar items]) {
+        if ([i isHidden]) {
+            [i _setVisible:NO];
+            [[i view] removeFromSuperview];
+            continue;
+        }
         if ([i isKindOfClass:[NSToolbarItemGroup class]] && ![i view] && [[(NSToolbarItemGroup *)i subitems] count]) {
             [i _setVisible:YES];
             [a addObjectsFromArray:[(NSToolbarItemGroup *)i subitems]];

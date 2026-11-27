@@ -419,6 +419,45 @@ CGColorRef CGColorCreateCopyWithAlpha(CGColorRef color, CGFloat alpha)
     return (CGColorRef)GColorNew(c->space, k);
 }
 
+/* The colour in another colour space (freemac 1.264): through its sRGB
+ * value, as Ferry draws in sRGB. Gray takes the colour's luminance; CMYK
+ * the plain conversion with black taken out first. Patterns and spaces
+ * with no components give NULL, as a colour that can't be matched does. */
+CGColorRef CGColorCreateCopyByMatchingToColorSpace(CGColorSpaceRef space, CGColorRenderingIntent intent,
+                                                   CGColorRef color, CFDictionaryRef options)
+{
+    (void)intent;
+    (void)options;
+    if (!space || !color || ![(id)color isKindOfClass:[GColor class]])
+        return NULL;
+    GColor *c = (GColor *)color;
+    GColorSpace *to = (GColorSpace *)space;
+    if ([to isEqual:c->space])
+        return (CGColorRef)[c retain];
+    const double *v = c->rgba;
+    CGFloat k[5] = {0};
+    switch (to->model) {
+    case kCGColorSpaceModelMonochrome:
+        k[0] = 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+        k[1] = v[3];
+        break;
+    case kCGColorSpaceModelRGB:
+        k[0] = v[0], k[1] = v[1], k[2] = v[2], k[3] = v[3];
+        break;
+    case kCGColorSpaceModelCMYK: {
+        double black = 1 - fmax(v[0], fmax(v[1], v[2]));
+        for (int i = 0; i < 3; i++)
+            k[i] = black < 1 ? (1 - v[i] - black) / (1 - black) : 0;
+        k[3] = black;
+        k[4] = v[3];
+        break;
+    }
+    default:
+        return NULL;
+    }
+    return (CGColorRef)GColorNew(to, k);
+}
+
 CGColorRef CGColorGetConstantColor(CFStringRef name)
 {
     static GColor *white, *black, *clear;

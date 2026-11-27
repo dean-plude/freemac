@@ -51,6 +51,18 @@ enum {
     kCMFormatDescriptionError_ValueNotAvailable = -12718,
 };
 
+/* the values of the colour extensions: the same strings as Core Video's */
+extern const CFStringRef kCMFormatDescriptionColorPrimaries_ITU_R_709_2, kCMFormatDescriptionColorPrimaries_EBU_3213,
+    kCMFormatDescriptionColorPrimaries_SMPTE_C, kCMFormatDescriptionColorPrimaries_DCI_P3,
+    kCMFormatDescriptionColorPrimaries_P3_D65, kCMFormatDescriptionColorPrimaries_ITU_R_2020,
+    kCMFormatDescriptionColorPrimaries_P22;
+extern const CFStringRef kCMFormatDescriptionTransferFunction_ITU_R_709_2,
+    kCMFormatDescriptionTransferFunction_SMPTE_240M_1995, kCMFormatDescriptionTransferFunction_UseGamma,
+    kCMFormatDescriptionTransferFunction_ITU_R_2020, kCMFormatDescriptionTransferFunction_SMPTE_ST_428_1,
+    kCMFormatDescriptionTransferFunction_SMPTE_ST_2084_PQ, kCMFormatDescriptionTransferFunction_ITU_R_2100_HLG,
+    kCMFormatDescriptionTransferFunction_Linear, kCMFormatDescriptionTransferFunction_sRGB;
+extern const CFStringRef kCMFormatDescriptionYCbCrMatrix_ITU_R_709_2, kCMFormatDescriptionYCbCrMatrix_ITU_R_601_4,
+    kCMFormatDescriptionYCbCrMatrix_SMPTE_240M_1995, kCMFormatDescriptionYCbCrMatrix_ITU_R_2020;
 extern const CFStringRef kCMFormatDescriptionExtension_FormatName;
 extern const CFStringRef kCMFormatDescriptionExtension_Depth;
 extern const CFStringRef kCMFormatDescriptionExtension_CleanAperture;
@@ -79,6 +91,25 @@ OSStatus CMVideoFormatDescriptionCreate(CFAllocatorRef allocator, CMVideoCodecTy
 OSStatus CMVideoFormatDescriptionCreateForImageBuffer(CFAllocatorRef allocator, CVImageBufferRef imageBuffer,
                                                       CMVideoFormatDescriptionRef *formatDescriptionOut);
 CMVideoDimensions CMVideoFormatDescriptionGetDimensions(CMVideoFormatDescriptionRef videoDesc);
+/* H.264 and HEVC parameter sets (SPS, PPS, VPS), kept in the description's
+ * avcC or hvcC atom as in an MP4 file (freemac 1.264) */
+OSStatus CMVideoFormatDescriptionCreateFromH264ParameterSets(CFAllocatorRef allocator, size_t parameterSetCount,
+                                                             const uint8_t *const *parameterSetPointers,
+                                                             const size_t *parameterSetSizes, int NALUnitHeaderLength,
+                                                             CMFormatDescriptionRef *formatDescriptionOut);
+OSStatus CMVideoFormatDescriptionCreateFromHEVCParameterSets(CFAllocatorRef allocator, size_t parameterSetCount,
+                                                             const uint8_t *const *parameterSetPointers,
+                                                             const size_t *parameterSetSizes, int NALUnitHeaderLength,
+                                                             CFDictionaryRef extensions,
+                                                             CMFormatDescriptionRef *formatDescriptionOut);
+OSStatus CMVideoFormatDescriptionGetH264ParameterSetAtIndex(CMFormatDescriptionRef videoDesc, size_t parameterSetIndex,
+                                                            const uint8_t **parameterSetPointerOut,
+                                                            size_t *parameterSetSizeOut, size_t *parameterSetCountOut,
+                                                            int *NALUnitHeaderLengthOut);
+OSStatus CMVideoFormatDescriptionGetHEVCParameterSetAtIndex(CMFormatDescriptionRef videoDesc, size_t parameterSetIndex,
+                                                            const uint8_t **parameterSetPointerOut,
+                                                            size_t *parameterSetSizeOut, size_t *parameterSetCountOut,
+                                                            int *NALUnitHeaderLengthOut);
 CGSize CMVideoFormatDescriptionGetPresentationDimensions(CMVideoFormatDescriptionRef videoDesc,
                                                          Boolean usePixelAspectRatio, Boolean useCleanAperture);
 Boolean CMVideoFormatDescriptionMatchesImageBuffer(CMVideoFormatDescriptionRef desc, CVImageBufferRef imageBuffer);

@@ -290,6 +290,13 @@ const struct ferry_symbol ferry_core_symbols[] = {
     {"ferry_capture_symbol", ferry_capture_symbol},
     /* Ferry's own: this system's cameras, for AVFoundation (camera.c, freemac 1.257) */
     {"ferry_camera_symbol", ferry_camera_symbol},
+    /* Ferry's own: sound codecs through this system's FFmpeg, for Core Audio (codec.c, freemac 1.264) */
+    {"ferry_acodec_available", ferry_acodec_available},
+    {"ferry_acodec_open", ferry_acodec_open},
+    {"ferry_acodec_info", ferry_acodec_info},
+    {"ferry_acodec_send", ferry_acodec_send},
+    {"ferry_acodec_receive", ferry_acodec_receive},
+    {"ferry_acodec_close", ferry_acodec_close},
     {NULL, NULL},
 };
 

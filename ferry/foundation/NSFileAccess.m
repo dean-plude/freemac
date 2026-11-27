@@ -70,6 +70,12 @@ NSString *const NSURLVolumeAvailableCapacityKey = @"NSURLVolumeAvailableCapacity
 NSString *const NSURLVolumeAvailableCapacityForImportantUsageKey = @"NSURLVolumeAvailableCapacityForImportantUsageKey";
 NSString *const NSURLVolumeAvailableCapacityForOpportunisticUsageKey =
     @"NSURLVolumeAvailableCapacityForOpportunisticUsageKey";
+NSString *const NSURLVolumeURLKey = @"NSURLVolumeURLKey";
+NSString *const NSURLVolumeNameKey = @"NSURLVolumeNameKey";
+NSString *const NSURLVolumeLocalizedNameKey = @"NSURLVolumeLocalizedNameKey";
+NSString *const NSURLVolumeIsReadOnlyKey = @"NSURLVolumeIsReadOnlyKey";
+NSString *const NSURLVolumeSupportsCaseSensitiveNamesKey = @"NSURLVolumeSupportsCaseSensitiveNamesKey";
+NSString *const NSURLVolumeIsRemovableKey = @"NSURLVolumeIsRemovableKey";
 NSString *const NSURLFileResourceTypeKey = @"NSURLFileResourceTypeKey";
 NSString *const NSURLFileResourceTypeNamedPipe = @"NSURLFileResourceTypeNamedPipe";
 NSString *const NSURLFileResourceTypeCharacterSpecial = @"NSURLFileResourceTypeCharacterSpecial";
@@ -483,6 +489,12 @@ NSDictionary *FFileAttributes(NSString *path, NSError **error)
     }
     return YES;
 }
+/* A Mac caches a URL's resource values and these clear the cache; Ferry
+ * reads them fresh each time, so there is nothing to clear (freemac 1.264,
+ * HandBrake before it encodes). */
+- (void)removeCachedResourceValueForKey:(NSURLResourceKey)key {}
+- (void)removeAllCachedResourceValues {}
+- (void)setTemporaryResourceValue:(id)value forKey:(NSURLResourceKey)key {}
 - (NSDictionary *)resourceValuesForKeys:(NSArray *)keys error:(NSError **)error
 {
     NSMutableDictionary *out = [NSMutableDictionary dictionary];
@@ -590,6 +602,12 @@ NSDictionary *FFileAttributes(NSString *path, NSError **error)
                     ? [NSNumber numberWithUnsignedLongLong:n * block]
                     : [NSNumber numberWithLongLong:(long long)(n * block)];
         }
+    }
+    else if (IS(NSURLVolumeURLKey) || IS(NSURLVolumeNameKey) || IS(NSURLVolumeLocalizedNameKey) ||
+             IS(NSURLVolumeIsReadOnlyKey) || IS(NSURLVolumeSupportsCaseSensitiveNamesKey) ||
+             IS(NSURLVolumeIsRemovableKey)) {
+        BOOL known;
+        v = FVolumeResourceValue(path, key, &known);
     }
     else if (IS(NSURLFileResourceIdentifierKey))
         v = [NSString stringWithFormat:@"%llu:%llu", (unsigned long long)st.st_dev, (unsigned long long)st.st_ino];

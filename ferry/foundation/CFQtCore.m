@@ -419,7 +419,7 @@ static NSString *volume_name(NSString *mountPoint)
 }
 
 /* A volume key's value from statfs, or nil when the key isn't a volume's. */
-static id volume_value(NSString *path, NSString *key, BOOL *known)
+id FVolumeResourceValue(NSString *path, NSString *key, BOOL *known)
 {
     *known = [key hasPrefix:@"NSURLVolume"] && ![key isEqualToString:@"NSURLVolumeIdentifierKey"];
     if (!*known)
@@ -465,7 +465,7 @@ CFDictionaryRef CFURLCopyResourcePropertiesForKeys(CFURLRef url, CFArrayRef keys
     NSMutableDictionary *out = [[NSMutableDictionary alloc] init];
     for (NSString *k in OBJ(keys)) {
         BOOL known;
-        id v = [u isFileURL] ? volume_value([u path], k, &known) : nil;
+        id v = [u isFileURL] ? FVolumeResourceValue([u path], k, &known) : nil;
         if (![u isFileURL])
             known = NO;
         if (!known) {

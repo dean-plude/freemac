@@ -1816,18 +1816,7 @@ APPKIT_EXTERN NSString *const NSNullPlaceholderBindingOption, *const NSNoSelecti
 @end
 
 /* ---- Backing scale (M7): points to the window's pixels ------------------------------- */
-typedef NS_OPTIONS(unsigned long long, NSAlignmentOptions) {
-    NSAlignMinXInward = 1ULL << 0, NSAlignMinYInward = 1ULL << 1, NSAlignMaxXInward = 1ULL << 2,
-    NSAlignMaxYInward = 1ULL << 3, NSAlignWidthInward = 1ULL << 4, NSAlignHeightInward = 1ULL << 5,
-    NSAlignMinXOutward = 1ULL << 8, NSAlignMinYOutward = 1ULL << 9, NSAlignMaxXOutward = 1ULL << 10,
-    NSAlignMaxYOutward = 1ULL << 11, NSAlignWidthOutward = 1ULL << 12, NSAlignHeightOutward = 1ULL << 13,
-    NSAlignMinXNearest = 1ULL << 16, NSAlignMinYNearest = 1ULL << 17, NSAlignMaxXNearest = 1ULL << 18,
-    NSAlignMaxYNearest = 1ULL << 19, NSAlignWidthNearest = 1ULL << 20, NSAlignHeightNearest = 1ULL << 21,
-    NSAlignRectFlipped = 1ULL << 63,
-    NSAlignAllEdgesInward = NSAlignMinXInward | NSAlignMaxXInward | NSAlignMinYInward | NSAlignMaxYInward,
-    NSAlignAllEdgesOutward = NSAlignMinXOutward | NSAlignMaxXOutward | NSAlignMinYOutward | NSAlignMaxYOutward,
-    NSAlignAllEdgesNearest = NSAlignMinXNearest | NSAlignMaxXNearest | NSAlignMinYNearest | NSAlignMaxYNearest,
-};
+/* NSAlignmentOptions is in Foundation, with NSIntegralRectWithOptions */
 APPKIT_EXTERN NSNotificationName const NSWindowDidChangeBackingPropertiesNotification;
 APPKIT_EXTERN NSString *const NSBackingPropertyOldScaleFactorKey, *const NSBackingPropertyOldColorSpaceKey;
 @interface NSWindow (NSBackingCoordinates)
@@ -3844,10 +3833,33 @@ APPKIT_EXTERN NSNotificationName const NSToolbarDidRemoveItemNotification;
 @property (getter=isNavigational) BOOL navigational;
 @property (readonly) BOOL allowsDuplicatesInToolbar;
 @property (readonly, getter=isVisible) BOOL visible;
+/* the labels it may show, so the toolbar leaves room for the longest; and
+ * whether it's left out of the toolbar (macOS 15) */
+@property (copy) NSSet<NSString *> *possibleLabels;
+@property (getter=isHidden) BOOL hidden;
 - (void)validate;
 @end
+typedef NS_ENUM(NSInteger, NSToolbarItemGroupSelectionMode) {
+    NSToolbarItemGroupSelectionModeSelectOne = 0, NSToolbarItemGroupSelectionModeSelectAny = 1,
+    NSToolbarItemGroupSelectionModeMomentary = 2,
+};
+typedef NS_ENUM(NSInteger, NSToolbarItemGroupControlRepresentation) {
+    NSToolbarItemGroupControlRepresentationAutomatic = 0, NSToolbarItemGroupControlRepresentationExpanded = 1,
+    NSToolbarItemGroupControlRepresentationCollapsed = 2,
+};
 @interface NSToolbarItemGroup : NSToolbarItem
++ (instancetype)groupWithItemIdentifier:(NSToolbarItemIdentifier)identifier titles:(NSArray<NSString *> *)titles
+                          selectionMode:(NSToolbarItemGroupSelectionMode)mode labels:(NSArray<NSString *> *)labels
+                                 target:(id)target action:(SEL)action;
++ (instancetype)groupWithItemIdentifier:(NSToolbarItemIdentifier)identifier images:(NSArray<NSImage *> *)images
+                          selectionMode:(NSToolbarItemGroupSelectionMode)mode labels:(NSArray<NSString *> *)labels
+                                 target:(id)target action:(SEL)action;
 @property (copy) NSArray<NSToolbarItem *> *subitems;
+@property NSToolbarItemGroupSelectionMode selectionMode;
+@property NSToolbarItemGroupControlRepresentation controlRepresentation;
+@property NSInteger selectedIndex;
+- (void)setSelected:(BOOL)selected atIndex:(NSInteger)index;
+- (BOOL)isSelectedAtIndex:(NSInteger)index;
 @end
 @protocol NSToolbarItemValidation <NSObject>
 - (BOOL)validateToolbarItem:(NSToolbarItem *)item;
@@ -3883,6 +3895,7 @@ APPKIT_EXTERN NSNotificationName const NSToolbarDidRemoveItemNotification;
 @interface NSWindow (NSToolbarSupport)
 @property (retain) NSToolbar *toolbar;
 @property NSWindowToolbarStyle toolbarStyle;
+@property (copy) NSString *subtitle;
 - (void)toggleToolbarShown:(id)sender;
 - (void)runToolbarCustomizationPalette:(id)sender;
 @end

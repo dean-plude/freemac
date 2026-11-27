@@ -55,6 +55,7 @@ _Static_assert(sizeof(struct FFrame) == 288, "frame");
 void FInvokeFrame(struct FFrame *f, void *fn, const uint64_t *stack, size_t words);
 void FForwardEntry(void);
 void FForwardEntryStret(void);
+void FBlockForwardEntry(void);
 
 /* FInvokeFrame(frame, fn, stack, words): copy the stack words, load the
  * argument registers from the frame, call fn, store the result registers
@@ -125,7 +126,7 @@ __asm__(
  * frame on the stack, with a pointer to the sender's stack arguments, call
  * FForward(frame, hidden) and return what it left in the frame's result
  * registers, pushing the x87 values it counts. */
-#define FORWARD_ENTRY(name, hidden)                                              \
+#define FORWARD_ENTRY(name, hidden, fn)                                          \
     "    .text\n"                                                               \
     "    .private_extern _" name "\n"                                           \
     "    .globl _" name "\n"                                                    \
@@ -157,7 +158,7 @@ __asm__(
     "    movq %rax, 272(%rsp)\n"                                                \
     "    movq %rsp, %rdi\n"                                                     \
     "    movl $" #hidden ", %esi\n"                                             \
-    "    callq _FForward\n"                                                     \
+    "    callq _" fn "\n"                                                       \
     "    testl %eax, %eax\n"                                                    \
     "    jz 1f\n"                                                               \
     "    cmpl $1, %eax\n"                                                       \
@@ -171,7 +172,8 @@ __asm__(
     "    leave\n"                                                               \
     "    retq\n"                                                                \
     "    .cfi_endproc\n"
-__asm__(FORWARD_ENTRY("FForwardEntry", 0) FORWARD_ENTRY("FForwardEntryStret", 1));
+__asm__(FORWARD_ENTRY("FForwardEntry", 0, "FForward") FORWARD_ENTRY("FForwardEntryStret", 1, "FForward")
+        FORWARD_ENTRY("FBlockForwardEntry", 0, "FBlockForward"));
 
 /* ---- type encodings --------------------------------------------------------------- */
 
@@ -1008,6 +1010,23 @@ __attribute__((used)) int FForward(struct FFrame *f, int hidden)
     NSInvocation *inv = [NSInvocation _invocationWithSignature:sig frame:f hidden:(BOOL)hidden];
     [self forwardInvocation:inv];
     return [inv _storeResultInFrame:f hidden:(BOOL)hidden];
+}
+
+/* Called by FBlockForwardEntry, the invoke function of a block that stands
+ * for one in another process (NSXPCConnection.m): the block keeps the
+ * object that sends the call on after its header, where a block literal
+ * capturing one object keeps it. */
+const char *_Block_signature(void *block);
+__attribute__((used)) int FBlockForward(struct FFrame *f, int unused)
+{
+    (void)unused;
+    void *block = (void *)(uintptr_t)f->gpr[0];
+    id box = *(id *)((char *)block + 32);
+    const char *types = _Block_signature(block);
+    NSMethodSignature *sig = [NSMethodSignature signatureWithObjCTypes:types ? types : "v8@?0"];
+    NSInvocation *inv = [NSInvocation _invocationWithSignature:sig frame:f hidden:NO];
+    [box performSelector:@selector(_ferryBlockCalled:) withObject:inv];
+    return [inv _storeResultInFrame:f hidden:NO];
 }
 
 __attribute__((constructor)) static void forwarding_init(void)

@@ -1183,6 +1183,20 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.264 "HandBrake converts video" (done)
+
+Ferry 0.87.0: HandBrake 1.9.2, the video converter, runs from its official download and converts a video from start to finish: it opens the file, shows its tracks and a preview, and its Start button encodes it to H.264 video with AAC sound, which plays back correctly. It was picked because it looked likely not to work: it does its encoding in separate helper programs that it talks to over XPC, which nothing in Ferry could start, and it encodes sound with Core Audio's AAC encoder, which Ferry didn't have. Both are there now. Core Audio's audio converters encode AAC, Apple Lossless, FLAC and Opus, and decode those, MP3 and AC-3, using the system's FFmpeg, so other apps that make or read compressed sound through Core Audio get them too.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | XPC services: an app's helpers in `Contents/XPCServices` start on its first message, get objects and replies with blocks, synchronous proxies, error and interruption handlers, and start again after they quit | Ferry Foundation | done |
+| 2 | Audio converters that encode (AAC, Apple Lossless, FLAC, Opus) and decode (those, MP3, MP2, AC-3, E-AC-3) through the system's FFmpeg: bit rates, magic cookies, priming, quality for variable bit rate | Ferry Core Audio | done |
+| 3 | `NSComboButton`, toolbar item groups shown as a segmented control, a toolbar item's possible labels and hiding, a window's subtitle and title bar line | Ferry AppKit | done |
+| 4 | Open panels that choose files and folders; the standard user folders (Movies, Music, Pictures, Downloads) made when first asked for | Ferry AppKit / Foundation | done |
+| 5 | `NSProgress` publishing, the symbols HandBrake's toolbars draw (sidebar.right, stop.circle and more) | Ferry Foundation / AppKit | done |
+| 6 | The Mac's `regex_t` layout for C's regular expressions; `getfsstat`, `fpclassify`, `copyfile` and attribute lists; IOKit power and volume calls | Ferry | done |
+| 7 | HandBrake 1.9.2 opens a video, shows its summary and preview, and encodes it to H.264 and AAC | Ferry / HandBrake | done |
+
 ## 1.263 "Audacity plays and records; OBS's own download opens" (done)
 
 Ferry 0.86.0: Audacity 3.7.5, the audio editor, runs from its official download. It opens a sound file and draws its waveform, plays it with the clock and playhead moving, and records, the waveform growing as it comes in. It was picked from the list of apps that looked likely not to work: it's built on wxWidgets and PortAudio, which use parts of AppKit and Core Audio no app had used before. The biggest change helps every app: a window now draws again only the part its views marked, as a Mac does, instead of the whole window, so an app that updates a meter or a clock many times a second stays quick. OBS Studio 33.0.3's official download, rather than a build made here, now opens to its main window too.

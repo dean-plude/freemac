@@ -1,0 +1,10 @@
+reply: HELLO HELLO HELLO, from another process: yes
+answered: yes
+dictionary back: movie, sum 6
+synchronous: NOW NOW
+error: 4097
+interrupted: yes
+after it quit: AGAIN
+started again: yes
+a service that isn't there: error 4099
+exit=0

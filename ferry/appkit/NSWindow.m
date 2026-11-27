@@ -13,6 +13,7 @@
  * its window's. The sheet calls are written from Apple's public NSWindow
  * documentation; no Apple code was used. */
 #import "AInternal.h"
+#import <objc/runtime.h>
 
 NSNotificationName const NSWindowWillCloseNotification = @"NSWindowWillCloseNotification";
 NSNotificationName const NSWindowDidResizeNotification = @"NSWindowDidResizeNotification";
@@ -276,7 +277,22 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 - (BOOL)autorecalculatesContentBorderThicknessForEdge:(NSRectEdge)edge { return YES; }
 /* What the title bar shows: an edited document's title says so, as a
  * Mac's title bar does. */
-- (NSString *)_shownTitle { return _edited ? [_title stringByAppendingString:@" — Edited"] : _title; }
+/* A Mac shows a subtitle (macOS 11) under the title in the title bar; the
+ * desktop's title bar has one line, so it follows the title there. */
+static char subtitle_key;
+- (NSString *)subtitle { return objc_getAssociatedObject(self, &subtitle_key) ?: @""; }
+- (void)setSubtitle:(NSString *)subtitle
+{
+    objc_setAssociatedObject(self, &subtitle_key, [subtitle length] ? subtitle : nil, OBJC_ASSOCIATION_COPY_NONATOMIC);
+    if (_gtk)
+        gtk_window_set_title(_gtk, [[self _shownTitle] UTF8String]);
+}
+- (NSString *)_shownTitle
+{
+    NSString *t = _edited ? [_title stringByAppendingString:@" — Edited"] : _title;
+    NSString *sub = objc_getAssociatedObject(self, &subtitle_key);
+    return sub ? [NSString stringWithFormat:@"%@ · %@", t, sub] : t;
+}
 - (void)setTitle:(NSString *)title
 {
     [_title release];

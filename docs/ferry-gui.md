@@ -3396,6 +3396,48 @@ Not there yet: IINA's images from its asset catalog (some buttons are
 blank), gesture recognizers don't fire, and picture in picture's window has
 no play and pause buttons.
 
+## HandBrake and what it needed (freemac 1.264, Ferry 0.87.0)
+
+HandBrake 1.9.2, from its official download, opens a video, shows its
+tracks, summary and preview, and encodes it. Its app does no encoding
+itself: it hands each job to HandBrakeXPCService, a helper program inside
+the app, over XPC. What it needed:
+
+- **XPC services.** `NSXPCConnection initWithServiceName:` finds the
+  service in the app's `Contents/XPCServices` (or a framework's) by its
+  bundle identifier. The first message starts the service as a child
+  process, with a socket between the two; the service's
+  `+[NSXPCListener serviceListener]` picks the socket up, asks its delegate
+  to accept the connection and runs its main queue. Messages are the
+  invocation's selector and arguments, archived with `NSKeyedArchiver`;
+  reply blocks are carried across and called back. Synchronous proxies wait
+  for their replies. When the service quits, waiting calls get their error
+  handler (4097), the interruption handler runs, and the next message
+  starts the service again.
+- **Compressed sound in Core Audio.** `AudioConverterNew` takes linear PCM
+  to AAC, Apple Lossless, FLAC or Opus, and those, MP3, MP2, AC-3 and E-AC-3
+  back to PCM. The work is done by the system's FFmpeg (libavcodec, loaded
+  when first needed); Ferry's own PCM converter sits in between for sample
+  formats and rates. The converter answers what HandBrake asks: the bit
+  rates it may choose, the bit rate it chose, the magic cookie (an ES
+  descriptor for AAC, the codec's configuration for the others), the
+  priming frames and the largest packet. Apple Lossless gives back exactly
+  what went in. On a system without FFmpeg, compressed formats are refused
+  as before.
+- **AppKit.** `NSComboButton`; toolbar item groups, shown as a segmented
+  control; a toolbar item's `possibleLabels` and `hidden`; a window's
+  `subtitle` and `titlebarSeparatorStyle`; open panels that choose both
+  files and folders; more symbols (sidebar.right, stop.circle).
+- **Foundation and C.** `NSProgress` publishing (kept in the app); the
+  standard user folders made when first asked for; the Mac's `regex_t`,
+  whose layout differs from this system's, so Ferry keeps the compiled
+  pattern itself; `getfsstat`, `fpclassify`, `copyfile` and attribute
+  lists; IOKit's power and volume calls.
+
+Not there yet: HandBrake's software updater (it needs Apple's compression
+library), the Delete buttons' images in its queue window, and video
+playback in its preview (AVFoundation's player).
+
 ## Audacity and what it needed (freemac 1.263, Ferry 0.86.0)
 
 Audacity 3.7.5, from its official download, opens a sound file, plays it

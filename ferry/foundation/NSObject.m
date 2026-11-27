@@ -1420,6 +1420,46 @@ NSString *NSFullUserName(void)
     return NSUserName();
 }
 
+/* A person's own folders, as the desktop names them in user-dirs.dirs
+ * (XDG_VIDEOS_DIR="$HOME/Videos", and in other languages other names),
+ * else the usual English name. A Mac always has its Movies, Music and
+ * Pictures folders, and apps such as HandBrake take a missing one as a
+ * bad place to save to, so a missing folder is made (freemac 1.264). */
+static NSString *user_dir(const char *key, NSString *fallback)
+{
+    NSString *home = FHome(), *found = nil;
+    const char *cfg = getenv("XDG_CONFIG_HOME");
+    NSString *file = cfg && cfg[0] == '/' ? [NSString stringWithUTF8String:cfg]
+                                          : [home stringByAppendingPathComponent:@".config"];
+    FILE *f = fopen([[file stringByAppendingPathComponent:@"user-dirs.dirs"] fileSystemRepresentation], "r");
+    if (f) {
+        char line[1024];
+        size_t klen = strlen(key);
+        while (fgets(line, sizeof line, f)) {
+            if (strncmp(line, key, klen) || line[klen] != '=')
+                continue;
+            char *v = line + klen + 1, *end;
+            if (*v == '"')
+                v++;
+            if ((end = strchr(v, '"')) || (end = strchr(v, '\n')))
+                *end = 0;
+            if (!strncmp(v, "$HOME", 5))
+                found = [home stringByAppendingString:[NSString stringWithUTF8String:v + 5]];
+            else if (v[0] == '/')
+                found = [NSString stringWithUTF8String:v];
+            break;
+        }
+        fclose(f);
+    }
+    /* "$HOME/" alone means the desktop turned the folder off: the home folder */
+    if (found && [[found stringByStandardizingPath] isEqualToString:[home stringByStandardizingPath]])
+        found = nil;
+    NSString *d = found ?: [home stringByAppendingPathComponent:fallback];
+    if (access([d fileSystemRepresentation], F_OK) != 0)
+        mkdir([d fileSystemRepresentation], 0755);
+    return d;
+}
+
 /* Where a Mac app's own folders are on freemac, in the user domain. */
 NSString *FUserFolder(NSSearchPathDirectory dir)
 {
@@ -1428,12 +1468,12 @@ NSString *FUserFolder(NSSearchPathDirectory dir)
     case NSLibraryDirectory:
     case NSApplicationSupportDirectory: return xdg_dir("XDG_DATA_HOME", @".local/share");
     case NSCachesDirectory: return xdg_dir("XDG_CACHE_HOME", @".cache");
-    case NSDocumentDirectory: return [FHome() stringByAppendingPathComponent:@"Documents"];
-    case NSDesktopDirectory: return [FHome() stringByAppendingPathComponent:@"Desktop"];
-    case NSDownloadsDirectory: return [FHome() stringByAppendingPathComponent:@"Downloads"];
-    case NSMoviesDirectory: return [FHome() stringByAppendingPathComponent:@"Videos"];
-    case NSMusicDirectory: return [FHome() stringByAppendingPathComponent:@"Music"];
-    case NSPicturesDirectory: return [FHome() stringByAppendingPathComponent:@"Pictures"];
+    case NSDocumentDirectory: return user_dir("XDG_DOCUMENTS_DIR", @"Documents");
+    case NSDesktopDirectory: return user_dir("XDG_DESKTOP_DIR", @"Desktop");
+    case NSDownloadsDirectory: return user_dir("XDG_DOWNLOAD_DIR", @"Downloads");
+    case NSMoviesDirectory: return user_dir("XDG_VIDEOS_DIR", @"Videos");
+    case NSMusicDirectory: return user_dir("XDG_MUSIC_DIR", @"Music");
+    case NSPicturesDirectory: return user_dir("XDG_PICTURES_DIR", @"Pictures");
     case NSUserDirectory: return [FHome() stringByDeletingLastPathComponent];
     default: return nil; /* a Mac folder with no counterpart here */
     }

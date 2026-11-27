@@ -22,6 +22,8 @@ SRC += src/libc_apps.c
 SRC += src/libc_audacity.c
 # cameras, for AVFoundation's capture (freemac 1.257)
 SRC += src/camera.c
+# AAC and other sound codecs through this system's FFmpeg, for Core Audio (freemac 1.264)
+SRC += src/codec.c
 OBJ = $(SRC:.c=.o) src/objc/msgsend.o src/objc/unwind.o
 TBD = sdk/lib/libSystem.tbd sdk/lib/libobjc.tbd sdk/lib/libiconv.tbd
 # -lm, -ldl, -lpthread and -lc link libSystem, as with a Mac's SDK (freemac 1.249)

@@ -326,6 +326,372 @@ static void draw_magnifier(NSRect r, CGFloat line)
     [h stroke];
 }
 
+/* freemac 1.264: more names, for HandBrake's toolbar and other apps' */
+static NSRect part(NSRect r, CGFloat x, CGFloat y, CGFloat w, CGFloat h)
+{
+    return NSMakeRect(NSMinX(r) + x * NSWidth(r), NSMinY(r) + y * NSHeight(r), w * NSWidth(r), h * NSHeight(r));
+}
+static void fill_poly(NSRect r, int n, const CGFloat *xy)
+{
+    NSBezierPath *p = [NSBezierPath bezierPath];
+    for (int i = 0; i < n; i++) {
+        if (i)
+            [p lineToPoint:at(r, xy[2 * i], xy[2 * i + 1])];
+        else
+            [p moveToPoint:at(r, xy[0], xy[1])];
+    }
+    [p closePath];
+    [p fill];
+}
+static void stroke_rounded(NSRect box, CGFloat radius, CGFloat line)
+{
+    NSBezierPath *p = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(box, line / 2, line / 2) xRadius:radius yRadius:radius];
+    [p setLineWidth:line];
+    [p stroke];
+}
+static void draw_play(NSRect r, CGFloat line)
+{
+    NSBezierPath *p = stroke_path(line);
+    [p moveToPoint:at(r, 0.22, 0.1)];
+    [p lineToPoint:at(r, 0.86, 0.5)];
+    [p lineToPoint:at(r, 0.22, 0.9)];
+    [p closePath];
+    [p stroke];
+}
+static void draw_play_fill(NSRect r, CGFloat line)
+{
+    const CGFloat xy[] = {0.2, 0.08, 0.9, 0.5, 0.2, 0.92};
+    fill_poly(r, 3, xy);
+}
+static void draw_pause_fill(NSRect r, CGFloat line)
+{
+    [[NSBezierPath bezierPathWithRoundedRect:part(r, 0.18, 0.1, 0.22, 0.8) xRadius:NSWidth(r) * 0.04 yRadius:NSWidth(r) * 0.04] fill];
+    [[NSBezierPath bezierPathWithRoundedRect:part(r, 0.6, 0.1, 0.22, 0.8) xRadius:NSWidth(r) * 0.04 yRadius:NSWidth(r) * 0.04] fill];
+}
+static void draw_pause(NSRect r, CGFloat line)
+{
+    NSBezierPath *p = stroke_path(line * 1.4);
+    [p moveToPoint:at(r, 0.32, 0.12)];
+    [p lineToPoint:at(r, 0.32, 0.88)];
+    [p moveToPoint:at(r, 0.68, 0.12)];
+    [p lineToPoint:at(r, 0.68, 0.88)];
+    [p stroke];
+}
+static void draw_stop_fill(NSRect r, CGFloat line)
+{
+    [[NSBezierPath bezierPathWithRoundedRect:part(r, 0.12, 0.12, 0.76, 0.76) xRadius:NSWidth(r) * 0.1 yRadius:NSWidth(r) * 0.1] fill];
+}
+static void draw_stop(NSRect r, CGFloat line) { stroke_rounded(part(r, 0.12, 0.12, 0.76, 0.76), NSWidth(r) * 0.1, line); }
+static void draw_forward_fill(NSRect r, CGFloat line)
+{
+    const CGFloat a[] = {0.04, 0.2, 0.5, 0.5, 0.04, 0.8}, b[] = {0.5, 0.2, 0.96, 0.5, 0.5, 0.8};
+    fill_poly(r, 3, a);
+    fill_poly(r, 3, b);
+}
+static void draw_backward_fill(NSRect r, CGFloat line)
+{
+    const CGFloat a[] = {0.96, 0.2, 0.5, 0.5, 0.96, 0.8}, b[] = {0.5, 0.2, 0.04, 0.5, 0.5, 0.8};
+    fill_poly(r, 3, a);
+    fill_poly(r, 3, b);
+}
+static void draw_film(NSRect r, CGFloat line)
+{
+    /* a strip of film: a frame with holes down both edges */
+    NSRect box = part(r, 0.08, 0.04, 0.84, 0.92);
+    stroke_rounded(box, NSWidth(r) * 0.08, line);
+    NSBezierPath *p = stroke_path(line * 0.8);
+    [p moveToPoint:at(r, 0.3, 0.06)];
+    [p lineToPoint:at(r, 0.3, 0.94)];
+    [p moveToPoint:at(r, 0.7, 0.06)];
+    [p lineToPoint:at(r, 0.7, 0.94)];
+    [p moveToPoint:at(r, 0.3, 0.5)];
+    [p lineToPoint:at(r, 0.7, 0.5)];
+    for (int i = 0; i < 3; i++) {
+        CGFloat y = 0.27 + i * 0.23;
+        [p moveToPoint:at(r, 0.1, y)];
+        [p lineToPoint:at(r, 0.3, y)];
+        [p moveToPoint:at(r, 0.7, y)];
+        [p lineToPoint:at(r, 0.9, y)];
+    }
+    [p stroke];
+}
+static void photo_in(NSRect r, CGFloat line)
+{
+    stroke_rounded(part(r, 0.04, 0.16, 0.92, 0.7), NSWidth(r) * 0.1, line);
+    const CGFloat hill[] = {0.1, 0.8, 0.38, 0.48, 0.58, 0.68, 0.7, 0.58, 0.9, 0.8};
+    fill_poly(r, 5, hill);
+    [[NSBezierPath bezierPathWithOvalInRect:part(r, 0.62, 0.28, 0.14, 0.14)] fill];
+}
+static void draw_photo(NSRect r, CGFloat line) { photo_in(r, line); }
+static void draw_photo_badge_plus(NSRect r, CGFloat line)
+{
+    photo_in(part(r, 0, 0.06, 0.8, 0.8), line);
+    [[NSBezierPath bezierPathWithOvalInRect:part(r, 0.56, 0.56, 0.44, 0.44)] fill];
+    [[NSGraphicsContext currentContext] saveGraphicsState];
+    [[NSGraphicsContext currentContext] setCompositingOperation:NSCompositingOperationClear];
+    draw_plus(part(r, 0.64, 0.64, 0.28, 0.28), line * 0.9);
+    [[NSGraphicsContext currentContext] restoreGraphicsState];
+}
+static void draw_photo_stack(NSRect r, CGFloat line)
+{
+    photo_in(part(r, 0, 0.12, 0.88, 0.88), line);
+    NSBezierPath *p = stroke_path(line);
+    [p moveToPoint:at(r, 0.16, 0.14)];
+    [p lineToPoint:at(r, 0.92, 0.14)];
+    [p lineToPoint:at(r, 0.92, 0.66)];
+    [p stroke];
+}
+static void draw_sliders(NSRect r, CGFloat line)
+{
+    NSBezierPath *p = stroke_path(line);
+    const CGFloat knob[3] = {0.66, 0.3, 0.55};
+    for (int i = 0; i < 3; i++) {
+        CGFloat y = 0.2 + i * 0.3;
+        [p moveToPoint:at(r, 0.06, y)];
+        [p lineToPoint:at(r, 0.94, y)];
+    }
+    [p stroke];
+    for (int i = 0; i < 3; i++) {
+        CGFloat y = 0.2 + i * 0.3, d = 0.2;
+        [[NSBezierPath bezierPathWithOvalInRect:part(r, knob[i] - d / 2, y - d / 2, d, d)] fill];
+    }
+}
+static void draw_eye(NSRect r, CGFloat line)
+{
+    NSBezierPath *p = stroke_path(line);
+    [p moveToPoint:at(r, 0.04, 0.5)];
+    [p curveToPoint:at(r, 0.96, 0.5) controlPoint1:at(r, 0.3, 0.08) controlPoint2:at(r, 0.7, 0.08)];
+    [p curveToPoint:at(r, 0.04, 0.5) controlPoint1:at(r, 0.7, 0.92) controlPoint2:at(r, 0.3, 0.92)];
+    [p stroke];
+    [[NSBezierPath bezierPathWithOvalInRect:part(r, 0.36, 0.36, 0.28, 0.28)] fill];
+}
+static void draw_viewfinder_text(NSRect r, CGFloat line)
+{
+    /* four corners, and lines of text inside */
+    NSBezierPath *p = stroke_path(line);
+    const CGFloat c[4][2] = {{0.06, 0.06}, {0.94, 0.06}, {0.94, 0.94}, {0.06, 0.94}};
+    for (int i = 0; i < 4; i++) {
+        CGFloat dx = c[i][0] < 0.5 ? 0.26 : -0.26, dy = c[i][1] < 0.5 ? 0.26 : -0.26;
+        [p moveToPoint:at(r, c[i][0] + dx, c[i][1])];
+        [p lineToPoint:at(r, c[i][0], c[i][1])];
+        [p lineToPoint:at(r, c[i][0], c[i][1] + dy)];
+    }
+    for (int i = 0; i < 3; i++) {
+        CGFloat y = 0.33 + i * 0.17;
+        [p moveToPoint:at(r, 0.28, y)];
+        [p lineToPoint:at(r, i == 2 ? 0.56 : 0.72, y)];
+    }
+    [p stroke];
+}
+static void draw_list_bullet(NSRect r, CGFloat line)
+{
+    NSBezierPath *p = stroke_path(line);
+    for (int i = 0; i < 3; i++) {
+        CGFloat y = 0.2 + i * 0.3, d = 0.14;
+        [[NSBezierPath bezierPathWithOvalInRect:part(r, 0.06, y - d / 2, d, d)] fill];
+        [p moveToPoint:at(r, 0.34, y)];
+        [p lineToPoint:at(r, 0.94, y)];
+    }
+    [p stroke];
+}
+static void draw_gear(NSRect r, CGFloat line)
+{
+    NSBezierPath *p = stroke_path(line * 1.6);
+    for (int i = 0; i < 8; i++) {
+        CGFloat a = i * M_PI / 4;
+        [p moveToPoint:at(r, 0.5 + 0.3 * cos(a), 0.5 + 0.3 * sin(a))];
+        [p lineToPoint:at(r, 0.5 + 0.44 * cos(a), 0.5 + 0.44 * sin(a))];
+    }
+    [p stroke];
+    NSBezierPath *ring = [NSBezierPath bezierPathWithOvalInRect:part(r, 0.2, 0.2, 0.6, 0.6)];
+    [ring setLineWidth:line];
+    [ring stroke];
+    NSBezierPath *hub = [NSBezierPath bezierPathWithOvalInRect:part(r, 0.38, 0.38, 0.24, 0.24)];
+    [hub setLineWidth:line];
+    [hub stroke];
+}
+static void draw_folder(NSRect r, CGFloat line)
+{
+    NSBezierPath *p = stroke_path(line);
+    [p moveToPoint:at(r, 0.06, 0.2)];
+    [p lineToPoint:at(r, 0.38, 0.2)];
+    [p lineToPoint:at(r, 0.46, 0.3)];
+    [p lineToPoint:at(r, 0.94, 0.3)];
+    [p lineToPoint:at(r, 0.94, 0.86)];
+    [p lineToPoint:at(r, 0.06, 0.86)];
+    [p closePath];
+    [p moveToPoint:at(r, 0.06, 0.42)];
+    [p lineToPoint:at(r, 0.94, 0.42)];
+    [p stroke];
+}
+static void draw_doc(NSRect r, CGFloat line)
+{
+    NSBezierPath *p = stroke_path(line);
+    [p moveToPoint:at(r, 0.16, 0.04)];
+    [p lineToPoint:at(r, 0.6, 0.04)];
+    [p lineToPoint:at(r, 0.84, 0.28)];
+    [p lineToPoint:at(r, 0.84, 0.96)];
+    [p lineToPoint:at(r, 0.16, 0.96)];
+    [p closePath];
+    [p moveToPoint:at(r, 0.6, 0.04)];
+    [p lineToPoint:at(r, 0.6, 0.28)];
+    [p lineToPoint:at(r, 0.84, 0.28)];
+    [p stroke];
+}
+static void draw_share(NSRect r, CGFloat line)
+{
+    NSBezierPath *p = stroke_path(line);
+    [p moveToPoint:at(r, 0.34, 0.4)];
+    [p lineToPoint:at(r, 0.16, 0.4)];
+    [p lineToPoint:at(r, 0.16, 0.96)];
+    [p lineToPoint:at(r, 0.84, 0.96)];
+    [p lineToPoint:at(r, 0.84, 0.4)];
+    [p lineToPoint:at(r, 0.66, 0.4)];
+    [p moveToPoint:at(r, 0.5, 0.64)];
+    [p lineToPoint:at(r, 0.5, 0.04)];
+    [p moveToPoint:at(r, 0.32, 0.2)];
+    [p lineToPoint:at(r, 0.5, 0.04)];
+    [p lineToPoint:at(r, 0.68, 0.2)];
+    [p stroke];
+}
+static void draw_info_circle(NSRect r, CGFloat line)
+{
+    draw_circle(r, line);
+    NSBezierPath *p = stroke_path(line * 1.2);
+    [p moveToPoint:at(r, 0.5, 0.46)];
+    [p lineToPoint:at(r, 0.5, 0.74)];
+    [p stroke];
+    CGFloat d = 0.1;
+    [[NSBezierPath bezierPathWithOvalInRect:part(r, 0.5 - d / 2, 0.27, d, d)] fill];
+}
+static void draw_arrow_clockwise(NSRect r, CGFloat line)
+{
+    NSBezierPath *p = stroke_path(line);
+    [p appendBezierPathWithArcWithCenter:at(r, 0.5, 0.54) radius:NSWidth(r) * 0.36 startAngle:-60 endAngle:240 clockwise:NO];
+    [p stroke];
+    NSPoint tip = NSMakePoint(NSMidX(r) + NSWidth(r) * 0.36 * cos(-60 * M_PI / 180),
+                              NSMinY(r) + NSHeight(r) * 0.54 + NSWidth(r) * 0.36 * sin(-60 * M_PI / 180));
+    NSBezierPath *h = stroke_path(line);
+    [h moveToPoint:NSMakePoint(tip.x - NSWidth(r) * 0.2, tip.y + NSHeight(r) * 0.02)];
+    [h lineToPoint:tip];
+    [h lineToPoint:NSMakePoint(tip.x + NSWidth(r) * 0.02, tip.y + NSHeight(r) * 0.22)];
+    [h stroke];
+}
+static void draw_square_grid(NSRect r, CGFloat line)
+{
+    for (int i = 0; i < 4; i++)
+        stroke_rounded(part(r, 0.06 + (i % 2) * 0.5, 0.06 + (i / 2) * 0.5, 0.38, 0.38), NSWidth(r) * 0.06, line);
+}
+static void draw_sidebar_left(NSRect r, CGFloat line)
+{
+    stroke_rounded(part(r, 0.04, 0.12, 0.92, 0.76), NSWidth(r) * 0.1, line);
+    NSBezierPath *p = stroke_path(line);
+    [p moveToPoint:at(r, 0.36, 0.14)];
+    [p lineToPoint:at(r, 0.36, 0.86)];
+    [p stroke];
+}
+static void draw_sidebar_right(NSRect r, CGFloat line)
+{
+    stroke_rounded(part(r, 0.04, 0.12, 0.92, 0.76), NSWidth(r) * 0.1, line);
+    NSBezierPath *p = stroke_path(line);
+    [p moveToPoint:at(r, 0.64, 0.14)];
+    [p lineToPoint:at(r, 0.64, 0.86)];
+    [p stroke];
+}
+/* a square inside a ring, and filled, a square cut out of a disc */
+static void draw_stop_circle(NSRect r, CGFloat line)
+{
+    draw_circle(r, line);
+    [[NSBezierPath bezierPathWithRoundedRect:part(r, 0.36, 0.36, 0.28, 0.28) xRadius:NSWidth(r) * 0.03
+                                     yRadius:NSWidth(r) * 0.03] fill];
+}
+static void draw_stop_circle_fill(NSRect r, CGFloat line)
+{
+    NSBezierPath *p = [NSBezierPath bezierPathWithOvalInRect:part(r, 0.06, 0.06, 0.88, 0.88)];
+    [p appendBezierPath:[NSBezierPath bezierPathWithRect:part(r, 0.36, 0.36, 0.28, 0.28)]];
+    p.windingRule = NSWindingRuleEvenOdd;
+    [p fill];
+}
+static void draw_star(NSRect r, CGFloat line, BOOL fill)
+{
+    NSBezierPath *p = stroke_path(line);
+    for (int i = 0; i < 10; i++) {
+        CGFloat a = -M_PI / 2 + i * M_PI / 5, k = i % 2 ? 0.2 : 0.46;
+        NSPoint q = at(r, 0.5 + k * cos(a), 0.54 + k * sin(a));
+        if (i)
+            [p lineToPoint:q];
+        else
+            [p moveToPoint:q];
+    }
+    [p closePath];
+    if (fill)
+        [p fill];
+    else
+        [p stroke];
+}
+static void draw_star_line(NSRect r, CGFloat line) { draw_star(r, line, NO); }
+static void draw_star_fill(NSRect r, CGFloat line) { draw_star(r, line, YES); }
+static void draw_house(NSRect r, CGFloat line)
+{
+    NSBezierPath *p = stroke_path(line);
+    [p moveToPoint:at(r, 0.04, 0.5)];
+    [p lineToPoint:at(r, 0.5, 0.08)];
+    [p lineToPoint:at(r, 0.96, 0.5)];
+    [p moveToPoint:at(r, 0.18, 0.4)];
+    [p lineToPoint:at(r, 0.18, 0.92)];
+    [p lineToPoint:at(r, 0.82, 0.92)];
+    [p lineToPoint:at(r, 0.82, 0.4)];
+    [p stroke];
+}
+static void draw_person(NSRect r, CGFloat line)
+{
+    NSBezierPath *head = [NSBezierPath bezierPathWithOvalInRect:part(r, 0.32, 0.06, 0.36, 0.36)];
+    [head setLineWidth:line];
+    [head stroke];
+    NSBezierPath *p = stroke_path(line);
+    [p moveToPoint:at(r, 0.1, 0.94)];
+    [p curveToPoint:at(r, 0.9, 0.94) controlPoint1:at(r, 0.12, 0.48) controlPoint2:at(r, 0.88, 0.48)];
+    [p closePath];
+    [p stroke];
+}
+static void draw_bell(NSRect r, CGFloat line)
+{
+    NSBezierPath *p = stroke_path(line);
+    [p moveToPoint:at(r, 0.1, 0.78)];
+    [p lineToPoint:at(r, 0.9, 0.78)];
+    [p curveToPoint:at(r, 0.78, 0.4) controlPoint1:at(r, 0.8, 0.68) controlPoint2:at(r, 0.78, 0.6)];
+    [p curveToPoint:at(r, 0.22, 0.4) controlPoint1:at(r, 0.78, 0.04) controlPoint2:at(r, 0.22, 0.04)];
+    [p curveToPoint:at(r, 0.1, 0.78) controlPoint1:at(r, 0.22, 0.6) controlPoint2:at(r, 0.2, 0.68)];
+    [p moveToPoint:at(r, 0.4, 0.9)];
+    [p lineToPoint:at(r, 0.6, 0.9)];
+    [p stroke];
+}
+static void draw_pencil(NSRect r, CGFloat line)
+{
+    NSBezierPath *p = stroke_path(line);
+    [p moveToPoint:at(r, 0.12, 0.88)];
+    [p lineToPoint:at(r, 0.16, 0.66)];
+    [p lineToPoint:at(r, 0.72, 0.1)];
+    [p lineToPoint:at(r, 0.9, 0.28)];
+    [p lineToPoint:at(r, 0.34, 0.84)];
+    [p closePath];
+    [p moveToPoint:at(r, 0.62, 0.2)];
+    [p lineToPoint:at(r, 0.8, 0.38)];
+    [p stroke];
+}
+static void draw_paperplane(NSRect r, CGFloat line)
+{
+    NSBezierPath *p = stroke_path(line);
+    [p moveToPoint:at(r, 0.06, 0.44)];
+    [p lineToPoint:at(r, 0.94, 0.06)];
+    [p lineToPoint:at(r, 0.56, 0.94)];
+    [p lineToPoint:at(r, 0.44, 0.56)];
+    [p closePath];
+    [p moveToPoint:at(r, 0.44, 0.56)];
+    [p lineToPoint:at(r, 0.94, 0.06)];
+    [p stroke];
+}
+
 static symbol_drawer symbol_drawer_for(NSString *name)
 {
     static NSDictionary *names;
@@ -350,6 +716,43 @@ static symbol_drawer symbol_drawer_for(NSString *name)
             @"circle.fill" : [NSValue valueWithPointer:(void *)draw_circle_fill],
             @"ellipsis" : [NSValue valueWithPointer:(void *)draw_ellipsis],
             @"magnifyingglass" : [NSValue valueWithPointer:(void *)draw_magnifier],
+            @"play" : [NSValue valueWithPointer:(void *)draw_play],
+            @"play.fill" : [NSValue valueWithPointer:(void *)draw_play_fill],
+            @"pause" : [NSValue valueWithPointer:(void *)draw_pause],
+            @"pause.fill" : [NSValue valueWithPointer:(void *)draw_pause_fill],
+            @"stop" : [NSValue valueWithPointer:(void *)draw_stop],
+            @"stop.fill" : [NSValue valueWithPointer:(void *)draw_stop_fill],
+            @"forward.fill" : [NSValue valueWithPointer:(void *)draw_forward_fill],
+            @"backward.fill" : [NSValue valueWithPointer:(void *)draw_backward_fill],
+            @"film" : [NSValue valueWithPointer:(void *)draw_film],
+            @"photo" : [NSValue valueWithPointer:(void *)draw_photo],
+            @"photo.badge.plus" : [NSValue valueWithPointer:(void *)draw_photo_badge_plus],
+            @"photo.stack" : [NSValue valueWithPointer:(void *)draw_photo_stack],
+            @"photo.on.rectangle" : [NSValue valueWithPointer:(void *)draw_photo_stack],
+            @"slider.horizontal.3" : [NSValue valueWithPointer:(void *)draw_sliders],
+            @"eye" : [NSValue valueWithPointer:(void *)draw_eye],
+            @"text.viewfinder" : [NSValue valueWithPointer:(void *)draw_viewfinder_text],
+            @"list.bullet" : [NSValue valueWithPointer:(void *)draw_list_bullet],
+            @"gearshape" : [NSValue valueWithPointer:(void *)draw_gear],
+            @"gear" : [NSValue valueWithPointer:(void *)draw_gear],
+            @"folder" : [NSValue valueWithPointer:(void *)draw_folder],
+            @"doc" : [NSValue valueWithPointer:(void *)draw_doc],
+            @"square.and.arrow.up" : [NSValue valueWithPointer:(void *)draw_share],
+            @"info.circle" : [NSValue valueWithPointer:(void *)draw_info_circle],
+            @"arrow.clockwise" : [NSValue valueWithPointer:(void *)draw_arrow_clockwise],
+            @"square.grid.2x2" : [NSValue valueWithPointer:(void *)draw_square_grid],
+            @"sidebar.left" : [NSValue valueWithPointer:(void *)draw_sidebar_left],
+            @"sidebar.right" : [NSValue valueWithPointer:(void *)draw_sidebar_right],
+            @"stop.circle" : [NSValue valueWithPointer:(void *)draw_stop_circle],
+            @"stop.circle.fill" : [NSValue valueWithPointer:(void *)draw_stop_circle_fill],
+            @"star" : [NSValue valueWithPointer:(void *)draw_star_line],
+            @"star.fill" : [NSValue valueWithPointer:(void *)draw_star_fill],
+            @"house" : [NSValue valueWithPointer:(void *)draw_house],
+            @"person" : [NSValue valueWithPointer:(void *)draw_person],
+            @"bell" : [NSValue valueWithPointer:(void *)draw_bell],
+            @"pencil" : [NSValue valueWithPointer:(void *)draw_pencil],
+            @"square.and.pencil" : [NSValue valueWithPointer:(void *)draw_pencil],
+            @"paperplane" : [NSValue valueWithPointer:(void *)draw_paperplane],
         } retain];
     return (symbol_drawer)[[names objectForKey:name] pointerValue];
 }
@@ -660,5 +1063,19 @@ static char button_background_key;
     if (!performer)
         performer = [[AHapticPerformer alloc] init];
     return performer;
+}
+@end
+
+/* macOS 11: the line under a window's title bar, kept for the app to read
+ * back (freemac 1.264, HandBrake's queue window) */
+static char separator_key;
+@implementation NSWindow (FerryTitlebarSeparator)
+- (NSTitlebarSeparatorStyle)titlebarSeparatorStyle
+{
+    return [objc_getAssociatedObject(self, &separator_key) integerValue];
+}
+- (void)setTitlebarSeparatorStyle:(NSTitlebarSeparatorStyle)style
+{
+    objc_setAssociatedObject(self, &separator_key, style ? @(style) : nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 @end

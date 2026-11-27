@@ -1,0 +1,15 @@
+combo button: Add To Queue, menu items 2, style 0
+click sends the action: yes, size fits: yes
+group: 2 subitems, a segmented control: yes
+selected: 1, second selected: yes
+possible labels: 2, hidden: yes
+subtitle: 2 jobs pending, separator: 2
+symbol sidebar.right: drawn
+symbol stop.circle: drawn
+symbol play.fill: drawn
+symbol info.circle: drawn
+published progress: 0.4, old: no
+regex: compiled yes, groups 2
+match: yes at 5 to 12
+no match says: something
+exit=0

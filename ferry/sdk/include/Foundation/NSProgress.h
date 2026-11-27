@@ -54,6 +54,11 @@ FOUNDATION_EXPORT NSProgressUserInfoKey const NSProgressFileCompletedCountKey;
 @property (copy) NSURL *fileURL;
 @property (copy) NSNumber *fileTotalCount;
 @property (copy) NSNumber *fileCompletedCount;
+- (void)publish;
+- (void)unpublish;
++ (id)addSubscriberForFileURL:(NSURL *)url withPublishingHandler:(NSProgress *(^)(NSProgress *progress))handler;
++ (void)removeSubscriber:(id)subscriber;
+@property (readonly, getter=isOld) BOOL old;
 @end
 
 @protocol NSProgressReporting <NSObject>

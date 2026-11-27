@@ -412,8 +412,87 @@ static int mac_fgetattrlist(int fd, struct mac_attrlist *a, void *buf, size_t si
     return attributes(NULL, fd, a, buf, size, options);
 }
 
+/* setattrlist and fsetattrlist: the values come packed in the same order,
+ * with no length in front. The dates of change and access, owner, group
+ * and permissions are set; the creation and backup dates, Finder info and
+ * flags have nowhere to go on Linux, so they are read and passed over, as
+ * a disk that doesn't keep them would on a Mac. Any other attribute is
+ * EINVAL. */
+#define SETTABLE (ATTR_CMN_CRTIME | ATTR_CMN_MODTIME | ATTR_CMN_CHGTIME | ATTR_CMN_ACCTIME | ATTR_CMN_BKUPTIME |      \
+                  ATTR_CMN_FNDRINFO | ATTR_CMN_OWNERID | ATTR_CMN_GRPID | ATTR_CMN_ACCESSMASK | ATTR_CMN_FLAGS)
+
+struct mac_timespec {
+    int64_t sec, nsec;
+};
+
+static int set_attributes(const char *path, int fd, const struct mac_attrlist *a, const void *buf, size_t size,
+                          unsigned options)
+{
+    if (!a || !buf || a->bitmapcount != ATTR_BIT_MAP_COUNT || (a->commonattr & ~SETTABLE) || a->volattr ||
+        a->dirattr || a->fileattr || a->forkattr) {
+        errno = EINVAL;
+        return -1;
+    }
+    const unsigned char *p = buf, *end = p + size;
+    struct timespec times[2] = {{0, UTIME_OMIT}, {0, UTIME_OMIT}};
+    uid_t uid = (uid_t)-1;
+    gid_t gid = (gid_t)-1;
+    int mode = -1;
+    static const struct { uint32_t bit; size_t len; } order[] = {
+        {ATTR_CMN_CRTIME, 16},   {ATTR_CMN_MODTIME, 16},  {ATTR_CMN_CHGTIME, 16},    {ATTR_CMN_ACCTIME, 16},
+        {ATTR_CMN_BKUPTIME, 16}, {ATTR_CMN_FNDRINFO, 32}, {ATTR_CMN_OWNERID, 4},     {ATTR_CMN_GRPID, 4},
+        {ATTR_CMN_ACCESSMASK, 4}, {ATTR_CMN_FLAGS, 4},
+    };
+    for (size_t i = 0; i < sizeof order / sizeof order[0]; i++) {
+        if (!(a->commonattr & order[i].bit))
+            continue;
+        if ((size_t)(end - p) < order[i].len) {
+            errno = EINVAL;
+            return -1;
+        }
+        struct mac_timespec t;
+        uint32_t v;
+        switch (order[i].bit) {
+        case ATTR_CMN_MODTIME:
+        case ATTR_CMN_ACCTIME:
+            memcpy(&t, p, sizeof t);
+            times[order[i].bit == ATTR_CMN_MODTIME ? 1 : 0] = (struct timespec){(time_t)t.sec, (long)t.nsec};
+            break;
+        case ATTR_CMN_OWNERID: memcpy(&v, p, 4); uid = v; break;
+        case ATTR_CMN_GRPID: memcpy(&v, p, 4); gid = v; break;
+        case ATTR_CMN_ACCESSMASK: memcpy(&v, p, 4); mode = (int)(v & 07777); break;
+        }
+        p += order[i].len;
+    }
+    int nofollow = (options & FSOPT_NOFOLLOW) != 0;
+    int r = 0;
+    if (uid != (uid_t)-1 || gid != (gid_t)-1)
+        r |= fd >= 0 ? fchown(fd, uid, gid) : nofollow ? lchown(path, uid, gid) : chown(path, uid, gid);
+    if (mode >= 0)
+        r |= fd >= 0 ? fchmod(fd, (mode_t)mode) : fchmodat(AT_FDCWD, path, (mode_t)mode, 0);
+    if (times[0].tv_nsec != UTIME_OMIT || times[1].tv_nsec != UTIME_OMIT)
+        r |= fd >= 0 ? futimens(fd, times) : utimensat(AT_FDCWD, path, times, nofollow ? AT_SYMLINK_NOFOLLOW : 0);
+    return r ? -1 : 0;
+}
+
+static int mac_setattrlist(const char *path, struct mac_attrlist *a, void *buf, size_t size, unsigned options)
+{
+    if (!path) {
+        errno = EFAULT;
+        return -1;
+    }
+    return set_attributes(path, -1, a, buf, size, options);
+}
+
+static int mac_fsetattrlist(int fd, struct mac_attrlist *a, void *buf, size_t size, unsigned options)
+{
+    return set_attributes(NULL, fd, a, buf, size, options);
+}
+
 const struct ferry_symbol ferry_attrlist_symbols[] = {
     {"getattrlist", mac_getattrlist},
     {"fgetattrlist", mac_fgetattrlist},
+    {"setattrlist", mac_setattrlist},
+    {"fsetattrlist", mac_fsetattrlist},
     {NULL, NULL},
 };
