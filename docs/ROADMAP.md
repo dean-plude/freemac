@@ -1183,6 +1183,17 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.261 "Swift apps run from the download" (done)
+
+Ferry 0.84.0: Swift's runtime and Ferry's Swift modules are now in Ferry's package, so they're on every freemac computer. Until now they were built only on the computers Ferry is made on, so a Mac app written in Swift (Rectangle, TomatoBar, apps made with SwiftUI) started there and nowhere else. The release now builds them from the open-source Swift project's source, as `swift/build-runtime.sh` always has, and the package puts them where Ferry looks. The runtime's build had stopped working with a recent change to Ferry's SDK headers; that's fixed.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `packaging/build-swift.sh`: fetches a swift.org toolchain and Swift's source, builds the runtime and Ferry's Swift modules | Ferry packaging | done |
+| 2 | The release builds them before Ferry's package; the package carries them in /usr/lib/ferry/frameworks/swift | release, Ferry packaging | done |
+| 3 | `sys/resource.h` brings in `id_t`, so the runtime builds again | Ferry SDK | done |
+| 4 | Rectangle 0.87 starts from the installed package alone | Ferry / Rectangle | done |
+
 ## 1.260 "Rectangle starts" (done)
 
 Ferry 0.83.0: Rectangle 0.87, the window-snapping app, runs from its official download, not built for Ferry: a Swift app with a main storyboard, the first of the apps picked because they looked likely not to work. Ferry now opens an app's compiled storyboard (its scenes, view controllers and the nibs inside them) and starts the app from it. Swift code built on a Mac finds what Apple's Swift overlays give it: the Mac's shapes of `DispatchQueue`, `os_log` and `OSLog`, `Locale`, `TimeZone`, `URLComponents`, `Notification` and the other Foundation value types, `NSNumber` conversions, the OS version check and image literals. Objective-C code's `os_log` calls are read as clang packs them. Labels in a nib wrap as the nib says, where before a flag was misread and their text was cut off.

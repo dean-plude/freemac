@@ -3352,3 +3352,14 @@ documentation. Objective-C code built on a Mac logs through
 official download and shows its first window. Its pictures are in an asset
 catalog (Assets.car), which Ferry doesn't read yet, and its update checker
 (Sparkle) needs libcompression, which Ferry doesn't have yet.
+
+## Swift in the package (freemac 1.261, Ferry 0.84.0)
+
+Ferry's package carries Swift's runtime and standard library and Ferry's
+Swift modules (Foundation, AppKit, Dispatch, os, CoreGraphics,
+CoreFoundation, Combine, SwiftUI) in /usr/lib/ferry/frameworks/swift, where
+Ferry finds them for an app that links /usr/lib/swift. The release builds
+them with `packaging/build-swift.sh`, which fetches a swift.org toolchain and
+the open-source Swift project's source at the same release (6.1.3) and runs
+`swift/build-runtime.sh` and `swift/build-modules.sh`. A package built
+without them still runs everything but apps written in Swift.

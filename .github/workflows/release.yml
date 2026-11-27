@@ -54,6 +54,18 @@ jobs:
             sudo udevadm trigger --name-match=kvm
           fi
 
+      - name: Build Swift's runtime for Ferry
+        # Mac apps written in Swift need it, and a freemac computer has no
+        # Swift of its own. A failure here doesn't stop the release: that
+        # package just runs no Swift apps.
+        continue-on-error: true
+        timeout-minutes: 45
+        run: |
+          sudo apt-get install -y clang lld llvm libcurl4-openssl-dev libedit2 libncurses-dev libpython3-dev \
+            libsqlite3-0 libstdc++-13-dev libxml2-dev libz3-dev zlib1g-dev
+          sh ferry/packaging/build-swift.sh "$RUNNER_TEMP/ferry-swift"
+          rm -rf "$RUNNER_TEMP/ferry-swift"
+
       - name: Build Ferry, freemac's runner for Mac apps
         # Its package goes on the ISO and is also published beside it. A
         # failure here doesn't stop the release: that ISO just has no Ferry.
