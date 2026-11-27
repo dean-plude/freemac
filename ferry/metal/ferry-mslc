@@ -1,0 +1,900 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+#   ferry-mslc reflect SOURCE.metal [-D NAME[=VALUE]]... > reflection.json
+#   ferry-mslc build SOURCE.metal -o LIBRARY.dylib [-D ...] [--fc INDEX=EXPR]...
+#                    [--fcname NAME=EXPR]... [--sdk DIR]
+#
+# Ferry's Metal shader compiler (freemac 1.NEXT). A Mac program hands Metal
+# its shaders as Metal Shading Language source; Ferry's Metal.framework runs
+# this to turn that source into a Mac library (a .dylib) of ordinary
+# processor code, which it then loads and calls for every vertex, fragment
+# and compute thread.
+#
+# MSL is C++ with a few additions, so the source is compiled by clang as
+# C++ for OpenCL (whose address spaces are MSL's) against Ferry's own
+# <metal_stdlib> (ferry/metal/msl). Before that, this script:
+#   - finds the vertex, fragment and kernel functions and the [[attributes]]
+#     on their arguments and on the fields of the structs they take and
+#     return, and takes the attributes out (clang has no use for them);
+#   - puts the values of function constants in place of their declarations;
+#   - gives threadgroup arrays declared in a function body a block shared
+#     by the threadgroup;
+#   - writes, for each function, a wrapper with a plain C name that
+#     Metal.framework calls with the bound resources, and an info function
+#     that lists what the function reads and writes.
+# Written from Apple's public "Metal Shading Language Specification".
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+
+
+def find_msl_dir():
+    for d in (os.environ.get("FERRY_MSL_DIR"), os.path.join(HERE, "msl"), "/usr/share/ferry/metal/msl"):
+        if d and os.path.isfile(os.path.join(d, "metal_stdlib")):
+            return d
+    sys.exit("ferry-mslc: Ferry's Metal headers (metal_stdlib) aren't installed")
+
+
+def find_tool(names):
+    for n in names:
+        for d in os.environ.get("PATH", "/usr/bin").split(":"):
+            p = os.path.join(d, n)
+            if os.access(p, os.X_OK):
+                return p
+    for v in range(30, 13, -1):
+        for n in names:
+            p = "/usr/lib/llvm-%d/bin/%s" % (v, n.split("-")[0])
+            if os.access(p, os.X_OK):
+                return p
+    return None
+
+
+CLANG_FLAGS = ["-x", "clcpp", "-cl-std=clc++2021", "-cl-no-stdinc", "-cl-single-precision-constant",
+               "-target", "x86_64-apple-macosx11", "-fdeclspec", "-fno-stack-protector", "-ffp-contract=off",
+               "-Wno-unknown-attributes", "-Wno-unused-value", "-Wno-ignored-attributes"]
+
+# ---- tokens -------------------------------------------------------------------------
+TOKEN = re.compile(r"""
+    (?P<ws>\s+)
+  | (?P<marker>^\#[^\n]*)
+  | (?P<str>"(?:[^"\\\n]|\\.)*")
+  | (?P<chr>'(?:[^'\\\n]|\\.)*')
+  | (?P<num>\.?[0-9](?:[eEpP][+-]|[0-9a-zA-Z_.])*)
+  | (?P<id>[A-Za-z_][A-Za-z0-9_]*)
+  | (?P<punct>\[\[|\]\]|::|->|<<=|>>=|\+\+|--|<<|>>|<=|>=|==|!=|&&|\|\||[-+*/%&|^]=|\.\.\.|[^\s])
+""", re.X | re.M)
+
+
+class Tok:
+    __slots__ = ("kind", "text", "start", "end", "user")
+
+    def __init__(self, kind, text, start, end, user):
+        self.kind, self.text, self.start, self.end, self.user = kind, text, start, end, user
+
+    def __repr__(self):
+        return self.text
+
+
+def tokenize(text, user_file):
+    """Tokens of the preprocessed text; .user tells whether a token came from
+    the program's own source (rather than from Ferry's headers)."""
+    toks = []
+    user = True
+    for m in TOKEN.finditer(text):
+        k = m.lastgroup
+        if k == "ws":
+            continue
+        if k == "marker":
+            mm = re.match(r'#\s*(?:line\s+)?\d+\s+"((?:[^"\\]|\\.)*)"', m.group())
+            if mm:
+                f = mm.group(1)
+                user = not (f.startswith(MSL_DIR) or f.startswith("<"))
+                if f == "<built-in>" or f == "<command line>":
+                    user = False
+                if f == user_file:
+                    user = True
+            continue
+        toks.append(Tok(k, m.group(), m.start(), m.end(), user))
+    return toks
+
+
+def match_close(toks, i):
+    """Index of the bracket that closes toks[i]."""
+    pairs = {"(": ")", "[": "]", "{": "}", "[[": "]]"}
+    open_, close = toks[i].text, pairs[toks[i].text]
+    depth = 0
+    for j in range(i, len(toks)):
+        t = toks[j].text
+        if t == open_:
+            depth += 1
+        elif t == close:
+            depth -= 1
+            if depth == 0:
+                return j
+    raise SystemExit("ferry-mslc: unbalanced %r" % open_)
+
+
+def split_commas(toks):
+    """Splits a token list at commas outside brackets and template angles."""
+    parts, cur, depth, angle = [], [], 0, 0
+    for t in toks:
+        x = t.text
+        if x in ("(", "[", "{", "[["):
+            depth += 1
+        elif x in (")", "]", "}", "]]"):
+            depth -= 1
+        elif depth == 0 and x == "<" and cur and cur[-1].kind == "id":
+            angle += 1
+        elif depth == 0 and x == ">" and angle:
+            angle -= 1
+        elif depth == 0 and x == ">>" and angle:
+            angle = max(0, angle - 2)
+        if x == "," and depth == 0 and angle == 0:
+            parts.append(cur)
+            cur = []
+        else:
+            cur.append(t)
+    if cur:
+        parts.append(cur)
+    return parts
+
+
+def text_of(toks):
+    out = []
+    for i, t in enumerate(toks):
+        if i and (t.kind in ("id", "num") and toks[i - 1].kind in ("id", "num")):
+            out.append(" ")
+        elif i:
+            out.append(" ")
+        out.append(t.text)
+    return "".join(out)
+
+
+def parse_attr(toks):
+    """'[[' a(1), b ']]' -> [('a', '1'), ('b', None)]"""
+    out = []
+    for part in split_commas(toks):
+        if not part:
+            continue
+        name = part[0].text
+        k = 1
+        while k + 1 < len(part) and part[k].text == "::":
+            name += "::" + part[k + 1].text
+            k += 2
+        arg = None
+        if k < len(part) and part[k].text == "(":
+            arg = text_of(part[k + 1:-1]).strip()
+        out.append((name, arg))
+    return out
+
+
+class Decl:
+    """A declaration with its attributes taken out: type tokens, name, array
+    dimensions."""
+
+    def __init__(self, toks, attrs):
+        self.attrs = attrs
+        self.toks = toks
+        # the declarator name: the last identifier before '[' (array) or '=' or the end
+        end = len(toks)
+        for k, t in enumerate(toks):
+            if t.text in ("=",):
+                end = k
+                break
+        k = end
+        dims = []
+        while k > 0 and toks[k - 1].text == "]":
+            o = k - 1
+            depth = 0
+            while o >= 0:
+                if toks[o].text == "]":
+                    depth += 1
+                elif toks[o].text == "[":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                o -= 1
+            dims.insert(0, text_of(toks[o + 1:k - 1]))
+            k = o
+        if k > 0 and toks[k - 1].kind == "id":
+            self.name = toks[k - 1].text
+            self.type_toks = toks[:k - 1]
+        else:
+            self.name = None
+            self.type_toks = toks[:k]
+        self.dims = dims
+
+    def attr(self, name):
+        for n, a in self.attrs:
+            if n == name:
+                return a if a is not None else ""
+        return None
+
+    @property
+    def type(self):
+        t = text_of(self.type_toks)
+        for d in self.dims:
+            t = t  # arrays are spelled through decltype in the wrappers
+        return t
+
+
+def take_attrs(toks):
+    """Removes [[...]] groups from a token list, returning the remaining
+    tokens and the attributes."""
+    out, attrs, k = [], [], 0
+    while k < len(toks):
+        if toks[k].text == "[[":
+            j = k
+            depth = 0
+            while j < len(toks):
+                if toks[j].text == "[[":
+                    depth += 1
+                elif toks[j].text == "]]":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                j += 1
+            attrs += parse_attr(toks[k + 1:j])
+            k = j + 1
+        else:
+            out.append(toks[k])
+            k += 1
+    return out, attrs
+
+
+STAGES = {"vertex": "vertex", "fragment": "fragment", "kernel": "kernel", "__ferry_kw_kernel": "kernel"}
+
+
+class Source:
+    def __init__(self, text, user_file):
+        self.text = text
+        self.toks = tokenize(text, user_file)
+        self.edits = []      # (start, end, replacement)
+        self.structs = {}    # name -> [Decl]
+        self.entries = []
+        self.fconsts = []    # dicts: name, index, type, start, end
+        self.tg_decls = 0
+        self.parse()
+
+    def edit(self, start, end, rep):
+        self.edits.append((start, end, rep))
+
+    def parse(self):
+        toks = self.toks
+        n = len(toks)
+        # every [[...]] in the program's own code goes
+        for k, t in enumerate(toks):
+            if t.user and t.text == "[[":
+                j = match_close(toks, k)
+                self.edit(t.start, toks[j].end, " ")
+        k = 0
+        brace_stack = []   # kinds of the open braces: 'ns', 'struct', 'func', 'other'
+        stmt_start = 0
+        while k < n:
+            t = toks[k]
+            x = t.text
+            if x == "{":
+                kind = "other"
+                prev = toks[stmt_start:k]
+                ptext = [p.text for p in prev]
+                if "namespace" in ptext and "(" not in ptext:
+                    kind = "ns"
+                elif ptext[:1] in (["struct"], ["class"], ["union"]) or (
+                        "struct" in ptext and "(" not in ptext and "=" not in ptext):
+                    kind = "struct"
+                    if t.user:
+                        self.parse_struct(prev, k)
+                elif prev and prev[-1].text in (")", "const") or "(" in ptext:
+                    kind = "func"
+                    if t.user and all(b in ("ns",) for b in brace_stack):
+                        self.maybe_entry(prev, k)
+                brace_stack.append(kind)
+                stmt_start = k + 1
+            elif x == "}":
+                if brace_stack:
+                    brace_stack.pop()
+                stmt_start = k + 1
+            elif x == ";":
+                if t.user:
+                    self.statement(toks[stmt_start:k + 1], brace_stack)
+                stmt_start = k + 1
+            elif x in ("public", "private", "protected") and k + 1 < n and toks[k + 1].text == ":":
+                stmt_start = k + 2
+            elif x == ":" and stmt_start == k - 1 and toks[k - 1].text in ("public", "private", "protected"):
+                stmt_start = k + 1
+            k += 1
+        # is_function_constant_defined(name)
+        for k, t in enumerate(toks):
+            if t.user and t.text == "is_function_constant_defined" and k + 3 < n and toks[k + 1].text == "(":
+                j = match_close(toks, k + 1)
+                name = text_of(toks[k + 2:j])
+                self.edit(t.start, toks[j].end, "__FERRY_FC_DEFINED_%s" % name)
+
+    def statement(self, st, brace_stack):
+        if not st:
+            return
+        body, attrs = take_attrs(st[:-1])
+        names = [a for a, _ in attrs]
+        # program-scope function constants
+        if "function_constant" in names and all(b == "ns" for b in brace_stack):
+            d = Decl([t for t in body if t.text not in ("__global", "const", "static")], attrs)
+            self.fconsts.append({"name": d.name, "index": d.attr("function_constant"),
+                                 "type": text_of(d.type_toks), "start": st[0].start, "end": st[-1].end})
+            return
+        # threadgroup memory declared in a function body
+        if brace_stack and brace_stack[-1] != "struct" and "func" in brace_stack and body and \
+                body[0].text == "__local":
+            texts = [t.text for t in body]
+            if not any(x in texts for x in ("*", "&", "(", "=", "&&")):
+                d = Decl(body[1:], attrs)
+                if d.name:
+                    ty = text_of(d.type_toks)
+                    dims = "".join("[%s]" % x for x in d.dims)
+                    full = "%s%s" % (ty, dims)
+                    ident = self.tg_decls
+                    self.tg_decls += 1
+                    if dims:
+                        rep = ("__local %s (&%s)%s = *(__local %s (*)%s)__ferry_tg_alloc(sizeof(%s), alignof(%s), %d);"
+                               % (ty, d.name, dims, ty, dims, full, ty, ident))
+                    else:
+                        rep = ("__local %s &%s = *(__local %s *)__ferry_tg_alloc(sizeof(%s), alignof(%s), %d);"
+                               % (ty, d.name, ty, ty, ty, ident))
+                    self.edit(st[0].start, st[-1].end, rep)
+
+    def parse_struct(self, prev, k):
+        toks = self.toks
+        ptext = [p.text for p in prev]
+        idx = max(i for i, x in enumerate(ptext) if x in ("struct", "class", "union"))
+        name = None
+        for p in prev[idx + 1:]:
+            if p.kind == "id" and p.text not in ("alignas",):
+                name = p.text
+        if not name:
+            return
+        j = match_close(toks, k)
+        body = toks[k + 1:j]
+        fields = []
+        cur = []
+        depth = 0
+        for t in body:
+            if t.text in ("{", "(", "["):
+                depth += 1
+            elif t.text in ("}", ")", "]"):
+                depth -= 1
+            if t.text == ";" and depth == 0:
+                rest, attrs = take_attrs(cur)
+                cur = []
+                texts = [r.text for r in rest]
+                if not rest or "(" in texts or texts[0] in ("static", "typedef", "using", "friend", "template"):
+                    continue
+                if texts and texts[-1] == "}":
+                    continue
+                for part in split_commas(rest):
+                    pass
+                parts = split_commas(rest)
+                first = Decl(parts[0], attrs)
+                fields.append(first)
+                for extra in parts[1:]:
+                    d = Decl(first.type_toks + extra, attrs)
+                    fields.append(d)
+            elif t.text in ("public", "private", "protected") and depth == 0:
+                continue
+            elif t.text == ":" and depth == 0 and cur and cur[-1].text in ("public", "private", "protected"):
+                cur.pop()
+                continue
+            else:
+                cur.append(t)
+        self.structs[name] = [f for f in fields if f.name]
+
+    def maybe_entry(self, prev, k):
+        # [[attrs]] (vertex|fragment|kernel) TYPE NAME ( PARAMS ) [[attrs]]? {
+        stage = None
+        pre_attrs = []
+        q = 0
+        rest, attrs_all = take_attrs(prev)
+        for q, t in enumerate(rest):
+            if t.text in STAGES:
+                stage = STAGES[t.text]
+                break
+            if t.text in ("static", "inline", "extern"):
+                continue
+            return
+        if stage is None:
+            return
+        # the parameter list: the last '(' ... ')' group
+        r = rest[q + 1:]
+        close = None
+        for i in range(len(r) - 1, -1, -1):
+            if r[i].text == ")":
+                close = i
+                break
+        if close is None:
+            return
+        depth = 0
+        open_ = None
+        for i in range(close, -1, -1):
+            if r[i].text == ")":
+                depth += 1
+            elif r[i].text == "(":
+                depth -= 1
+                if depth == 0:
+                    open_ = i
+                    break
+        if open_ is None or open_ == 0:
+            return
+        name_tok = r[open_ - 1]
+        ret_toks = r[:open_ - 1]
+        # the parameters keep their attributes: take them from the original tokens
+        orig_open = prev.index(name_tok) + 1
+        orig_close = match_close(self.toks, self.toks.index(prev[orig_open]))
+        ptoks = self.toks[self.toks.index(prev[orig_open]) + 1:orig_close]
+        params = []
+        for part in split_commas(ptoks):
+            body, attrs = take_attrs(part)
+            if not body or [b.text for b in body] == ["void"]:
+                continue
+            params.append(Decl(body, attrs))
+        # where the qualifier was: take it out
+        qual = rest[q]
+        self.edit(qual.start, qual.end, " ")
+        self.entries.append({
+            "name": name_tok.text, "stage": stage, "ret": text_of(ret_toks), "params": params,
+            "attrs": [a for a in attrs_all],
+        })
+
+
+def apply_edits(text, edits):
+    edits = sorted(edits, key=lambda e: (e[0], -e[1]))
+    out, pos = [], 0
+    for s, e, r in edits:
+        if s < pos:
+            continue
+        out.append(text[pos:s])
+        out.append(r)
+        pos = e
+    out.append(text[pos:])
+    return "".join(out)
+
+
+# ---- wrappers -----------------------------------------------------------------------
+GRID = {
+    "thread_position_in_grid": 0, "threadgroup_position_in_grid": 1, "thread_position_in_threadgroup": 2,
+    "threads_per_threadgroup": 3, "threads_per_grid": 4, "threadgroups_per_grid": 5,
+    "dispatch_threads_per_threadgroup": 3,
+}
+ONE = {
+    "vertex_id": "c->vertex_id", "instance_id": "c->instance_id", "base_vertex": "c->base_vertex",
+    "base_instance": "c->base_instance", "primitive_id": "c->primitive_id", "sample_id": "c->sample_id",
+    "sample_mask": "c->sample_mask_in", "front_facing": "c->front_facing",
+    "render_target_array_index": "c->render_target_array_index",
+    "viewport_array_index": "c->viewport_array_index", "amplification_id": "c->amplification_id",
+    "thread_index_in_threadgroup": "c->grid[6][0]", "thread_index_in_simdgroup": "0u",
+    "thread_index_in_quadgroup": "0u", "simdgroup_index_in_threadgroup": "c->grid[6][0]",
+    "quadgroup_index_in_threadgroup": "c->grid[6][0]", "threads_per_simdgroup": "1u",
+    "thread_execution_width": "1u", "simdgroups_per_threadgroup": "c->grid[6][1]",
+    "dispatch_simdgroups_per_threadgroup": "c->grid[6][1]", "quadgroups_per_threadgroup": "c->grid[6][1]",
+}
+INTERP = {"flat": "FERRY_I_FLAT", "center_no_perspective": "FERRY_I_NO_PERSPECTIVE",
+          "centroid_no_perspective": "FERRY_I_NO_PERSPECTIVE", "sample_no_perspective": "FERRY_I_NO_PERSPECTIVE"}
+
+
+def info_type(expr):
+    """The type of a value named in an info function, without naming a
+    variable (__r is the function's result type __R; __inN the type of
+    stage_in parameter N)."""
+    m = re.match(r"^(__r|__in(\d+))(.*)$", expr)
+    if not m:
+        return "decltype(%s)" % expr
+    base = "__R" if m.group(1) == "__r" else "__I%s" % m.group(2)
+    if not m.group(3):
+        return base
+    return "decltype(__ferry::declval<%s>()%s)" % (base, m.group(3))
+
+
+def cstr(s):
+    return '"%s"' % s.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def strip_type(t):
+    """A type as written, without address space and reference (for locals)."""
+    t = re.sub(r"\b(__global|__local|__constant|__private|__generic)\b", "", t)
+    return t.replace("&", "").strip()
+
+
+class Gen:
+    def __init__(self, src):
+        self.src = src
+        self.out = []
+        self.reflect = []
+
+    def emit(self, s):
+        self.out.append(s)
+
+    def struct_of(self, typename):
+        t = strip_type(typename)
+        t = re.sub(r"\b(const|volatile|struct|class)\b", "", t).strip()
+        t = t.split("::")[-1].strip()
+        return t, self.src.structs.get(t)
+
+    def gen_all(self):
+        for e in self.src.entries:
+            getattr(self, "gen_" + e["stage"])(e)
+
+    def bind_params(self, e, inputs_var=None):
+        """Locals for each parameter; returns (call args, reflection)."""
+        args, refl = [], {"buffers": [], "textures": [], "samplers": [], "threadgroup": [], "stage_in": []}
+        for i, p in enumerate(e["params"]):
+            ty = text_of(p.type_toks) + "".join("[%s]" % d for d in p.dims)
+            loc = "__a%d" % i
+            self.emit("    typedef %s __T%d;" % (text_of(p.type_toks), i))
+            names = [a for a, _ in p.attrs]
+            if p.attr("buffer") is not None:
+                idx = p.attr("buffer")
+                self.emit("    __T%d %s = __ferry_entry::buffer<__T%d>::get(c->buffers[%s]);" % (i, loc, i, idx))
+                refl["buffers"].append({"index": int(idx, 0), "name": p.name})
+            elif p.attr("texture") is not None:
+                idx = p.attr("texture")
+                self.emit("    __T%d %s = __ferry_entry::texture<__ferry::plain<__T%d>>::get(c, %s);" % (i, loc, i, idx))
+                refl["textures"].append({"index": int(idx, 0), "name": p.name})
+            elif p.attr("sampler") is not None:
+                idx = p.attr("sampler")
+                self.emit("    __T%d %s = __ferry_entry::samplers<__ferry::plain<__T%d>>::get(c, %s);" % (i, loc, i, idx))
+                refl["samplers"].append({"index": int(idx, 0), "name": p.name})
+            elif p.attr("threadgroup") is not None:
+                idx = p.attr("threadgroup")
+                self.emit("    __T%d %s = (__T%d)c->tgmem[%s];" % (i, loc, i, idx))
+                refl["threadgroup"].append({"index": int(idx, 0), "name": p.name})
+            elif p.attr("stage_in") is not None:
+                sname, fields = self.struct_of(text_of(p.type_toks))
+                if fields is None:
+                    raise SystemExit("ferry-mslc: %s: the [[stage_in]] struct %s isn't one ferry-mslc can read"
+                                     % (e["name"], sname))
+                self.emit("    __ferry::plain<__T%d> %s;" % (i, loc))
+                refl["stage_in"] = self.stage_in(e, loc, fields, inputs_var)
+            elif p.attr("position") is not None and e["stage"] == "fragment":
+                self.emit("    __T%d %s = __ferry_entry::frag_position(c);" % (i, loc))
+            elif p.attr("point_coord") is not None:
+                self.emit("    __T%d %s = float2(c->point_coord[0], c->point_coord[1]);" % (i, loc))
+            elif any(n in GRID for n in names):
+                n = [n for n in names if n in GRID][0]
+                self.emit("    __T%d %s = __ferry_entry::builtin<__T%d>(c->grid[%d]);" % (i, loc, i, GRID[n]))
+            elif any(n in ONE for n in names):
+                n = [n for n in names if n in ONE][0]
+                expr = ONE[n]
+                if n == "front_facing":
+                    self.emit("    __T%d %s = %s != 0;" % (i, loc, expr))
+                else:
+                    self.emit("    __T%d %s = __T%d(%s);" % (i, loc, i, expr))
+            elif p.attr("payload") is not None or p.attr("patch_id") is not None:
+                self.emit("    __ferry::plain<__T%d> %s{};" % (i, loc))
+            else:
+                # no attribute: in a fragment function, a varying taken by itself
+                self.emit("    __ferry::plain<__T%d> %s{};" % (i, loc))
+            args.append(loc)
+        return args, refl
+
+    def stage_in(self, e, loc, fields, inputs_var):
+        refl = []
+        k = 0
+        for f in fields:
+            fn = "%s.%s" % (loc, f.name)
+            if e["stage"] == "vertex":
+                a = f.attr("attribute")
+                if a is None:
+                    continue
+                self.emit("    __ferry_entry::fetch(%s, c, %s);" % (fn, a))
+                refl.append({"name": f.name, "attribute": int(a, 0), "field": k})
+            else:
+                if f.attr("position") is not None:
+                    self.emit("    %s = __ferry_entry::frag_position(c);" % fn)
+                    continue
+                if f.attr("front_facing") is not None:
+                    self.emit("    %s = c->front_facing != 0;" % fn)
+                    continue
+                builtin = [n for n, _ in f.attrs if n in ONE]
+                if builtin:
+                    self.emit("    %s = decltype(%s)(%s);" % (fn, fn, ONE[builtin[0]]))
+                    continue
+                if f.attr("point_coord") is not None:
+                    self.emit("    %s = float2(c->point_coord[0], c->point_coord[1]);" % fn)
+                    continue
+                tag = f.attr("user") or f.name
+                interp = "FERRY_I_PERSPECTIVE"
+                for n, _ in f.attrs:
+                    if n in INTERP:
+                        interp = INTERP[n]
+                self.emit("    __ferry_entry::get(%s, %s + c->stage_in_map[%d]);" % (fn, inputs_var, k))
+                refl.append({"name": f.name, "tag": tag, "field": k, "interp": interp, "expr": fn})
+                k += 1
+        return refl
+
+    # ---- vertex ----
+    def gen_vertex(self, e):
+        name = e["name"]
+        sym = "__ferry_vs_" + name
+        self.emit('extern "C" void %s(const ferry_call *c, float *out)\n{' % sym)
+        args, refl = self.bind_params(e)
+        ret = e["ret"].strip()
+        slots = []
+        if ret != "void":
+            self.emit("    auto __r = %s(%s);" % (name, ", ".join(args)))
+            self.emit("    typedef decltype(__r) __R;")
+            sname, fields = self.struct_of(ret)
+            if fields is None:
+                # float4 returned alone: the position
+                self.emit("    __ferry_entry::put(out + FERRY_VS_POSITION, __r);")
+                slots.append(("position", None, "__r", "FERRY_W_POSITION", 0))
+            else:
+                off = "FERRY_VS_VARYINGS"
+                for f in fields:
+                    fn = "__r.%s" % f.name
+                    if f.attr("position") is not None:
+                        self.emit("    __ferry_entry::put(out + FERRY_VS_POSITION, %s);" % fn)
+                        slots.append(("position", None, fn, "FERRY_W_POSITION", 0))
+                    elif f.attr("point_size") is not None:
+                        self.emit("    __ferry_entry::put(out + FERRY_VS_POINT_SIZE, %s);" % fn)
+                        slots.append(("point_size", None, fn, "FERRY_W_POINT_SIZE", 0))
+                    elif f.attr("clip_distance") is not None:
+                        self.emit("    __ferry_entry::put(out + FERRY_VS_CLIP, %s);" % fn)
+                        slots.append(("clip_distance", None, fn, "FERRY_W_CLIP_DISTANCE", 0))
+                    elif f.attr("invariant") is not None and len(f.attrs) == 1:
+                        pass
+                    elif any(n in ("render_target_array_index", "viewport_array_index", "primitive_id")
+                             for n, _ in f.attrs):
+                        pass
+                    else:
+                        tag = f.attr("user") or f.name
+                        self.emit("    __ferry_entry::put(out + %s, %s);" % (off, fn))
+                        slots.append((tag, off, fn, "FERRY_W_VARYING", 0))
+                        off = "%s + __ferry_entry::ncomp<%s>()" % (off, info_type(fn))
+        else:
+            self.emit("    %s(%s);" % (name, ", ".join(args)))
+        self.emit("}")
+        self.info(e, sym, slots, refl, "__r" if ret != "void" else None)
+
+    def info(self, e, sym, slots, refl, rvar):
+        """The info function: what the wrapper reads and writes, filled in at
+        run time so the sizes come from the compiler."""
+        name = e["name"]
+        isym = sym.replace("__ferry_", "__ferry_info_", 1)
+        self.emit('extern "C" int %s(struct ferry_slot *s, int max)\n{' % isym)
+        self.emit("    int k = 0;")
+        if rvar is not None:
+            self.emit("    typedef decltype(%s(%s)) __R;" % (name, ", ".join(
+                "__ferry::declval<%s>()" % (text_of(p.type_toks) or "int") for p in e["params"])))
+        for tag, off, expr, what, index in slots:
+            t = info_type(expr)
+            self.emit("    if (k < max) s[k] = (ferry_slot){%s, %s, %d, %s, __ferry_entry::ncomp<%s>(), "
+                      "__ferry_entry::kind<%s>(), 0};" % (cstr(tag), what, index, off or "0", t, t))
+            self.emit("    k++;")
+        # stage_in of a fragment function
+        for f in refl.get("stage_in", []):
+            if "tag" not in f:
+                continue
+        self.emit("    return k;\n}")
+        e["symbol"] = sym
+        e["info"] = isym
+        e["reflection"] = refl
+
+    # ---- fragment ----
+    def gen_fragment(self, e):
+        name = e["name"]
+        sym = "__ferry_fs_" + name
+        self.emit('extern "C" void %s(const ferry_call *c, const float *in, float *out)\n{' % sym)
+        args, refl = self.bind_params(e, "in")
+        ret = e["ret"].strip()
+        slots = []
+        if ret != "void":
+            self.emit("    auto __r = %s(%s);" % (name, ", ".join(args)))
+            sname, fields = self.struct_of(ret)
+            if fields is None:
+                self.emit("    __ferry_entry::put(out, __r);")
+                slots.append(("color", "0", "__r", "FERRY_W_COLOR", 0))
+            else:
+                for f in fields:
+                    fn = "__r.%s" % f.name
+                    if f.attr("color") is not None:
+                        n = int(f.attr("color"), 0)
+                        if f.attr("index") not in (None, "0"):
+                            n += 8  # dual-source blending's second color
+                            self.emit("    __ferry_entry::put(out + FERRY_FS_RESULTS + 4 * %d, %s);" % (n - 8, fn))
+                            slots.append((f.name, "FERRY_FS_RESULTS + %d" % (4 * (n - 8)), fn, "FERRY_W_COLOR", n))
+                        else:
+                            self.emit("    __ferry_entry::put(out + 4 * %d, %s);" % (n, fn))
+                            slots.append((f.name, str(4 * n), fn, "FERRY_W_COLOR", n))
+                    elif f.attr("depth") is not None:
+                        self.emit("    __ferry_entry::put(out + FERRY_FS_DEPTH, %s);" % fn)
+                        slots.append((f.name, "FERRY_FS_DEPTH", fn, "FERRY_W_DEPTH", 0))
+                    elif f.attr("sample_mask") is not None:
+                        self.emit("    __ferry_entry::put(out + FERRY_FS_SAMPLE_MASK, %s);" % fn)
+                        slots.append((f.name, "FERRY_FS_SAMPLE_MASK", fn, "FERRY_W_SAMPLE_MASK", 0))
+                    elif f.attr("stencil") is not None:
+                        self.emit("    __ferry_entry::put(out + FERRY_FS_STENCIL, %s);" % fn)
+                        slots.append((f.name, "FERRY_FS_STENCIL", fn, "FERRY_W_STENCIL", 0))
+        else:
+            self.emit("    %s(%s);" % (name, ", ".join(args)))
+        self.emit("}")
+        # the inputs: listed with the kinds the compiler gives them
+        for f in refl.get("stage_in", []):
+            slots.append((f["tag"], None, f["expr"].replace("__a", "__in"), "FERRY_W_INPUT", f["field"]))
+        self.info_fragment(e, sym, slots, refl, "__r" if ret != "void" else None)
+
+    def info_fragment(self, e, sym, slots, refl, rvar):
+        name = e["name"]
+        isym = sym.replace("__ferry_", "__ferry_info_", 1)
+        self.emit('extern "C" int %s(struct ferry_slot *s, int max)\n{' % isym)
+        self.emit("    int k = 0;")
+        if rvar is not None:
+            self.emit("    typedef decltype(%s(%s)) __R;" % (name, ", ".join(
+                "__ferry::declval<%s>()" % text_of(p.type_toks) for p in e["params"])))
+        for i, p in enumerate(e["params"]):
+            if p.attr("stage_in") is not None:
+                self.emit("    typedef __ferry::plain<%s> __I%d;" % (text_of(p.type_toks), i))
+        interp = {f["field"]: f["interp"] for f in refl.get("stage_in", [])}
+        for tag, off, expr, what, index in slots:
+            ip = interp.get(index, "0") if what == "FERRY_W_INPUT" else "0"
+            t = info_type(expr)
+            self.emit("    if (k < max) s[k] = (ferry_slot){%s, %s, %d, %s, __ferry_entry::ncomp<%s>(), "
+                      "__ferry_entry::kind<%s>(), %s};" % (cstr(tag), what, index, off or "0", t, t, ip))
+            self.emit("    k++;")
+        self.emit("    return k;\n}")
+        e["symbol"] = sym
+        e["info"] = isym
+        e["reflection"] = refl
+
+    # ---- kernel ----
+    def gen_kernel(self, e):
+        name = e["name"]
+        sym = "__ferry_cs_" + name
+        self.emit('extern "C" void %s(const ferry_call *c)\n{' % sym)
+        args, refl = self.bind_params(e)
+        self.emit("    %s(%s);" % (name, ", ".join(args)))
+        self.emit("}")
+        e["symbol"] = sym
+        e["info"] = None
+        e["reflection"] = refl
+        for n, a in e["attrs"]:
+            if n == "max_total_threads_per_threadgroup":
+                e["max_threads"] = a
+
+
+def fc_literal(ty, expr):
+    return "(%s)(%s)" % (ty, expr)
+
+
+def preprocess(src_path, defines, msl_dir, clang):
+    cmd = [clang, "-E"] + CLANG_FLAGS + ["-I", msl_dir, "-D__METAL_VERSION__=240", "-D__METAL_MACOS__=1",
+                                         "-D__FERRY_METAL__=1"]
+    for d in defines:
+        cmd += ["-D", d]
+    cmd.append(src_path)
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode:
+        sys.stderr.write(r.stderr)
+        sys.exit(1)
+    return r.stdout
+
+
+def reflection(src, gen):
+    out = {"functions": [], "function_constants": []}
+    for f in src.fconsts:
+        out["function_constants"].append({"name": f["name"], "index": f["index"], "type": f["type"]})
+    for e in src.entries:
+        r = e.get("reflection", {})
+        out["functions"].append({
+            "name": e["name"], "stage": e["stage"], "symbol": e.get("symbol"), "info": e.get("info"),
+            "buffers": r.get("buffers", []), "textures": r.get("textures", []),
+            "samplers": r.get("samplers", []), "threadgroup": r.get("threadgroup", []),
+            "stage_in": [{k: v for k, v in s.items() if k != "expr"} for s in r.get("stage_in", [])],
+            "max_threads": e.get("max_threads"),
+        })
+    return out
+
+
+def main(argv):
+    if len(argv) < 3 or argv[1] not in ("reflect", "build"):
+        sys.exit(__doc__ if False else "usage: ferry-mslc reflect|build SOURCE [-o OUT] [-D NAME=VALUE] "
+                 "[--fc INDEX=EXPR] [--fcname NAME=EXPR]")
+    mode, src_path = argv[1], argv[2]
+    defines, fcs, fcnames, out = [], {}, {}, None
+    keep = os.environ.get("FERRY_MSLC_KEEP")
+    i = 3
+    while i < len(argv):
+        a = argv[i]
+        if a == "-o":
+            out = argv[i + 1]
+            i += 2
+        elif a == "-D":
+            defines.append(argv[i + 1])
+            i += 2
+        elif a.startswith("-D"):
+            defines.append(a[2:])
+            i += 1
+        elif a == "--fc":
+            k, v = argv[i + 1].split("=", 1)
+            fcs[k] = v
+            i += 2
+        elif a == "--fcname":
+            k, v = argv[i + 1].split("=", 1)
+            fcnames[k] = v
+            i += 2
+        else:
+            sys.exit("ferry-mslc: unknown option %s" % a)
+    clang = find_tool(["clang", "clang-18", "clang-19", "clang-17", "clang-16", "clang-15"])
+    if not clang:
+        sys.exit("ferry-mslc: clang isn't installed; Metal shaders need it (package clang)")
+    text = preprocess(src_path, defines, MSL_DIR, clang)
+    src = Source(text, os.path.abspath(src_path) if os.path.isabs(src_path) else src_path)
+    gen = Gen(src)
+    gen.gen_all()
+    # function constants: their values in place of their declarations
+    fcdefs = []
+    for f in src.fconsts:
+        val = fcnames.get(f["name"])
+        if val is None and f["index"] is not None:
+            val = fcs.get(str(f["index"]))
+        ty = re.sub(r"\b(__global|const|constant)\b", "", f["type"]).strip()
+        if val is None:
+            rep = "static const %s %s = %s();" % (ty, f["name"], ty)
+            fcdefs.append("#define __FERRY_FC_DEFINED_%s false" % f["name"])
+        elif re.match(r"^(bool|int|uint|short|ushort|char|uchar|float|half|long|ulong|int32_t|uint32_t)$", ty):
+            rep = "static constexpr %s %s = %s;" % (ty, f["name"], fc_literal(ty, val))
+            fcdefs.append("#define __FERRY_FC_DEFINED_%s true" % f["name"])
+        else:
+            rep = "\n#define %s (%s)\n" % (f["name"], fc_literal(ty, val))
+            fcdefs.append("#define __FERRY_FC_DEFINED_%s true" % f["name"])
+        src.edit(f["start"], f["end"], rep)
+    for e in src.entries:
+        pass
+    # names used by is_function_constant_defined() without a declaration
+    used = set(re.findall(r"__FERRY_FC_DEFINED_(\w+)", " ".join(r for _, _, r in src.edits)))
+    declared = {f["name"] for f in src.fconsts}
+    for u in used - declared:
+        fcdefs.append("#define __FERRY_FC_DEFINED_%s false" % u)
+    body = apply_edits(text, src.edits)
+    final = "\n".join(fcdefs) + "\n" + body + "\n" + "\n".join(gen.out) + "\n"
+    refl = reflection(src, gen)
+    if mode == "reflect":
+        json.dump(refl, sys.stdout, indent=1)
+        sys.stdout.write("\n")
+        return 0
+    if not out:
+        sys.exit("ferry-mslc: build needs -o LIBRARY.dylib")
+    with tempfile.TemporaryDirectory(prefix="ferry-mslc-") as tmp:
+        cpp = os.path.join(tmp, "shader.clcpp")
+        obj = os.path.join(tmp, "shader.o")
+        with open(cpp, "w") as fh:
+            fh.write(final)
+        if keep:
+            with open(keep, "w") as fh:
+                fh.write(final)
+        opt = os.environ.get("FERRY_MSLC_OPT", "-O2")
+        r = subprocess.run([clang] + CLANG_FLAGS + [opt, "-I", MSL_DIR, "-c", cpp, "-o", obj],
+                           capture_output=True, text=True)
+        if r.returncode:
+            sys.stderr.write(r.stderr)
+            return 1
+        lld = find_tool(["ld64.lld", "ld64.lld-18", "ld64.lld-19", "ld64.lld-17"])
+        if not lld:
+            sys.exit("ferry-mslc: LLVM's Mach-O linker (ld64.lld, package lld) isn't installed")
+        r = subprocess.run([lld, "-dylib", "-arch", "x86_64", "-platform_version", "macos", "11.0", "11.0",
+                            "-undefined", "dynamic_lookup", "-install_name", "@rpath/ferry-metal-shader.dylib",
+                            "-o", out, obj], capture_output=True, text=True)
+        if r.returncode:
+            sys.stderr.write(r.stderr)
+            return 1
+    with open(out + ".json", "w") as fh:
+        json.dump(refl, fh, indent=1)
+    return 0
+
+
+MSL_DIR = find_msl_dir()
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
