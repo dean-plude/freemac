@@ -45,6 +45,7 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
     id _document;            /* not retained, as on a Mac */
     NSArray *_topLevel;
     NSViewController *_contentViewController;
+    NSStoryboard *_storyboard;
     BOOL _cascades, _closesWithDocument, _loading;
 }
 
@@ -81,6 +82,13 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
         _nibName = [[coder decodeObjectForKey:@"NSWindowNibName"] copy];
     if (_nibName)
         _owner = self;
+    /* From a storyboard: the window is in the same nib (freemac 1.260). */
+    if (self && [coder containsValueForKey:@"IBWindowTemplate"]) {
+        _storyboard = [AStoryboardLoading() retain];
+        id w = [coder decodeObjectForKey:@"IBWindowTemplate"];
+        if ([w isKindOfClass:[NSWindow class]])
+            [self setWindow:w];
+    }
     return self;
 }
 - (void)encodeWithCoder:(NSCoder *)coder { [coder encodeObject:_nibName forKey:@"NSWindowNibName"]; }
@@ -98,6 +106,7 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
     [_autosaveName release];
     [_topLevel release];
     [_contentViewController release];
+    [_storyboard release];
     [super dealloc];
 }
 
@@ -270,7 +279,10 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
 }
 - (void)setDocumentEdited:(BOOL)edited { [_window setDocumentEdited:edited]; }
 
-- (NSViewController *)contentViewController { return _contentViewController; }
+- (NSViewController *)contentViewController
+{
+    return _contentViewController ?: [_window contentViewController];
+}
 - (void)setContentViewController:(NSViewController *)vc
 {
     [vc retain];
@@ -278,7 +290,14 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
     _contentViewController = vc;
     [[self window] setContentViewController:vc];
 }
-- (NSStoryboard *)storyboard { return nil; }
+- (NSStoryboard *)storyboard { return _storyboard; }
+/* the storyboard's outlet to it (freemac 1.260) */
+- (void)setStoryboard:(NSStoryboard *)s
+{
+    [s retain];
+    [_storyboard release];
+    _storyboard = s;
+}
 @end
 
 /* ---- NSViewController ------------------------------------------------------------------- */
@@ -292,6 +311,9 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
     NSMutableArray *_children;
     NSViewController *_parent;       /* not retained */
     NSSize _preferred;
+    NSStoryboard *_storyboard;
+    NSDictionary *_externals;        /* handed to the nib of its view, apart from itself */
+    NSArray *_selfNames;             /* the names it hands itself as */
     BOOL _loading, _loaded;
 }
 
@@ -313,6 +335,29 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
             [self setView:[coder decodeObjectForKey:@"NSView"]];
         if ([coder containsValueForKey:@"NSTitle"])
             _title = [[coder decodeObjectForKey:@"NSTitle"] copy];
+        /* From a storyboard: the nib of its view is in the storyboard, and
+         * is handed outside objects, the controller among them. Those that
+         * are the controller are kept as names, so that it doesn't keep
+         * itself (freemac 1.260). */
+        if ([coder containsValueForKey:@"NSExternalObjectsTableForViewLoading"] ||
+            [coder containsValueForKey:@"NSStoryboardIdentifier"])
+            _storyboard = [AStoryboardLoading() retain];
+        id table = [coder containsValueForKey:@"NSExternalObjectsTableForViewLoading"]
+                       ? [coder decodeObjectForKey:@"NSExternalObjectsTableForViewLoading"]
+                       : nil;
+        if ([table isKindOfClass:[NSDictionary class]]) {
+            NSMutableDictionary *others = [NSMutableDictionary dictionary];
+            NSMutableArray *names = [NSMutableArray array];
+            for (id key in table) {
+                id value = [table objectForKey:key];
+                if (value == self)
+                    [names addObject:key];
+                else
+                    [others setObject:value forKey:key];
+            }
+            _externals = [others copy];
+            _selfNames = [names copy];
+        }
     }
     return self;
 }
@@ -332,6 +377,9 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
     [_bundle release];
     [_represented release];
     [_topLevel release];
+    [_storyboard release];
+    [_externals release];
+    [_selfNames release];
     for (NSViewController *c in _children)
         c->_parent = nil;
     [_children release];
@@ -360,6 +408,25 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
     if (!name) {
         fprintf(stderr, "ferry: a %s has no view and no nib to load one from\n", object_getClassName(self));
         return;
+    }
+    NSString *inStoryboard = _storyboard ? [_storyboard _pathForNibNamed:name] : nil;
+    if (inStoryboard) {
+        NSMutableDictionary *externals = [NSMutableDictionary dictionaryWithDictionary:_externals ?: @{}];
+        for (NSString *n in _selfNames)
+            [externals setObject:self forKey:n];
+        [externals setObject:_storyboard forKey:@"NSStoryboardPlaceholder"];
+        NSNib *nib = [[NSNib alloc] initWithContentsOfURL:[NSURL fileURLWithPath:inStoryboard]];
+        NSArray *top = nil;
+        BOOL ok = [nib _instantiateWithOwner:self externalObjects:externals topLevelObjects:&top];
+        [nib release];
+        if (ok) {
+            [_topLevel release];
+            _topLevel = [top ?: @[] retain];
+            if (!_view)
+                fprintf(stderr, "ferry: the storyboard's nib \"%s\" didn't connect a view to its %s\n",
+                        [name UTF8String], object_getClassName(self));
+            return;
+        }
     }
     NSArray *top = load_nib(name, nil, [self nibBundle], self);
     if (!top && [self nibBundle] != [NSBundle mainBundle])
@@ -530,5 +597,12 @@ static void prefer_dimension(NSView *v, char *key, NSLayoutDimension *d, CGFloat
     if (!ADismissPopover(self))
         [[[self viewIfLoaded] window] close];
 }
-- (NSStoryboard *)storyboard { return nil; }
+- (NSStoryboard *)storyboard { return _storyboard; }
+/* the storyboard's outlet to it (freemac 1.260) */
+- (void)setStoryboard:(NSStoryboard *)s
+{
+    [s retain];
+    [_storyboard release];
+    _storyboard = s;
+}
 @end

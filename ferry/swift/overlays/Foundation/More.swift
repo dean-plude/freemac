@@ -41,13 +41,7 @@ extension String {
         public var description: String { NSString.localizedName(ofStringEncoding: rawValue) ?? "\(rawValue)" }
     }
 
-    /// The string's bytes in an encoding, or nil when it can't be written in it.
-    public func data(using encoding: Encoding, allowLossyConversion: Bool = false) -> Data? {
-        if encoding == .utf8 { return Data(utf8) }
-        return (self as NSString).data(usingEncoding: encoding.rawValue, allowLossyConversion: allowLossyConversion)
-    }
-
-    public init?(data: Data, encoding: Encoding) {
+    public init?(data: __shared Data, encoding: Encoding) {
         if encoding == .utf8 {
             guard let s = String(validatingUTF8Bytes: data) else { return nil }
             self = s
@@ -70,20 +64,8 @@ extension String {
         self = s
     }
 
-    public init(contentsOf url: URL, encoding: Encoding = .utf8) throws {
+    public init(contentsOf url: __shared URL, encoding: Encoding = .utf8) throws {
         try self.init(contentsOfFile: url.path, encoding: encoding)
-    }
-
-    public func write(toFile path: String, atomically: Bool, encoding: Encoding) throws {
-        guard let d = data(using: encoding) else {
-            throw NSError(domain: NSCocoaErrorDomain, code: NSFileWriteInapplicableStringEncodingError,
-                          userInfo: [NSFilePathErrorKey: path])
-        }
-        try d.write(to: URL(fileURLWithPath: path), options: atomically ? .atomic : [])
-    }
-
-    public func write(to url: URL, atomically: Bool, encoding: Encoding) throws {
-        try write(toFile: url.path, atomically: atomically, encoding: encoding)
     }
 
     private init?(validatingUTF8Bytes d: Data) {
@@ -101,7 +83,29 @@ extension String {
     }
 }
 
+// On StringProtocol, as Apple's Foundation has them, so that a Mac app's
+// calls reach them by the same names (freemac 1.260).
 extension StringProtocol {
+    /// The string's bytes in an encoding, or nil when it can't be written in it.
+    public func data(using encoding: String.Encoding, allowLossyConversion: Bool = false) -> Data? {
+        let s = String(self)
+        if encoding == .utf8 { return Data(s.utf8) }
+        return (s as NSString).data(usingEncoding: encoding.rawValue, allowLossyConversion: allowLossyConversion)
+    }
+
+    public func write<T: StringProtocol>(toFile path: T, atomically: Bool, encoding: String.Encoding) throws {
+        let path = String(path)
+        guard let d = data(using: encoding) else {
+            throw NSError(domain: NSCocoaErrorDomain, code: NSFileWriteInapplicableStringEncodingError,
+                          userInfo: [NSFilePathErrorKey: path])
+        }
+        try d.write(to: URL(fileURLWithPath: path), options: atomically ? .atomic : [])
+    }
+
+    public func write(to url: URL, atomically: Bool, encoding: String.Encoding) throws {
+        try write(toFile: url.path, atomically: atomically, encoding: encoding)
+    }
+
     public func lengthOfBytes(using encoding: String.Encoding) -> Int {
         String(self).data(using: encoding)?.count ?? 0
     }
@@ -158,7 +162,6 @@ public typealias ISO8601DateFormatter = NSISO8601DateFormatter
 public typealias ByteCountFormatter = NSByteCountFormatter
 public typealias Calendar = NSCalendar
 public typealias DateComponents = NSDateComponents
-public typealias TimeZone = NSTimeZone
 public typealias OperationQueue = NSOperationQueue
 public typealias Operation = NSOperation
 public typealias Process = NSTask

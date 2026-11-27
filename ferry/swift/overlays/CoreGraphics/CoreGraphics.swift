@@ -117,3 +117,14 @@ extension CGRect: CustomDebugStringConvertible {
 extension CGAffineTransform {
     public static var identity: CGAffineTransform { CGAffineTransform(a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0) }
 }
+
+// MARK: - dictionaries (freemac 1.260)
+
+extension CGRect {
+    /// The rectangle a dictionary made by dictionaryRepresentation holds.
+    public init?(dictionaryRepresentation dict: CFDictionary) {
+        var r = CGRect(x: 0, y: 0, width: 0, height: 0)
+        guard CGRectMakeWithDictionaryRepresentation(dict, &r) else { return nil }
+        self = r
+    }
+}

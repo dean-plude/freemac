@@ -1686,6 +1686,20 @@ AXError AXUIElementGetPid(AXUIElementRef element, pid_t *pid)
     return kAXErrorSuccess;
 }
 
+/* The window number of a window element, as CGWindowListCopyWindowInfo
+ * numbers the window (kCGWindowNumber). A Mac's private call, which window
+ * managers such as Rectangle use to match the two (freemac 1.260). */
+AXError _AXUIElementGetWindow(AXUIElementRef element, uint32_t *out)
+{
+    if (!element || ![(id)element isKindOfClass:[AAXElement class]] || !out)
+        return kAXErrorIllegalArgument;
+    AAXElement *e = (AAXElement *)element;
+    if (e->kind != AX_WINDOW)
+        return kAXErrorIllegalArgument;
+    *out = ACGWindowNumberForView(e->view);
+    return kAXErrorSuccess;
+}
+
 AXError AXUIElementSetMessagingTimeout(AXUIElementRef element, float timeout)
 {
     return element && timeout >= 0 ? kAXErrorSuccess : kAXErrorIllegalArgument;

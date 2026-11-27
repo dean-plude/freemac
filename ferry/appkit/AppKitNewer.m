@@ -639,3 +639,26 @@ static char button_background_key;
         [self setStringValue:[[s substringToIndex:amp.location] stringByAppendingString:[s substringFromIndex:amp.location + 1]]];
 }
 @end
+
+/* ---- haptic feedback (freemac 1.260) -------------------------------------------- */
+
+/* A PC has no Force Touch trackpad, so feedback is accepted and nothing is
+ * felt, as on a Mac without one. */
+@interface AHapticPerformer : NSObject <NSHapticFeedbackPerformer>
+@end
+@implementation AHapticPerformer
+- (void)performFeedbackPattern:(NSHapticFeedbackPattern)pattern
+               performanceTime:(NSHapticFeedbackPerformanceTime)performanceTime
+{
+}
+@end
+
+@implementation NSHapticFeedbackManager
++ (id<NSHapticFeedbackPerformer>)defaultPerformer
+{
+    static AHapticPerformer *performer;
+    if (!performer)
+        performer = [[AHapticPerformer alloc] init];
+    return performer;
+}
+@end

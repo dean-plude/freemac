@@ -1183,6 +1183,19 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.260 "Rectangle starts" (done)
+
+Ferry 0.83.0: Rectangle 0.87, the window-snapping app, runs from its official download, not built for Ferry: a Swift app with a main storyboard, the first of the apps picked because they looked likely not to work. Ferry now opens an app's compiled storyboard (its scenes, view controllers and the nibs inside them) and starts the app from it. Swift code built on a Mac finds what Apple's Swift overlays give it: the Mac's shapes of `DispatchQueue`, `os_log` and `OSLog`, `Locale`, `TimeZone`, `URLComponents`, `Notification` and the other Foundation value types, `NSNumber` conversions, the OS version check and image literals. Objective-C code's `os_log` calls are read as clang packs them. Labels in a nib wrap as the nib says, where before a flag was misread and their text was cut off.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `NSStoryboard`: a compiled storyboard's scenes, controllers by identifier, the initial controller, the main menu, and an app started from `NSMainStoryboardFile` | Ferry AppKit | done |
+| 2 | Swift overlays with the Mac's shapes: Dispatch's queue, group and semaphore classes; `os_log` and `OSLog`; a CoreFoundation module; Foundation's value types, `NSNumber` conversions, `Date` and `URL` strings; `CGRect` from a dictionary; image literals | Ferry Swift | done |
+| 3 | `_os_log_impl` (clang's packed values), `_swift_stdlib_operatingSystemVersion` and the OS version check Swift calls | Ferry | done |
+| 4 | Accessibility window ids, pointer warping (refused, as Wayland refuses it), haptic feedback (does nothing) | Ferry AppKit | done |
+| 5 | Nib text fields wrap as their cell's line-break mode says | Ferry AppKit | done |
+| 6 | Rectangle 0.87 starts and shows its "Authorize Rectangle" window | Ferry / Rectangle | done |
+
 ## 1.259 "OBS quits cleanly with a camera" (done)
 
 Ferry 0.82.0: OBS Studio's Legacy camera source no longer crashes OBS when it quits. Posting a notification kept the object it was about until the posting thread's autorelease pool drained, and OBS loads its scenes in a pool it never drains, so a capture session that OBS let go of kept running and handed pictures to a source OBS had already freed. A notification is now let go of as soon as it has been posted, as on a Mac. A capture session that its app lets go of while it runs stops, and pictures already on their way to a delegate aren't handed over once it has stopped.
