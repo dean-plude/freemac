@@ -169,6 +169,9 @@ NSString *FStringFromUTF8(const char *s, NSUInteger len)
     for (NSUInteger i = 0; i < range.length; i++)
         buffer[i] = [self characterAtIndex:range.location + i];
 }
+/* every character, as Apple's older -getCharacters: (deprecated, still
+ * sent: Chromium's text input does) (freemac 1.266) */
+- (void)getCharacters:(unichar *)buffer { [self getCharacters:buffer range:NSMakeRange(0, [self length])]; }
 - (instancetype)initWithCharacters:(const unichar *)chars length:(NSUInteger)length
 {
     [self release];

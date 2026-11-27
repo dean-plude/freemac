@@ -410,6 +410,7 @@ FOUNDATION_EXPORT NSKeyValueChangeKey const NSKeyValueChangeNotificationIsPriorK
 @property (readonly) NSUInteger length;
 - (unichar)characterAtIndex:(NSUInteger)index;
 - (void)getCharacters:(unichar *)buffer range:(NSRange)range;
+- (void)getCharacters:(unichar *)buffer; /* deprecated on a Mac; freemac 1.266 */
 + (instancetype FERRY_SWIFT_NONNULL)string;
 + (instancetype)stringWithString:(NSString *)string;
 + (instancetype)stringWithUTF8String:(const char *)s;
@@ -2324,6 +2325,8 @@ FOUNDATION_EXPORT NSURLResourceKey const NSURLNameKey, NSURLLocalizedNameKey, NS
 FOUNDATION_EXPORT NSURLResourceKey const NSURLVolumeIdentifierKey;
 /* freemac 1.262: whether the volume is on this computer, not a network share */
 FOUNDATION_EXPORT NSURLResourceKey const NSURLVolumeIsLocalKey;
+/* freemac 1.266: Time Machine's backup exclusion, and the content's UTType */
+FOUNDATION_EXPORT NSURLResourceKey const NSURLIsExcludedFromBackupKey, NSURLContentTypeKey;
 FOUNDATION_EXPORT NSURLResourceKey const NSURLVolumeURLKey;
 FOUNDATION_EXPORT NSURLResourceKey const NSURLVolumeSupportsCaseSensitiveNamesKey;
 FOUNDATION_EXPORT NSURLResourceKey const NSURLIsSystemImmutableKey;

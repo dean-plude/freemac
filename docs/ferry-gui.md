@@ -3396,6 +3396,45 @@ Not there yet: IINA's images from its asset catalog (some buttons are
 blank), gesture recognizers don't fire, and picture in picture's window has
 no play and pause buttons.
 
+## Obsidian opens (freemac 1.266, Ferry 0.89.0)
+
+Obsidian 1.8.10, from its official download, now opens a working window:
+its start page, a new vault from Quick start, the Welcome note and the
+graph view, and a note that takes typing and saves it. Chromium runs a page
+in one process, draws it in another and shows it in a third, so most of
+the work was between processes:
+
+- **Mach ports between processes.** A right sent in a message now reaches
+  the other process, messages are forwarded through the port's owner, and
+  a reply to a process that has quit fails as it would on a Mac.
+  `FERRY_MACH_TRACE=1` prints sends that fail or find a full queue, and
+  `FERRY_MACH_TRACE=2` every send between processes.
+- **Shared IOSurfaces.** A surface's memory is a Mach memory entry with a
+  page describing it, so another process maps the same pixels. A surface
+  counts as in use while another process holds it, as Apple's
+  `IOSurfaceIsInUse` describes; Chromium's compositor then draws the next
+  frame into a free buffer, and the window sees each one.
+  `FERRY_IOSURFACE_TRACE=1` follows surfaces between processes.
+- **Run loops.** An observer told the run loop is about to sleep may set a
+  timer; the run loop now wakes for it, and it always says it woke after it
+  slept, which Chromium checks.
+- **Core Animation.** A layer that resizes with its superlayer
+  (`kCALayerWidthSizable`, `kCALayerHeightSizable`) grows by the whole
+  change. It grew by a sixteenth, which put Obsidian's page almost entirely
+  below its window.
+- **Drawing and text.** Core Graphics fonts and glyphs, mask clipping (to
+  its rectangle for now), PDF contexts (not drawn yet), data consumers,
+  Core Text character sets, `-[NSString getCharacters:]` and the spell
+  checker's typing settings (all off: Ferry corrects nothing as you type).
+- **Software drawing.** Ferry starts an Electron app with Chromium's own
+  `--disable-gpu`, because Ferry's OpenGL can't yet fill the shared surfaces
+  Chromium composites into on the graphics card. WebGL still runs, in
+  software. `FERRY_ELECTRON_GPU=1` keeps the graphics card.
+
+Two debugging switches help with apps like this: `FERRY_VIEW_TREE=1` prints
+a window's views and layers as it draws them, and `FERRY_KEY_TRACE=1`
+prints each key and where it goes.
+
 ## Electron apps and what they needed (freemac 1.265, Ferry 0.88.0)
 
 Electron apps carry Chromium and Node.js inside, and many popular Mac apps

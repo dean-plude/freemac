@@ -134,6 +134,7 @@ static BOOL is_update(CGDisplayStreamUpdateRef u) { return u && [(id)u isKindOfC
   @public
     ACaptureStream *stream;
     BOOL started;
+    CFRunLoopSourceRef source;   /* CGDisplayStreamCreate's */
 }
 @end
 @implementation FerryCGDisplayStream
@@ -141,6 +142,8 @@ static BOOL is_update(CGDisplayStreamUpdateRef u) { return u && [(id)u isKindOfC
 {
     [stream stop];
     [stream release];
+    if (source)
+        CFRelease(source);
     [super dealloc];
 }
 @end
@@ -213,6 +216,29 @@ CGDisplayStreamRef CGDisplayStreamCreateWithDispatchQueue(CGDirectDisplayID disp
         return (CGDisplayStreamRef)s;
     }
 }
+
+/* A stream for a run loop (Apple's CGDisplayStream documentation): its
+ * frames come to the handler on a serial queue of the stream's own, one at
+ * a time, as a run loop would bring them; the run loop source the app adds
+ * is a quiet one, there for the app to add and remove (freemac 1.266;
+ * Chromium's screen capture). */
+static void quiet_perform(void *info) {}
+CGDisplayStreamRef CGDisplayStreamCreate(CGDirectDisplayID display, size_t outputWidth, size_t outputHeight,
+                                         int32_t pixelFormat, CFDictionaryRef properties,
+                                         CGDisplayStreamFrameAvailableHandler handler)
+{
+    dispatch_queue_t q = dispatch_queue_create("freemac.ferry.display-stream", DISPATCH_QUEUE_SERIAL);
+    CGDisplayStreamRef s =
+        CGDisplayStreamCreateWithDispatchQueue(display, outputWidth, outputHeight, pixelFormat, properties, q, handler);
+    dispatch_release(q);
+    if (s) {
+        CFRunLoopSourceContext c = {.version = 0, .perform = quiet_perform};
+        DS(s)->source = CFRunLoopSourceCreate(NULL, 0, &c);
+    }
+    return s;
+}
+
+CFRunLoopSourceRef CGDisplayStreamGetRunLoopSource(CGDisplayStreamRef s) { return is_stream(s) ? DS(s)->source : NULL; }
 
 CGError CGDisplayStreamStart(CGDisplayStreamRef s)
 {

@@ -214,6 +214,13 @@ SInt32 CFRunLoopRunInMode(CFRunLoopMode mode, CFTimeInterval seconds, Boolean re
 {
     return [[NSRunLoop currentRunLoop] runFor:seconds returnAfterSource:returnAfterSourceHandled];
 }
+/* The mode the run loop is running in, or NULL when it isn't running
+ * (Apple's CFRunLoop documentation; freemac 1.266, Chromium's message pump). */
+CFRunLoopMode CFRunLoopCopyCurrentMode(CFRunLoopRef rl)
+{
+    NSString *m = [OBJ(rl) currentMode];
+    return m ? (CFRunLoopMode)[m copy] : NULL;
+}
 void CFRunLoopStop(CFRunLoopRef rl) { [OBJ(rl) stop]; }
 void CFRunLoopWakeUp(CFRunLoopRef rl) { [OBJ(rl) _wakeUp]; }
 void CFRunLoopPerformBlock(CFRunLoopRef rl, CFTypeRef mode, void (^block)(void)) { [OBJ(rl) performBlock:block]; }

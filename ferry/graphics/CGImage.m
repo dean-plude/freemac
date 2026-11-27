@@ -189,6 +189,51 @@ CFDataRef CGDataProviderCopyData(CGDataProviderRef p)
     return p ? (CFDataRef)[((GDataProvider *)p)->data copy] : NULL;
 }
 
+/* ---- data consumers (freemac 1.266) --------------------------------------------- */
+
+/* Where a PDF context would write: bytes appended to a CFMutableData, or
+ * handed to the app's own callbacks (Apple's CGDataConsumer documentation). */
+@interface GDataConsumer : NSObject {
+@public
+    NSMutableData *data;
+    void *info;
+    CGDataConsumerCallbacks callbacks;
+}
+@end
+@implementation GDataConsumer
+- (void)dealloc
+{
+    [data release];
+    if (callbacks.releaseConsumer)
+        callbacks.releaseConsumer(info);
+    [super dealloc];
+}
+@end
+
+CFTypeID CGDataConsumerGetTypeID(void) { return (CFTypeID)[GDataConsumer class]; }
+CGDataConsumerRef CGDataConsumerCreate(void *info, const CGDataConsumerCallbacks *callbacks)
+{
+    if (!callbacks || !callbacks->putBytes)
+        return NULL;
+    GDataConsumer *c = [[GDataConsumer alloc] init];
+    c->info = info;
+    c->callbacks = *callbacks;
+    return (CGDataConsumerRef)c;
+}
+CGDataConsumerRef CGDataConsumerCreateWithCFData(CFMutableDataRef data)
+{
+    if (!data)
+        return NULL;
+    GDataConsumer *c = [[GDataConsumer alloc] init];
+    c->data = [(NSMutableData *)data retain];
+    return (CGDataConsumerRef)c;
+}
+/* Nothing in Ferry writes to a consumer yet (no PDF contexts), so none is
+ * made for a file, which is left as it is. */
+CGDataConsumerRef CGDataConsumerCreateWithURL(CFURLRef url) { return NULL; }
+CGDataConsumerRef CGDataConsumerRetain(CGDataConsumerRef c) { return (CGDataConsumerRef)[OBJ(c) retain]; }
+void CGDataConsumerRelease(CGDataConsumerRef c) { [OBJ(c) release]; }
+
 /* ---- images --------------------------------------------------------------------- */
 
 @implementation GImage

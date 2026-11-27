@@ -33,6 +33,7 @@ int ferry_image_count(void);
 struct image *ferry_image_at(int index);
 struct image *ferry_main_image(void);
 struct image *ferry_image_containing(const void *addr);
+void ferry_crash_report_init(void); /* FERRY_CRASH_REPORT (posix.c) */
 const char *ferry_image_path(struct image *im);
 void *ferry_image_header(struct image *im);
 intptr_t ferry_image_slide(struct image *im);

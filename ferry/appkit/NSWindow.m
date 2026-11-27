@@ -937,6 +937,32 @@ static BOOL places_own_windows(void)
     [_overlay _drawInContext:ctx dirty:all screen:screen];
 }
 
+/* FERRY_VIEW_TREE=1: the window's views and their layers, as drawn, for
+ * finding where an app's content went (freemac 1.266). */
+static void dump_layer(CALayer *l, int depth)
+{
+    CGRect f = [l frame];
+    id c = [l contents];
+    fprintf(stderr, "%*slayer %s %p (%g,%g %gx%g) flipped %d hidden %d contents %s gravity %s rect (%g,%g %gx%g) transform %d\n",
+            depth * 2, "", object_getClassName(l), (void *)l, f.origin.x, f.origin.y, f.size.width, f.size.height,
+            [l isGeometryFlipped], [l isHidden], c ? object_getClassName(c) : "-", [[l contentsGravity] UTF8String],
+            [l contentsRect].origin.x, [l contentsRect].origin.y, [l contentsRect].size.width,
+            [l contentsRect].size.height, !CATransform3DIsIdentity([l transform]));
+    for (CALayer *sub in [l sublayers])
+        dump_layer(sub, depth + 1);
+}
+static void dump_view(NSView *v, int depth)
+{
+    NSRect f = [v frame], b = [v bounds];
+    fprintf(stderr, "%*sview %s %p (%g,%g %gx%g) bounds (%g,%g %gx%g) flipped %d hidden %d\n", depth * 2, "",
+            object_getClassName(v), (void *)v, f.origin.x, f.origin.y, f.size.width, f.size.height, b.origin.x,
+            b.origin.y, b.size.width, b.size.height, [v isFlipped], [v isHidden]);
+    if ([v layer])
+        dump_layer([v layer], depth + 1);
+    for (NSView *sub in [v subviews])
+        dump_view(sub, depth + 1);
+}
+
 - (void)display
 {
     AMainThreadOnly("-[NSWindow display]");
@@ -960,6 +986,11 @@ static BOOL places_own_windows(void)
         full = roots[i] && ![roots[i] _collectDirty:rects count:&n max:MAXDIRTY];
     _needsDisplay = NO;
     if (full) {
+        static int dumps;
+        if (getenv("FERRY_VIEW_TREE") && dumps++ < 12) {
+            fprintf(stderr, "window %p frame %gx%g:\n", (void *)self, _frame.size.width, _frame.size.height);
+            dump_view(_contentView, 1);
+        }
         [self _drawWindowInContext:_ctx screen:YES];
     } else {
         NSRect all = NSMakeRect(0, 0, _frame.size.width, _frame.size.height);
@@ -2062,6 +2093,9 @@ static int on_key(GtkWidget *w, GdkEvent *e, void *data)
         /* a GTK view inside the window (a web view) that has the keyboard
          * takes its keys, all but the menus' Command keys */
         GtkWidget *focus = gtk_window_get_focus(w);
+        if (getenv("FERRY_KEY_TRACE"))
+            fprintf(stderr, "ferry: key %#x (%u) in %p: key window %d, focus %p %s (area %p), first responder %s\n", keyval, hardware,
+                    (void *)win, [win isKeyWindow], (void *)focus, focus ? g_type_name(**(size_t **)focus) : "-", (void *)win->_area, object_getClassName([win firstResponder]));
         if (focus && focus != win->_area && !(AModifiersFromGdk(state) & NSEventModifierFlagCommand))
             return 0;
         BOOL down = gdk_event_get_event_type(e) == 8;    /* GDK_KEY_PRESS */

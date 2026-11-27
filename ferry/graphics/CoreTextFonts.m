@@ -281,6 +281,26 @@ CFArrayRef CTFontCollectionCreateMatchingFontDescriptors(CTFontCollectionRef col
     return (CFArrayRef)out;
 }
 
+/* The collection's fonts of one family (Apple's CTFontCollection
+ * documentation; freemac 1.266). */
+CFArrayRef CTFontCollectionCreateMatchingFontDescriptorsForFamily(CTFontCollectionRef collection,
+                                                                  CFStringRef familyName, CFDictionaryRef options)
+{
+    NSArray *all = collection ? [(NSArray *)CTFontCollectionCreateMatchingFontDescriptors(collection) autorelease] : nil;
+    NSMutableArray *out = [[NSMutableArray alloc] init];
+    for (id d in all) {
+        NSString *family = [(id)CTFontDescriptorCopyAttribute((CTFontDescriptorRef)d, kCTFontFamilyNameAttribute) autorelease];
+        if ([family isKindOfClass:[NSString class]] && familyName &&
+            [family caseInsensitiveCompare:(NSString *)familyName] == NSOrderedSame)
+            [out addObject:d];
+    }
+    if (![out count]) {
+        [out release];
+        return NULL;
+    }
+    return (CFArrayRef)out;
+}
+
 /* ---- the font manager ---------------------------------------------------------------- */
 
 /* the faces in a font file, in the order of their index in it */

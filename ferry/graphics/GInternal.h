@@ -147,6 +147,7 @@ struct gstate {
     int depth, cap;
     BOOL allowsAntialias;
     CGAffineTransform textMatrix;   /* its tx and ty are the text position */
+    id cgFont;                      /* CGContextSetFont's, retained */
     /* bitmap contexts */
     void *data;
     BOOL ownsData, shadow;
