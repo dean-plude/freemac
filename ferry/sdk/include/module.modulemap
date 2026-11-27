@@ -536,6 +536,7 @@ module QuartzCore [system] {
     header "QuartzCore/QuartzCore.h"
     header "QuartzCore/CAAnimation.h"
     header "QuartzCore/CABase.h"
+    header "QuartzCore/CAContext.h"
     header "QuartzCore/CAGradientLayer.h"
     header "QuartzCore/CALayer.h"
     header "QuartzCore/CAMediaTiming.h"

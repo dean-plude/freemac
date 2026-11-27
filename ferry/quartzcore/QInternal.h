@@ -188,6 +188,8 @@ Q_EXPORT CGAffineTransform FerryCALayerPresentationOffset(CALayer *layer);
 /* Whether any animation is running on the layer or under it. */
 Q_EXPORT BOOL FerryCALayerTreeIsAnimating(CALayer *layer);
 Q_EXPORT void FerryCALayerSetHost(CALayer *layer, id host);
+/* Whether the layer is in a CAContext's tree (CAContext.m) */
+Q_EXPORT BOOL FerryCALayerInContext(CALayer *layer);
 
 /* values from a dictionary, with defaults */
 CGFloat QNum(NSDictionary *v, NSString *key);

@@ -1195,7 +1195,11 @@ static void box_level(struct __ferry_tex *t, unsigned layer, unsigned lvl)
 /* ---- drawables ------------------------------------------------------------------------------- */
 /* What a CAMetalLayer shows, from one of its drawables: the texture as a
  * picture in the layer's contents. The layer's -_ferryShowMetalImage:
- * puts it there on the main thread. */
+ * puts it there on the main thread, or -_ferryTakeMetalImage: at once when
+ * the layer is shared with another program (quartzcore/CAContext.m). */
+@interface NSObject (FerryMetalLayerTake)
+- (BOOL)_ferryTakeMetalImage:(NSArray *)a;
+@end
 static void release_pixels(void *info, const void *data, size_t size) { free((void *)data); }
 
 static CGImageRef image_of(const struct __ferry_tex *t, BOOL opaque)
@@ -1279,7 +1283,9 @@ static NSUInteger drawable_ids;
     if (img) {
         NSArray *a = @[ (id)img, @(_drawableID) ];
         CGImageRelease(img);
-        if ([layer respondsToSelector:@selector(_ferryShowMetalImage:)])
+        if ([layer respondsToSelector:@selector(_ferryTakeMetalImage:)] && [layer _ferryTakeMetalImage:a])
+            ;
+        else if ([layer respondsToSelector:@selector(_ferryShowMetalImage:)])
             [layer performSelectorOnMainThread:@selector(_ferryShowMetalImage:) withObject:a waitUntilDone:NO];
     }
     for (MTLDrawablePresentedHandler h in _presentedHandlers) h(self);

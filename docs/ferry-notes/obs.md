@@ -64,6 +64,28 @@ neither, and FFmpeg's AAC encoder and x264 serve instead.
 - Settings (every page), a source's Properties and Filters, and Add Source.
 - `--startrecording` and `--collection NAME` on the command line.
 
+## OBS's official download
+
+OBS Studio 33.0.3's own Mac download (`OBS-Studio-33.0.3-macOS-Intel.dmg`
+from OBS's GitHub releases), unchanged, as a user would get it:
+
+- Ferry's Installer opens the `.dmg` (with 7-Zip installed) and puts
+  `OBS.app` in Applications; it opens from a fresh account to OBS's
+  first-run windows (freemac 1.263).
+- With Ferry's test camera it previews and records at 30 fps (1.265). From
+  freemac 1.266 OBS offers its "CoreAudio AAC" encoder and simple-mode
+  recordings use it; run 11 came out as H.264 1280x720 at 30 fps with AAC,
+  52.5 s, the file finished.
+- Text: this build has no fallback for a missing face, so a new Text source,
+  which asks for Helvetica, draws nothing until a font is picked. OBS's own
+  font picker lists the installed families, and a Text source set to Inter,
+  Liberation Sans or DejaVu Sans draws in that face, in the preview and the
+  recording (run 11; the drawn widths match each face). freemac has no font
+  named Helvetica and won't rename one to it.
+
+Stop a test recording with SIGINT to OBS's own process: signalling its whole
+process group also stops `obs-ffmpeg-mux` and leaves the file unfinished.
+
 ## Known gaps
 
 - "Desktop Audio" as OBS sets it up by default (`coreaudio_output_capture`)
