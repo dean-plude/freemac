@@ -21,6 +21,11 @@ sampled bottom left: yes
 sampled bottom right: yes
 sampled top left: yes
 sampled top right: yes
+a discarding pipeline: yes
+discarded on the left: yes
+drawn on the right: yes
+an argument encoder from a function: yes
+sampled through the argument buffer: yes
 a compute pipeline: yes
 the kernel added: yes
 a filled and copied buffer: yes

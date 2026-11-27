@@ -255,6 +255,7 @@ const struct ferry_symbol ferry_core_symbols[] = {
     {"_Unwind_Resume", ferry_unwind_resume},
     /* clang lowers memset(p, 0, n) to this name on a Mac */
     {"__bzero", bzero},
+    /* clang calls it on a Mac before a frame larger than a page */
     /* not a symbol of this system's C library (it wraps __cxa_atexit) */
     {"atexit", atexit},
     {"__sincos_stret", mac_sincos_stret},
@@ -299,7 +300,7 @@ static const struct ferry_symbol *const tables[] = {
     ferry_sysctl_symbols, ferry_attrlist_symbols, ferry_dyld_symbols, ferry_wchar_symbols,
     ferry_tlv_symbols, ferry_socket_symbols, ferry_kqueue_symbols, ferry_libc_more_symbols, ferry_oslog_symbols,
     ferry_swift_symbols, ferry_copyfile_symbols, ferry_libc_vlc_symbols,
-    ferry_libc_apps_symbols, ferry_libc_audacity_symbols,
+    ferry_libc_apps_symbols, ferry_libc_audacity_symbols, ferry_libc_blender_symbols,
 };
 
 static void *find_own(const char *name)

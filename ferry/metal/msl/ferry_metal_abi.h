@@ -61,6 +61,10 @@ struct ferry_slot {
     int ncomp, kind;   /* components; FERRY_K_* */
     int interp;        /* fragment inputs: FERRY_I_* */
 };
+/* An argument buffer: where each [[id(n)]] member of a buffer argument's
+ * struct is, as the function a shader gives for that argument lists them. */
+struct ferry_arg { int id, offset, count, stride, type; };
+enum { FERRY_A_DATA = 0, FERRY_A_BUFFER, FERRY_A_TEXTURE, FERRY_A_SAMPLER };
 enum { FERRY_W_VARYING = 0, FERRY_W_POSITION, FERRY_W_POINT_SIZE, FERRY_W_CLIP_DISTANCE, FERRY_W_COLOR,
        FERRY_W_DEPTH, FERRY_W_SAMPLE_MASK, FERRY_W_STENCIL, FERRY_W_ATTRIBUTE, FERRY_W_INPUT,
        FERRY_W_BUILTIN_INPUT };

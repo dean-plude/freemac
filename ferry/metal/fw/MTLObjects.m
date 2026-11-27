@@ -103,6 +103,32 @@ static void note_missing(id obj, SEL sel)
 @end
 
 /* ---- the device ------------------------------------------------------------------------ */
+/* Whether an image links a framework; a system framework (one whose own
+ * name is under /System/Library/, as Ferry's are) counts as linking none. */
+static int image_links(const struct mach_header_64 *mh, const char *framework)
+{
+    if (!mh || mh->magic != MH_MAGIC_64) return 0;
+    const char *p = (const char *)(mh + 1);
+    for (uint32_t i = 0; i < mh->ncmds; i++) {
+        const struct load_command *lc = (const void *)p;
+        if (lc->cmd == LC_ID_DYLIB) {
+            const struct dylib_command *dc = (const void *)lc;
+            if (!strncmp(p + dc->dylib.name.offset, "/System/Library/", 16)) return 0;
+        }
+        p += lc->cmdsize;
+    }
+    p = (const char *)(mh + 1);
+    for (uint32_t i = 0; i < mh->ncmds; i++) {
+        const struct load_command *lc = (const void *)p;
+        if (lc->cmd == LC_LOAD_DYLIB || lc->cmd == LC_LOAD_WEAK_DYLIB || lc->cmd == LC_REEXPORT_DYLIB) {
+            const struct dylib_command *dc = (const void *)lc;
+            if (strstr(p + dc->dylib.name.offset, framework)) return 1;
+        }
+        p += lc->cmdsize;
+    }
+    return 0;
+}
+
 static int program_links(const char *framework)
 {
     const struct mach_header_64 *mh = (const void *)_dyld_get_image_header(0);
@@ -120,17 +146,35 @@ static int program_links(const char *framework)
     return 0;
 }
 
-FerryMTLDevice *FerryMTLDeviceIfOn(void)
+/* On or off for the whole program, or (-1) for each library that asks: a
+ * program that links neither Metal nor OpenGL, such as Python, hosts the
+ * library that draws (Blender's module), so that library's own links
+ * decide when it asks for a device; once one has one, it stays on. */
+static int metal_on = -2;
+
+static FerryMTLDevice *device_for(const void *caller)
 {
-    static int on = -1;
-    if (on < 0) {
+    if (metal_on == -2) {
         const char *e = getenv("FERRY_METAL");
-        if (e && *e) on = strcmp(e, "0") != 0;
-        else on = program_links("/Metal.framework/") && !program_links("/OpenGL.framework/");
-        if (on && mtl_verbose) mtl_log("the Ferry Software Renderer is on");
+        if (e && *e) metal_on = strcmp(e, "0") != 0;
+        else if (program_links("/Metal.framework/") || program_links("/OpenGL.framework/"))
+            metal_on = program_links("/Metal.framework/") && !program_links("/OpenGL.framework/");
+        else
+            metal_on = -1;
+        if (metal_on == 1 && mtl_verbose) mtl_log("the Ferry Software Renderer is on");
     }
-    return on ? [FerryMTLDevice shared] : nil;
+    if (metal_on == -1 && caller) {
+        Dl_info info;
+        if (dladdr(caller, &info) && image_links(info.dli_fbase, "/Metal.framework/") &&
+            !image_links(info.dli_fbase, "/OpenGL.framework/")) {
+            metal_on = 1;
+            if (mtl_verbose) mtl_log("the Ferry Software Renderer is on, for %s", info.dli_fname);
+        }
+    }
+    return metal_on == 1 ? [FerryMTLDevice shared] : nil;
 }
+
+FerryMTLDevice *FerryMTLDeviceIfOn(void) { return device_for(NULL); }
 
 @implementation FerryMTLDevice
 /* QuartzCore's CAMetalLayer asks for the device this way (it doesn't link Metal). */
@@ -482,16 +526,17 @@ id<MTLArgumentEncoder> FerryMTLNewArgumentEncoder(NSArray *arguments);
 }
 @end
 
-id<MTLDevice> MTLCreateSystemDefaultDevice(void) { return FerryMTLDeviceIfOn(); }
-NSArray<id<MTLDevice>> *MTLCopyAllDevices(void)
+id<MTLDevice> MTLCreateSystemDefaultDevice(void) { return device_for(__builtin_return_address(0)); }
+static NSArray<id<MTLDevice>> *all_devices(const void *caller)
 {
-    FerryMTLDevice *d = FerryMTLDeviceIfOn();
+    FerryMTLDevice *d = device_for(caller);
     return d ? [[NSArray alloc] initWithObjects:d, nil] : [[NSArray alloc] init];
 }
+NSArray<id<MTLDevice>> *MTLCopyAllDevices(void) { return all_devices(__builtin_return_address(0)); }
 NSArray<id<MTLDevice>> *MTLCopyAllDevicesWithObserver(id *observer, MTLDeviceNotificationHandler handler)
 {
     if (observer) *observer = [[NSObject alloc] init];
-    return MTLCopyAllDevices();
+    return all_devices(__builtin_return_address(0));
 }
 void MTLRemoveDeviceObserver(id observer) { [observer release]; }
 

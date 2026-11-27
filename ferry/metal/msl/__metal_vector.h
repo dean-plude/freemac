@@ -97,6 +97,25 @@ template<class T, int N> struct __ncomp<packed_vec<T, N>> { static constexpr int
 __FERRY_VBIN(+) __FERRY_VBIN(-) __FERRY_VBIN(*) __FERRY_VBIN(/) __FERRY_VBIN(%)
 __FERRY_VBIN(&) __FERRY_VBIN(|) __FERRY_VBIN(^) __FERRY_VBIN(<<) __FERRY_VBIN(>>)
 #undef __FERRY_VBIN
+/* A packed vector in arithmetic works as the vector it holds. */
+#define __FERRY_PBIN(op) \
+    template<class T, int N> vec<T, N> operator op(const packed_vec<T, N> &a, const packed_vec<T, N> &b) \
+    { return vec<T, N>(a) op vec<T, N>(b); } \
+    template<class T, int N> vec<T, N> operator op(const packed_vec<T, N> &a, const vec<T, N> &b) \
+    { return vec<T, N>(a) op b; } \
+    template<class T, int N> vec<T, N> operator op(const vec<T, N> &a, const packed_vec<T, N> &b) \
+    { return a op vec<T, N>(b); } \
+    template<class T, int N, class U, __ferry::enable_if_t<__ferry::is_scalar<U>::value, int> = 0> \
+    vec<T, N> operator op(const packed_vec<T, N> &a, U b) { return vec<T, N>(a) op b; } \
+    template<class T, int N, class U, __ferry::enable_if_t<__ferry::is_scalar<U>::value, int> = 0> \
+    vec<T, N> operator op(U a, const packed_vec<T, N> &b) { return a op vec<T, N>(b); } \
+    template<class T, int N, class X> packed_vec<T, N> &operator op##=(packed_vec<T, N> &a, const X &b) \
+    { a = vec<T, N>(a) op b; return a; } \
+    template<class T, int N> vec<T, N> &operator op##=(vec<T, N> &a, const packed_vec<T, N> &b) \
+    { a = a op vec<T, N>(b); return a; }
+__FERRY_PBIN(+) __FERRY_PBIN(-) __FERRY_PBIN(*) __FERRY_PBIN(/)
+#undef __FERRY_PBIN
+template<class T, int N> vec<T, N> operator-(const packed_vec<T, N> &a) { return -vec<T, N>(a); }
 /* % on floating-point vectors is fmod in MSL's GLSL-derived code; C++ has none. */
 template<int N> vec<float, N> operator%(const vec<float, N> &a, const vec<float, N> &b)
 { vec<float, N> r; for (int i = 0; i < N; i++) r.c[i] = __builtin_fmodf(a.c[i], b.c[i]); return r; }
@@ -258,5 +277,13 @@ using ::int2; using ::int3; using ::int4; using ::uint2; using ::uint3; using ::
 using ::bool2; using ::bool3; using ::bool4;
 using ::float2x2; using ::float3x3; using ::float4x4;
 }
+
+/* ferry-mslc passes each side of a ?: in a program's code through this. In
+ * C++ for OpenCL a local vector is a "__private vec" and a function's result
+ * a plain "vec", which ?: won't mix (Metal's own compiler does); by value
+ * both are plain, and a packed vector gives the vector it holds. */
+template<class T> struct __ferry_unpacked { typedef T type; };
+template<class T, int N> struct __ferry_unpacked<metal::packed_vec<T, N>> { typedef metal::vec<T, N> type; };
+template<class T> constexpr typename __ferry_unpacked<__ferry::plain<T>>::type __ferry_value(const T &x) { return x; }
 
 #endif
