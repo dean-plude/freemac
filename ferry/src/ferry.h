@@ -162,6 +162,15 @@ int ferry_open_flags_to_linux(int mac_flags); /* open(2)'s O_ flags (freemac 1.2
 extern const struct ferry_symbol ferry_libc_apps_symbols[];
 extern const struct ferry_symbol ferry_libc_audacity_symbols[]; /* libc_audacity.c (freemac 1.263) */
 extern const struct ferry_symbol ferry_libc_blender_symbols[];
+extern const struct ferry_symbol ferry_mach_symbols[];
+int ferry_mach_port_fd(uint32_t name, int dead);
+unsigned ferry_mach_port_pending(uint32_t name, uint32_t *member);
+int ferry_mach_receive(uint32_t name, void *buf, unsigned size, int option);
+int ferry_mach_send_empty(uint32_t port, int32_t id);
+uint32_t ferry_mach_new_receive(void);
+int ferry_mach_is_receive(uint32_t name);
+extern const struct ferry_symbol ferry_notify_symbols[];
+extern const struct ferry_symbol ferry_libc_electron_symbols[];
 
 /* socket.c: BSD sockets, name lookups and interfaces with the Mac's layouts */
 extern const struct ferry_symbol ferry_socket_symbols[];
@@ -204,6 +213,10 @@ struct kevent64_s {
 #define FERRY_EVFILT_PROC (-5)
 #define FERRY_EVFILT_SIGNAL (-6)
 #define FERRY_EVFILT_TIMER (-7)
+#define FERRY_EVFILT_MACHPORT (-8)
+/* memory entries (mach.c): forget mappings vm_deallocate removes; an entry's size */
+void ferry_mach_unmapped(uintptr_t addr, size_t len);
+uint64_t ferry_mach_entry_size(uint32_t name);
 #define FERRY_EVFILT_USER (-10)
 #define FERRY_EV_ADD 0x0001
 #define FERRY_EV_DELETE 0x0002

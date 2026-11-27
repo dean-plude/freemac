@@ -56,5 +56,12 @@ kern_return_t IOConnectCallScalarMethod(mach_port_t connection, uint32_t selecto
 CFMutableDictionaryRef IOBSDNameMatching(mach_port_t mainPort, uint32_t options,
                                          const char *bsdName) CF_RETURNS_RETAINED;
 
+/* Notification ports (freemac 1.265): a Mach port and a run loop source
+ * that nothing is sent to. */
+typedef struct IONotificationPort *IONotificationPortRef;
+IONotificationPortRef IONotificationPortCreate(mach_port_t mainPort);
+void IONotificationPortDestroy(IONotificationPortRef notify);
+CFRunLoopSourceRef IONotificationPortGetRunLoopSource(IONotificationPortRef notify);
+mach_port_t IONotificationPortGetMachPort(IONotificationPortRef notify);
 __FERRY_END
 #endif

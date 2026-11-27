@@ -8,6 +8,7 @@
  * work). */
 #import "FInternal.h"
 #include <IOKit/IOKitLib.h>
+#include <mach/port.h>
 #include <IOKit/pwr_mgt/IOPMLib.h>
 #include <IOKit/IOCFPlugIn.h>
 #include <IOKit/hid/IOHIDManager.h>
@@ -49,7 +50,10 @@ kern_return_t IOServiceGetMatchingServices(mach_port_t mainPort, CFDictionaryRef
 }
 io_object_t IOIteratorNext(io_iterator_t iterator) { return IO_OBJECT_NULL; }
 boolean_t IOIteratorIsValid(io_iterator_t iterator) { return iterator == IO_OBJECT_NULL; }
-kern_return_t IOObjectRelease(io_object_t object) { return object == IO_OBJECT_NULL ? kIOReturnSuccess : kIOReturnBadArgument; }
+kern_return_t IOObjectRelease(io_object_t object)
+{
+    return object == IO_OBJECT_NULL || object == 0x504d01 ? kIOReturnSuccess : kIOReturnBadArgument;
+}
 kern_return_t IOObjectRetain(io_object_t object) { return IOObjectRelease(object); }
 io_registry_entry_t IORegistryEntryFromPath(mach_port_t mainPort, const io_string_t path) { return IO_OBJECT_NULL; }
 io_registry_entry_t IORegistryGetRootEntry(mach_port_t mainPort) { return IO_OBJECT_NULL; }
@@ -215,6 +219,23 @@ IOReturn IOPMCopyAssertionsByProcess(CFDictionaryRef *byPID)
     *byPID = (CFDictionaryRef)[[NSDictionary alloc] initWithObjectsAndKeys:list, @(getpid()), nil];
     return kIOReturnSuccess;
 }
+/* The CPU's power and thermal limits: this system doesn't say, as a Mac
+ * that keeps no figures doesn't (freemac 1.265, for Chromium's thermal
+ * monitor). */
+IOReturn IOPMCopyCPUPowerStatus(CFDictionaryRef *status)
+{
+    if (status)
+        *status = NULL;
+    return kIOReturnNotFound;
+}
+
+IOReturn IOPMGetThermalWarningLevel(uint32_t *level)
+{
+    if (level)
+        *level = 0; /* kIOPMThermalWarningLevelNormal */
+    return kIOReturnNotFound;
+}
+
 IOReturn IOPMCopyAssertionsStatus(CFDictionaryRef *status)
 {
     if (!status)
@@ -355,18 +376,41 @@ CFStringRef IOPSGetProvidingPowerSourceType(CFTypeRef blob)
 }
 
 /* ---- notification ports and user clients: freemac has no IOKit services to
- * send notices or take calls, so none come and calls aren't supported. */
+ * send notices or take calls, so none come and calls aren't supported. A
+ * notification port has a real Mach port and a run loop source, so a
+ * program can wait on either; nothing is ever sent to them. */
 
-typedef struct IONotificationPort *IONotificationPortRef;
-struct IONotificationPort { int unused; };
+struct IONotificationPort {
+    mach_port_t port;
+    CFRunLoopSourceRef source;
+};
+
+static void never(void *info) { (void)info; }
 
 IONotificationPortRef IONotificationPortCreate(mach_port_t mainPort)
 {
     (void)mainPort;
-    return calloc(1, sizeof(struct IONotificationPort));
+    IONotificationPortRef n = calloc(1, sizeof *n);
+    if (!n)
+        return NULL;
+    mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &n->port);
+    CFRunLoopSourceContext c = {.version = 0, .perform = never};
+    n->source = CFRunLoopSourceCreate(NULL, 0, &c);
+    return n;
 }
 
-void IONotificationPortDestroy(IONotificationPortRef notify) { free(notify); }
+void IONotificationPortDestroy(IONotificationPortRef notify)
+{
+    if (!notify)
+        return;
+    if (notify->source) {
+        CFRunLoopSourceInvalidate(notify->source);
+        CFRelease(notify->source);
+    }
+    if (notify->port)
+        mach_port_mod_refs(mach_task_self(), notify->port, MACH_PORT_RIGHT_RECEIVE, -1);
+    free(notify);
+}
 
 void IONotificationPortSetDispatchQueue(IONotificationPortRef notify, void *queue)
 {
@@ -374,16 +418,52 @@ void IONotificationPortSetDispatchQueue(IONotificationPortRef notify, void *queu
     (void)queue;
 }
 
-void *IONotificationPortGetRunLoopSource(IONotificationPortRef notify)
+CFRunLoopSourceRef IONotificationPortGetRunLoopSource(IONotificationPortRef notify)
 {
-    (void)notify;
-    return NULL;
+    return notify ? notify->source : NULL;
 }
 
 mach_port_t IONotificationPortGetMachPort(IONotificationPortRef notify)
 {
-    (void)notify;
-    return 0;
+    return notify ? notify->port : MACH_PORT_NULL;
+}
+
+/* System sleep and wake: this system's notices aren't passed on, so the
+ * program's callback is never called. The connection it gets back stands
+ * for the root power domain and can be closed. */
+#define ROOT_DOMAIN ((io_connect_t)0x504d01)
+
+io_connect_t IORegisterForSystemPower(void *refcon, IONotificationPortRef *thePortRef,
+                                      IOServiceInterestCallback callback, io_object_t *notifier)
+{
+    (void)refcon;
+    (void)callback;
+    if (thePortRef)
+        *thePortRef = IONotificationPortCreate(MACH_PORT_NULL);
+    if (notifier)
+        *notifier = ROOT_DOMAIN;
+    return ROOT_DOMAIN;
+}
+
+IOReturn IODeregisterForSystemPower(io_object_t *notifier)
+{
+    if (notifier)
+        *notifier = IO_OBJECT_NULL;
+    return kIOReturnSuccess;
+}
+
+IOReturn IOAllowPowerChange(io_connect_t kernelPort, intptr_t notificationID)
+{
+    (void)kernelPort;
+    (void)notificationID;
+    return kIOReturnSuccess;
+}
+
+IOReturn IOCancelPowerChange(io_connect_t kernelPort, intptr_t notificationID)
+{
+    (void)kernelPort;
+    (void)notificationID;
+    return kIOReturnSuccess;
 }
 
 kern_return_t IOServiceAddInterestNotification(IONotificationPortRef notifyPort, io_service_t service,

@@ -249,6 +249,12 @@ static uint32_t mac_maskrune(int32_t c, unsigned long mask)
 {
     return (c >= 0 && c < 256 ? default_rune.runetype[c] : 0) & mask;
 }
+/* in a locale: the same table, since Ferry's locales share the C one's character types */
+static uint32_t mac_maskrune_l(int32_t c, unsigned long mask, void *locale)
+{
+    (void)locale;
+    return mac_maskrune(c, mask);
+}
 static int32_t mac_tolower(int32_t c) { return c >= 0 && c < 256 ? default_rune.maplower[c] : c; }
 static int32_t mac_toupper(int32_t c) { return c >= 0 && c < 256 ? default_rune.mapupper[c] : c; }
 
@@ -282,6 +288,7 @@ const struct ferry_symbol ferry_core_symbols[] = {
     {"_DefaultRuneLocale", &default_rune},
     {"_CurrentRuneLocale", &current_rune},
     {"__maskrune", mac_maskrune},
+    {"__maskrune_l", mac_maskrune_l},
     {"__tolower", mac_tolower},
     {"__toupper", mac_toupper},
     {"_Unwind_Resume", ferry_unwind_resume},
@@ -387,6 +394,7 @@ static const struct ferry_symbol *const tables[] = {
     ferry_tlv_symbols, ferry_socket_symbols, ferry_kqueue_symbols, ferry_libc_more_symbols, ferry_oslog_symbols,
     ferry_swift_symbols, ferry_copyfile_symbols, ferry_libc_vlc_symbols,
     ferry_libc_apps_symbols, ferry_libc_audacity_symbols, ferry_libc_blender_symbols,
+    ferry_mach_symbols, ferry_notify_symbols, ferry_libc_electron_symbols,
 };
 
 static void *find_own(const char *name)

@@ -59,6 +59,46 @@ CFStringRef SCDynamicStoreCopyComputerName(SCDynamicStoreRef store, CFStringEnco
 CFStringRef SCDynamicStoreCopyLocalHostName(SCDynamicStoreRef store);
 /* the user at the console, which here is the user this program runs as (freemac 1.224) */
 CFStringRef SCDynamicStoreCopyConsoleUser(SCDynamicStoreRef store, uid_t *uid, gid_t *gid);
+/* The dynamic store (freemac 1.265, foundation/CFElectron.m): the keys apps
+ * watch. The proxies are SCDynamicStoreCopyProxies'; other keys have no
+ * value, and no change is reported, as the network isn't watched here. */
+typedef void (*SCDynamicStoreCallBack)(SCDynamicStoreRef store, CFArrayRef changedKeys, void *info);
+typedef struct {
+    CFIndex version;
+    void *info;
+    const void *(*retain)(const void *info);
+    void (*release)(const void *info);
+    CFStringRef (*copyDescription)(const void *info);
+} SCDynamicStoreContext;
+CFTypeID SCDynamicStoreGetTypeID(void);
+SCDynamicStoreRef SCDynamicStoreCreate(CFAllocatorRef allocator, CFStringRef name, SCDynamicStoreCallBack callout,
+                                       SCDynamicStoreContext *context);
+SCDynamicStoreRef SCDynamicStoreCreateWithOptions(CFAllocatorRef allocator, CFStringRef name,
+                                                  CFDictionaryRef storeOptions, SCDynamicStoreCallBack callout,
+                                                  SCDynamicStoreContext *context);
+CFStringRef SCDynamicStoreKeyCreateNetworkGlobalEntity(CFAllocatorRef allocator, CFStringRef domain, CFStringRef entity);
+CFStringRef SCDynamicStoreKeyCreateNetworkInterfaceEntity(CFAllocatorRef allocator, CFStringRef domain,
+                                                          CFStringRef ifname, CFStringRef entity);
+CFStringRef SCDynamicStoreKeyCreateNetworkServiceEntity(CFAllocatorRef allocator, CFStringRef domain,
+                                                        CFStringRef serviceID, CFStringRef entity);
+CFStringRef SCDynamicStoreKeyCreateProxies(CFAllocatorRef allocator);
+CFPropertyListRef SCDynamicStoreCopyValue(SCDynamicStoreRef store, CFStringRef key);
+CFDictionaryRef SCDynamicStoreCopyMultiple(SCDynamicStoreRef store, CFArrayRef keys, CFArrayRef patterns);
+CFArrayRef SCDynamicStoreCopyKeyList(SCDynamicStoreRef store, CFStringRef pattern);
+CFDictionaryRef SCDynamicStoreCopyProxies(SCDynamicStoreRef store);
+Boolean SCDynamicStoreSetNotificationKeys(SCDynamicStoreRef store, CFArrayRef keys, CFArrayRef patterns);
+Boolean SCDynamicStoreSetDispatchQueue(SCDynamicStoreRef store, void *queue);
+CFRunLoopSourceRef SCDynamicStoreCreateRunLoopSource(CFAllocatorRef allocator, SCDynamicStoreRef store, CFIndex order);
+int SCError(void);
+CFStringRef SCErrorString(int status);
+extern const CFStringRef kSCDynamicStoreDomainState, kSCDynamicStoreDomainSetup, kSCDynamicStoreDomainFile,
+    kSCDynamicStoreDomainPlugin, kSCDynamicStoreDomainPrefs;
+extern const CFStringRef kSCCompNetwork, kSCCompGlobal, kSCCompService, kSCCompInterface, kSCCompAnyRegex;
+extern const CFStringRef kSCEntNetIPv4, kSCEntNetIPv6, kSCEntNetDNS, kSCEntNetProxies, kSCEntNetInterface,
+    kSCEntNetLink, kSCEntNetAirPort;
+extern const CFStringRef kSCPropNetIPv4Addresses, kSCPropNetIPv6Addresses, kSCPropNetInterfaces,
+    kSCPropInterfaceName, kSCPropNetDNSServerAddresses, kSCPropNetDNSSearchDomains, kSCPropNetDNSDomainName,
+    kSCDynamicStorePropNetPrimaryInterface, kSCDynamicStorePropNetPrimaryService;
 #ifdef __cplusplus
 }
 #endif

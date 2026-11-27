@@ -139,7 +139,7 @@ extern struct dispatch_queue_attr_s _dispatch_queue_attr_concurrent;
 extern const struct dispatch_source_type_s _dispatch_source_type_timer, _dispatch_source_type_data_add,
     _dispatch_source_type_data_or, _dispatch_source_type_data_replace, _dispatch_source_type_read,
     _dispatch_source_type_write, _dispatch_source_type_signal, _dispatch_source_type_proc,
-    _dispatch_source_type_vnode;
+    _dispatch_source_type_vnode, _dispatch_source_type_mach_recv, _dispatch_source_type_mach_send;
 __FERRY_END
 
 #ifdef __OBJC__
@@ -186,6 +186,11 @@ typedef unsigned long dispatch_source_proc_flags_t;
 #define DISPATCH_PROC_EXEC 0x20000000ul
 #define DISPATCH_PROC_SIGNAL 0x08000000ul
 #define DISPATCH_SOURCE_TYPE_VNODE (&_dispatch_source_type_vnode)
+/* Mach port sources (freemac 1.265, Ferry 0.88.0) */
+#define DISPATCH_SOURCE_TYPE_MACH_RECV (&_dispatch_source_type_mach_recv)
+#define DISPATCH_SOURCE_TYPE_MACH_SEND (&_dispatch_source_type_mach_send)
+typedef unsigned long dispatch_source_mach_send_flags_t;
+#define DISPATCH_MACH_SEND_DEAD 0x1ul
 typedef unsigned long dispatch_source_vnode_flags_t;
 #define DISPATCH_VNODE_DELETE 0x1ul
 #define DISPATCH_VNODE_WRITE 0x2ul

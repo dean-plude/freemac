@@ -609,6 +609,19 @@ static uint8_t *mac_getsectiondata(const void *mh, const char *segname, const ch
     return (uint8_t *)(uintptr_t)(sect->addr + (uint64_t)slide);
 }
 
+/* The main program's section, at its address in the file (unslid), as
+ * getsectdata's man page says. */
+static char *mac_getsectdata(const char *segname, const char *sectname, unsigned long *size)
+{
+    intptr_t slide;
+    const struct mac_sect64 *sect = mac_find_section(mac_dyld_get_image_header(0), segname, sectname, &slide);
+    if (!sect)
+        return NULL;
+    if (size)
+        *size = (unsigned long)sect->size;
+    return (char *)(uintptr_t)sect->addr;
+}
+
 /* The section's own record, with its unslid address, as the man page says. */
 static const void *mac_getsectbynamefromheader_64(const void *mh, const char *segname, const char *sectname)
 {
@@ -658,6 +671,7 @@ const struct ferry_symbol ferry_dyld_symbols[] = {
     {"_dyld_is_objc_constant", mac_dyld_is_objc_constant},
     {"_dyld_register_func_for_remove_image", mac_dyld_register_func_for_remove_image},
     {"getsectiondata", mac_getsectiondata},
+    {"getsectdata", mac_getsectdata},
     {"getsegmentdata", mac_getsegmentdata},
     {"getsectbynamefromheader_64", mac_getsectbynamefromheader_64},
     {"getsegbyname", mac_getsegbyname},

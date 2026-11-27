@@ -248,6 +248,17 @@ run_one twins "$here/twins.c" "$here/twins.out" -lz -lbz2 -licucore -lxml2
 # 0.45.0): the SDK's availability, target and BSD headers, zlib's and
 # Mach-O's, and malloc zones, basename, extended attributes and scandir.
 run_one libsystem_more "$here/libsystem_more.c" "$here/libsystem_more.out" -lz
+# malloc zones as PartitionAlloc reorders them and vm_region_64, for
+# Electron apps (freemac 1.265)
+run_one libsystem_electron "$here/libsystem_electron.c" "$here/libsystem_electron.out"
+# Mach ports and messages in one process, with kevent's EVFILT_MACHPORT and
+# dispatch's mach sources, which Chromium carries its messages on (1.265)
+run_one mach_ports "$here/mach_ports.c" "$here/mach_ports.out"
+# Core Foundation heaps and tokenizers, the dynamic store, Security's
+# identities and trust settings, vDSP and symlink paths, which Electron's
+# Chromium calls at start (1.265)
+run_one electron_calls "$here/electron/calls.m" "$here/electron/calls.out" -fobjc-arc -framework Foundation \
+    -framework Security -framework Accelerate -framework SystemConfiguration
 # fts, statfs, asl, os_log, O_SYMLINK and the wait macros, for Sparkle and
 # the apps (1.223).
 run_one libsystem_apps "$here/libsystem_apps.c" "$here/libsystem_apps.out"

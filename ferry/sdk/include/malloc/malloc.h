@@ -27,5 +27,11 @@ void malloc_zone_free(malloc_zone_t *zone, void *ptr);
 void malloc_set_zone_name(malloc_zone_t *zone, const char *name);
 const char *malloc_get_zone_name(malloc_zone_t *zone);
 size_t malloc_zone_pressure_relief(malloc_zone_t *zone, size_t goal);
+/* the list of zones, the default first (freemac 1.264): registering adds a
+ * zone at the end, unregistering moves the last zone into its place */
+typedef int memory_reader_t(unsigned task, unsigned long address, unsigned long size, void **local_memory);
+int malloc_get_all_zones(unsigned task, memory_reader_t reader, unsigned long **addresses, unsigned *count);
+void malloc_zone_register(malloc_zone_t *zone);
+void malloc_zone_unregister(malloc_zone_t *zone);
 __FERRY_END
 #endif

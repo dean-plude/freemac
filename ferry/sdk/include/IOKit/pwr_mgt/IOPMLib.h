@@ -47,5 +47,16 @@ IOReturn IOPMAssertionDeclareUserActivity(CFStringRef assertionName, IOPMUserAct
 IOReturn IOPMCopyAssertionsByProcess(CFDictionaryRef *assertionsByPID);
 IOReturn IOPMCopyAssertionsStatus(CFDictionaryRef *assertionsStatus);
 
+/* System sleep and wake (freemac 1.265): registering works, and the
+ * callback is never called. */
+typedef void (*IOServiceInterestCallback)(void *refcon, io_service_t service, uint32_t messageType,
+                                          void *messageArgument);
+io_connect_t IORegisterForSystemPower(void *refcon, IONotificationPortRef *thePortRef,
+                                      IOServiceInterestCallback callback, io_object_t *notifier);
+IOReturn IODeregisterForSystemPower(io_object_t *notifier);
+IOReturn IOAllowPowerChange(io_connect_t kernelPort, intptr_t notificationID);
+IOReturn IOCancelPowerChange(io_connect_t kernelPort, intptr_t notificationID);
+IOReturn IOPMCopyCPUPowerStatus(CFDictionaryRef *cpuPowerStatus);
+IOReturn IOPMGetThermalWarningLevel(uint32_t *thermalLevel);
 __FERRY_END
 #endif

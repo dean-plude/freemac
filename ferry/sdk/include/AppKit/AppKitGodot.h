@@ -32,9 +32,6 @@
 @interface NSWindow (FerryGodot)
 @property (readonly) NSUserInterfaceLayoutDirection windowTitlebarLayoutDirection;
 @end
-@interface NSScreen (FerryGodot)
-@property (readonly) NSInteger maximumFramesPerSecond;
-@end
 @interface NSWorkspace (FerryGodot)
 - (void)openURLs:(NSArray<NSURL *> *)urls withApplicationAtURL:(NSURL *)applicationURL
         configuration:(NSWorkspaceOpenConfiguration *)configuration

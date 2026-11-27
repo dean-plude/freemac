@@ -825,5 +825,43 @@ enum { kSecLineLength64 = 64, kSecLineLength76 = 76 };
 SecTransformRef SecEncodeTransformCreate(CFTypeRef encodeType, CFErrorRef *error) CF_RETURNS_RETAINED;
 SecTransformRef SecDecodeTransformCreate(CFTypeRef decodeType, CFErrorRef *error) CF_RETURNS_RETAINED;
 
+/* ---- identities, keychain callbacks, trust settings, type IDs (freemac 1.265,
+ * security/SecIdentity.m). Ferry keeps no identities and no trust settings. */
+typedef struct __SecIdentitySearch *SecIdentitySearchRef;
+CFTypeID SecCertificateGetTypeID(void);
+CFTypeID SecPolicyGetTypeID(void);
+CFTypeID SecTrustGetTypeID(void);
+CFTypeID SecIdentityGetTypeID(void);
+CFTypeID SecIdentitySearchGetTypeID(void);
+extern const CFStringRef kSecPolicyOid, kSecPolicyName, kSecPolicyClient, kSecPolicyRevocationFlags,
+    kSecPolicyTeamIdentifier, kSecPolicyAppleX509Basic, kSecPolicyAppleSSL;
+CFDictionaryRef SecPolicyCopyProperties(SecPolicyRef policyRef) CF_RETURNS_RETAINED;
+OSStatus SecIdentitySearchCreate(CFTypeRef keychainOrArray, uint32_t keyUsage, SecIdentitySearchRef *searchRef);
+OSStatus SecIdentitySearchCopyNext(SecIdentitySearchRef searchRef, SecIdentityRef *identity);
+SecIdentityRef SecIdentityCopyPreferred(CFStringRef name, CFArrayRef keyUsage, CFArrayRef validIssuers);
+OSStatus SecIdentityCopyPreference(CFStringRef name, uint32_t keyUsage, CFArrayRef validIssuers,
+                                   SecIdentityRef *identity);
+OSStatus SecIdentitySetPreferred(SecIdentityRef identity, CFStringRef name, CFArrayRef keyUsage);
+OSStatus SecIdentityCreateWithCertificate(CFTypeRef keychainOrArray, SecCertificateRef certificateRef,
+                                          SecIdentityRef *identityRef);
+OSStatus SecIdentityCopyCertificate(SecIdentityRef identityRef, SecCertificateRef *certificateRef);
+OSStatus SecIdentityCopyPrivateKey(SecIdentityRef identityRef, SecKeyRef *privateKeyRef);
+typedef uint32_t SecKeychainEvent;
+typedef uint32_t SecKeychainEventMask;
+typedef OSStatus (*SecKeychainCallback)(SecKeychainEvent keychainEvent, void *info, void *context);
+OSStatus SecKeychainAddCallback(SecKeychainCallback callbackFunction, SecKeychainEventMask eventMask, void *userContext);
+OSStatus SecKeychainRemoveCallback(SecKeychainCallback callbackFunction);
+typedef uint32_t SecTrustSettingsDomain;
+enum { kSecTrustSettingsDomainUser = 0, kSecTrustSettingsDomainAdmin = 1, kSecTrustSettingsDomainSystem = 2 };
+OSStatus SecTrustSettingsCopyCertificates(SecTrustSettingsDomain domain, CFArrayRef *certArray);
+OSStatus SecTrustSettingsCopyTrustSettings(SecCertificateRef certRef, SecTrustSettingsDomain domain,
+                                           CFArrayRef *trustSettings);
+OSStatus SecTrustSettingsCopyModificationDate(SecCertificateRef certRef, SecTrustSettingsDomain domain,
+                                              CFDateRef *modificationDate);
+OSStatus SecTrustSettingsSetTrustSettings(SecCertificateRef certRef, SecTrustSettingsDomain domain,
+                                          CFTypeRef trustSettingsDictOrArray);
+OSStatus SecRequirementCopyData(SecRequirementRef requirement, SecCSFlags flags, CFDataRef *data);
+OSStatus SecRequirementCreateWithData(CFDataRef data, SecCSFlags flags, SecRequirementRef *requirement);
+
 __FERRY_END
 #endif

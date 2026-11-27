@@ -876,7 +876,6 @@ static int mac_vm_page_shift = 12;
 
 static mac_port_t mac_mach_host_self(void) { return MAC_HOST_PORT; }
 static mac_port_t mac_mach_task_self(void) { return MAC_TASK_PORT; }
-static int mac_mach_port_deallocate(mac_port_t task, mac_port_t name) { return KERN_SUCCESS; }
 
 static int mac_host_page_size(mac_port_t host, uintptr_t *size)
 {
@@ -1202,8 +1201,12 @@ static int mac_vm_deallocate(mac_port_t task, uintptr_t addr, uintptr_t size)
 {
     if (task != MAC_TASK_PORT)
         return MAC_KERN_INVALID_ARGUMENT;
-    if (size)
-        munmap((void *)(addr & ~(uintptr_t)(getpagesize() - 1)), size + (addr & (uintptr_t)(getpagesize() - 1)));
+    if (size) {
+        uintptr_t a = addr & ~(uintptr_t)(getpagesize() - 1);
+        size_t len = size + (addr & (uintptr_t)(getpagesize() - 1));
+        ferry_mach_unmapped(a, len);
+        munmap((void *)a, len);
+    }
     return 0;
 }
 
@@ -1229,6 +1232,104 @@ static int mac_vm_remap(mac_port_t task, uintptr_t *addr, uintptr_t size, uintpt
     if (max)
         *max = MAC_VM_PROT_READ | MAC_VM_PROT_WRITE | MAC_VM_PROT_EXECUTE;
     return 0;
+}
+
+/* ---- vm_region_64 and mach_vm_region (freemac 1.264) ----------------------------
+ * The region at or after an address, from this system's /proc/self/maps,
+ * with the basic information Apple's developer documentation of
+ * vm_region_basic_info_64 describes: Chromium
+ * (in every Electron app) asks this of its own stacks and heap. Other
+ * flavors are refused. */
+#define MAC_KERN_INVALID_ADDRESS 1
+#define MAC_VM_REGION_BASIC_INFO_64 9
+#define MAC_VM_REGION_BASIC_INFO 10
+
+#pragma pack(push, 4)
+struct mac_vm_region_basic_info_64 {
+    int protection, max_protection;
+    unsigned inheritance;
+    unsigned shared, reserved;
+    uint64_t offset;
+    int behavior;
+    unsigned short user_wired_count;
+};
+#pragma pack(pop)
+_Static_assert(sizeof(struct mac_vm_region_basic_info_64) == 36, "vm_region_basic_info_64");
+
+static int region_find(uint64_t *address, uint64_t *size, struct mac_vm_region_basic_info_64 *info)
+{
+    FILE *f = fopen("/proc/self/maps", "re");
+    if (!f)
+        return MAC_KERN_INVALID_ADDRESS;
+    char line[512];
+    int found = 0;
+    while (fgets(line, sizeof line, f)) {
+        unsigned long long lo, hi, off;
+        char perms[8];
+        if (sscanf(line, "%llx-%llx %7s %llx", &lo, &hi, perms, &off) != 4)
+            continue;
+        if (hi <= *address)
+            continue;
+        memset(info, 0, sizeof *info);
+        info->protection = (perms[0] == 'r' ? MAC_VM_PROT_READ : 0) | (perms[1] == 'w' ? MAC_VM_PROT_WRITE : 0) |
+                           (perms[2] == 'x' ? MAC_VM_PROT_EXECUTE : 0);
+        info->max_protection = MAC_VM_PROT_READ | MAC_VM_PROT_WRITE | MAC_VM_PROT_EXECUTE;
+        info->inheritance = 1; /* VM_INHERIT_COPY */
+        info->shared = perms[3] == 's';
+        info->offset = off;
+        *address = lo;
+        *size = hi - lo;
+        found = 1;
+        break;
+    }
+    fclose(f);
+    return found ? 0 : MAC_KERN_INVALID_ADDRESS;
+}
+
+static int region_common(mac_port_t task, uint64_t *address, uint64_t *size, int flavor, void *info,
+                         unsigned *count, mac_port_t *object)
+{
+    if (task != MAC_TASK_PORT || !address || !size || !info || !count)
+        return MAC_KERN_INVALID_ARGUMENT;
+    /* the older flavor's offset is 32 bits: 8 words where the 64-bit one has 9 */
+    unsigned words = flavor == MAC_VM_REGION_BASIC_INFO_64 ? 9 : flavor == MAC_VM_REGION_BASIC_INFO ? 8 : 0;
+    if (!words || *count < words)
+        return MAC_KERN_INVALID_ARGUMENT;
+    struct mac_vm_region_basic_info_64 b;
+    int r = region_find(address, size, &b);
+    if (r)
+        return r;
+    if (words == 9)
+        memcpy(info, &b, sizeof b);
+    else {
+        uint32_t w[8] = {(uint32_t)b.protection, (uint32_t)b.max_protection, b.inheritance, b.shared,
+                         b.reserved, (uint32_t)b.offset, (uint32_t)b.behavior, b.user_wired_count};
+        memcpy(info, w, sizeof w);
+    }
+    *count = words;
+    if (object)
+        *object = 0;
+    return 0;
+}
+
+static int mac_vm_region_64(mac_port_t task, uintptr_t *address, uintptr_t *size, int flavor, void *info,
+                            unsigned *count, mac_port_t *object)
+{
+    if (!address || !size)
+        return MAC_KERN_INVALID_ARGUMENT;
+    uint64_t a = *address, n = 0;
+    int r = region_common(task, &a, &n, flavor, info, count, object);
+    if (!r) {
+        *address = (uintptr_t)a;
+        *size = (uintptr_t)n;
+    }
+    return r;
+}
+
+static int mac_mach_vm_region(mac_port_t task, uint64_t *address, uint64_t *size, int flavor, void *info,
+                              unsigned *count, mac_port_t *object)
+{
+    return region_common(task, address, size, flavor, info, count, object);
 }
 
 /* ---- waiting on an address: __ulock_wait, __ulock_wait2, __ulock_wake ---------- */
@@ -1428,6 +1529,10 @@ const struct ferry_symbol ferry_sysctl_symbols[] = {
     {"vm_allocate", mac_vm_allocate},
     {"vm_deallocate", mac_vm_deallocate},
     {"vm_remap", mac_vm_remap},
+    {"mach_vm_remap", mac_vm_remap},
+    {"vm_region_64", mac_vm_region_64},
+    {"vm_region", mac_vm_region_64},
+    {"mach_vm_region", mac_mach_vm_region},
     {"sysctl", mac_sysctl},
     {"sysctlbyname", mac_sysctlbyname},
     {"sysctlnametomib", mac_sysctlnametomib},
@@ -1439,7 +1544,6 @@ const struct ferry_symbol ferry_sysctl_symbols[] = {
     {"vm_page_size", &mac_vm_page_size},
     {"vm_page_mask", &mac_vm_page_mask},
     {"vm_page_shift", &mac_vm_page_shift},
-    {"mach_port_deallocate", mac_mach_port_deallocate},
     {"host_page_size", mac_host_page_size},
     {"host_statistics", mac_host_statistics},
     {"host_statistics64", mac_host_statistics64},

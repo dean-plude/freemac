@@ -738,6 +738,19 @@ static const char *case_locale(id locale)
     return abs ? [@"/" stringByAppendingString:joined] : ([joined length] ? joined : @".");
 }
 - (BOOL)isAbsolutePath { return [self hasPrefix:@"/"] || [self hasPrefix:@"~"]; }
+/* The path with its symbolic links followed (freemac 1.265): an absolute path
+ * that exists comes back as the file system has it; any other path is only
+ * standardized, as Apple's documentation describes. */
+- (NSString *)stringByResolvingSymlinksInPath
+{
+    NSString *s = [self stringByExpandingTildeInPath];
+    if (![s hasPrefix:@"/"])
+        return [s stringByStandardizingPath];
+    char real[PATH_MAX];
+    if (realpath([s fileSystemRepresentation], real))
+        return [NSString stringWithUTF8String:real];
+    return [s stringByStandardizingPath];
+}
 @end
 
 /* ---- the concrete immutable string ---------------------------------------------------- */
