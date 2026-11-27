@@ -1,0 +1,6 @@
+multi-line label: wraps 1, line break 0, single line 0
+clipping label: wraps 0, line break 2, single line 0
+single-line label: wraps 0, line break 0, single line 1
+text field: 2 lines
+date with locale: has 1971 1, plain without one 1
+exit=0

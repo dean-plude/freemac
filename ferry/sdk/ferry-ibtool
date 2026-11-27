@@ -501,6 +501,8 @@ class Compiler:
         if breaks in ("wordWrapping", "charWrapping") and not yes(cell, "scrollable") and \
                 not yes(cell, "usesSingleLineMode"):
             f |= 0x40
+        if yes(cell, "usesSingleLineMode"):
+            f |= 0x200
         if not yes(cell, "enabled", True):
             f |= 0x20000000
         if cell.get("state") == "on":

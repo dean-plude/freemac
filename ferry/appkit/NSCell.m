@@ -24,6 +24,7 @@ enum {
     CELL_SCROLLABLE = 0x00100000u,
     CELL_CONTINUOUS = 0x00080000u,
     CELL_WRAPS = 0x00000040u, /* written for wrapping cells; read as "truncates the last line" */
+    CELL_SINGLE_LINE = 0x00000200u,
 };
 
 static id coder_value(NSCoder *c, NSString *key)
@@ -141,6 +142,7 @@ static void cell_changed(NSCell *cell, NSView *view)
         _scrollable = (f & CELL_SCROLLABLE) != 0;
         _continuous = (f & CELL_CONTINUOUS) != 0;
         _wraps = (f & CELL_WRAPS) != 0;
+        _singleLine = (f & CELL_SINGLE_LINE) != 0;
     }
     if ([coder containsValueForKey:@"NSCellFlags2"]) {
         unsigned f = (unsigned)[coder decodeInt64ForKey:@"NSCellFlags2"];
@@ -157,12 +159,14 @@ static void cell_changed(NSCell *cell, NSView *view)
      * documents wraps and lineBreakMode going together; the 0x40 bit of the
      * first word is "truncates the last visible line" (freemac 1.260, which
      * had taken it for wrapping until Rectangle's labels showed otherwise).
-     * A scrolling field never wraps. */
+     * A scrolling field never wraps, nor does one in single-line mode
+     * (0x200; Sparkle's "Check for updates automatically?" message,
+     * freemac 1.NEXT, is a cell with neither, which wraps). */
     if ([coder containsValueForKey:@"NSCellFlags2"]) {
         BOOL wrapping = _lineBreak == NSLineBreakByWordWrapping || _lineBreak == NSLineBreakByCharWrapping;
         if (_scrollable && wrapping)
             _lineBreak = NSLineBreakByClipping;
-        _wraps = wrapping && !_scrollable;
+        _wraps = wrapping && !_scrollable && !_singleLine;
     } else if (!_wraps && _lineBreak == NSLineBreakByWordWrapping)
         _lineBreak = _scrollable ? NSLineBreakByClipping : NSLineBreakByTruncatingTail;
     if ([coder containsValueForKey:@"NSState"])
