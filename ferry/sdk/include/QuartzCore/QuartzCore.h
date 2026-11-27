@@ -3,10 +3,17 @@
  * for freemac from Apple's public API documentation; not Apple's header.
  * Every class and call declared here is implemented in ferry/quartzcore.
  * Layers are drawn with Ferry's own Core Graphics, on the program's one
- * thread; animations are stepped by a timer on the main run loop. */
+ * thread; animations are stepped by a timer on the main run loop. From C
+ * (VLC's cvpx module, freemac 1.NEXT) only the time and 3D transform calls
+ * are declared, with Core Video, as on a Mac; the rest is Objective-C. */
 #ifndef _FERRY_QUARTZCORE_H_
 #define _FERRY_QUARTZCORE_H_
+#ifdef __OBJC__
 #import <Foundation/Foundation.h>
+#else
+#include <CoreFoundation/CoreFoundation.h>
+#include <CoreVideo/CoreVideo.h>
+#endif
 #include <CoreGraphics/CoreGraphics.h>
 #include <CoreText/CoreText.h>
 
@@ -43,6 +50,7 @@ CGAffineTransform CATransform3DGetAffineTransform(CATransform3D t);
 
 __FERRY_END
 
+#ifdef __OBJC__
 @interface NSValue (CATransform3DAdditions)
 + (NSValue *)valueWithCATransform3D:(CATransform3D)t;
 @property (readonly) CATransform3D CATransform3DValue;
@@ -503,5 +511,7 @@ CAFrameRateRange CAFrameRateRangeMake(float minimum, float maximum, float prefer
 
 /* OpenGL layers (freemac 1.235) */
 #import <QuartzCore/CAOpenGLLayer.h>
+
+#endif /* __OBJC__ */
 
 #endif

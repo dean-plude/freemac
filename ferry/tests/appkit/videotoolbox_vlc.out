@@ -1,0 +1,8 @@
+htonl: 44332211
+core video from QuartzCore: 1
+format: 0
+decoder: -12906 (no decoder), session none
+hardware H.264: 0, takes new format: 0
+pixel transfer: -12905 (not supported), session none
+atoms key: 1, deinterlace key: 1
+exit=0
