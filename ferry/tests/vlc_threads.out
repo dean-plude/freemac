@@ -5,5 +5,5 @@ run in mode with nothing to do: finished 1
 CFRunLoopRun on the main thread: ran both blocks 1, then returned
 nil in C: 1
 turns taken through a condition: 40000
-an unsignalled wait came back to look again: 1
+an unsignalled wait goes on waiting: 1, then the signal ends it: 1
 exit=0
