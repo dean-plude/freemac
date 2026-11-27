@@ -1198,6 +1198,7 @@ Ferry 0.85.0: IINA 1.3.5, the video player written in Swift, runs from its offic
 | 7 | A system framework found by bundle identifier, so mpv finds OpenGL's functions | Ferry Foundation | done |
 | 8 | Swift's private storage classes archive and unarchive as `NSArray` and the like | Ferry Foundation | done |
 | 9 | IINA 1.3.5 opens a video and plays it | Ferry / IINA | done |
+| 10 | Metal, in software (from the Blender work): shaders built when the app runs, so clang and lld are now on the ISO and in Ferry's package | Ferry Metal, packaging | done |
 
 ## 1.261 "Swift apps run from the download" (done)
 

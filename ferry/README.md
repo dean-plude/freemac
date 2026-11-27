@@ -587,8 +587,9 @@ without a window.
   formats) load, and real apps start, but none runs all the way yet:
   [docs/ferry-compat.md](../docs/ferry-compat.md) lists the apps tried and
   what stops each one. These are being added step by step (see
-  [docs/ferry-gui.md](../docs/ferry-gui.md)). SwiftUI, Metal and other large
-  frameworks are further off. Core Data is there (from Ferry 0.35.0), but
+  [docs/ferry-gui.md](../docs/ferry-gui.md)). SwiftUI and other large
+  frameworks are further off. Metal draws, in software
+  ([metal/README.md](metal/README.md)). Core Data is there (from Ferry 0.35.0), but
   compiled models aren't read yet, so an app that ships only a `.momd`
   stops there.
 - **Apple silicon (arm64) programs.** Ferry runs Intel programs only, and says
