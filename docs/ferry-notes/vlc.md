@@ -398,6 +398,38 @@ All 32 windows in VLC's nibs have a title bar. VLC makes only three
 borderless windows itself (full screen, the blackout window, and the
 video window with decorations off), and those stay undecorated.
 
+## VLC's updater, from Sparkle's own download (freemac 1.NEXT)
+
+VLC's own Mac build ships the Sparkle 1.16.0 updater
+(contrib/src/sparkle/rules.mak). VLC's disk image can't be fetched here, but
+Sparkle's official prebuilt release can, from its GitHub releases page
+(Sparkle-1.16.0.tar.bz2), so that was the "download an app and run it"
+test: VLC configured with HAVE_SPARKLE, its macosx module linked against the
+downloaded Sparkle.framework, and the framework put in VLC.app's
+Contents/Frameworks as on a Mac. Nothing of Sparkle's is built or changed.
+
+- VLC starts with it. On the second launch Sparkle asks "Check for updates
+  automatically?", and Check for Update... opens Sparkle's own windows; here
+  the check ends in Sparkle's "Update Error!" alert, because this test
+  machine can't reach update.videolan.org.
+- The prompt's message showed on one line, cut off: Xcode writes a
+  multi-line label as a word-wrapping text cell that neither scrolls nor
+  keeps to one line, with no further mark. freemac 1.260 reads wrapping
+  from the line break mode, which fixes it; on top of that, a cell in
+  single-line mode (0x200 in the cell flags, which ferry-ibtool now writes
+  too) stays on one line. Test: appkit/sparkle_prompt.
+- VLC's Preferences show the last check with NSDate's
+  descriptionWithLocale:, which Ferry didn't have.
+- Sparkle names a few things Ferry doesn't have yet, all used only to
+  install an update: libxar (for .pkg updates), hash_create and hash_search,
+  and objc_initializeClassPair, object_getIndexedIvars and
+  objc_copyClassNamesForImage.
+- The prompt opens where the nib puts it, overlapping VLC's window, and with
+  no title bar on the bare test display (the desktop's compositor draws
+  title bars). Whether a Mac centres it there is unchecked.
+- freemac's own VLC build (ferry/apps/vlc.sh) still configures with
+  --disable-sparkle.
+
 ## Still to do
 
 - The MIDI module (AudioToolbox's AUGraph) doesn't build yet.
