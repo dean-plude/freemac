@@ -560,12 +560,77 @@ static BOOL literal_unsigned(char t) { return strchr("CSILQ", t) != NULL; }
 - (NSString *)stringValue { return [[self _ferryNumber] stringValue]; }
 @end
 
+/* ---- NSConstantDoubleNumber, NSConstantFloatNumber: literals such as @1.5 ----
+ * The class, then the value itself (kitty's fast_data_types holds these). */
+@interface NSConstantDoubleNumber : NSNumber
+@end
+@interface NSConstantFloatNumber : NSNumber
+@end
+struct constant_double { Class isa; double value; };
+struct constant_float { Class isa; float value; };
+
+@implementation NSConstantDoubleNumber
+- (id)retain { return self; }
+- (oneway void)release {}
+- (id)autorelease { return self; }
+- (NSUInteger)retainCount { return NSUIntegerMax; }
+- (void)dealloc { /* kept in the program, never freed */ if (0) [super dealloc]; }
+- (id)copyWithZone:(NSZone *)zone { return self; }
+- (const char *)objCType { return "d"; }
+- (double)doubleValue { return ((const struct constant_double *)(const void *)self)->value; }
+- (float)floatValue { return (float)[self doubleValue]; }
+- (long long)longLongValue { return (long long)[self doubleValue]; }
+- (unsigned long long)unsignedLongLongValue { return (unsigned long long)[self doubleValue]; }
+- (BOOL)boolValue { return [self doubleValue] != 0; }
+- (void)getValue:(void *)value { *(double *)value = [self doubleValue]; }
+- (NSNumber *)_ferryNumber { return [NSNumber numberWithDouble:[self doubleValue]]; }
+- (NSComparisonResult)compare:(NSNumber *)other { return [[self _ferryNumber] compare:other]; }
+- (BOOL)isEqual:(id)other { return other == self || [[self _ferryNumber] isEqual:other]; }
+- (NSUInteger)hash { return [[self _ferryNumber] hash]; }
+- (NSString *)description { return [[self _ferryNumber] description]; }
+- (NSString *)stringValue { return [[self _ferryNumber] stringValue]; }
+@end
+
+@implementation NSConstantFloatNumber
+- (id)retain { return self; }
+- (oneway void)release {}
+- (id)autorelease { return self; }
+- (NSUInteger)retainCount { return NSUIntegerMax; }
+- (void)dealloc { /* kept in the program, never freed */ if (0) [super dealloc]; }
+- (id)copyWithZone:(NSZone *)zone { return self; }
+- (const char *)objCType { return "f"; }
+- (float)floatValue { return ((const struct constant_float *)(const void *)self)->value; }
+- (double)doubleValue { return [self floatValue]; }
+- (long long)longLongValue { return (long long)[self floatValue]; }
+- (unsigned long long)unsignedLongLongValue { return (unsigned long long)[self floatValue]; }
+- (BOOL)boolValue { return [self floatValue] != 0; }
+- (void)getValue:(void *)value { *(float *)value = [self floatValue]; }
+- (NSNumber *)_ferryNumber { return [NSNumber numberWithFloat:[self floatValue]]; }
+- (NSComparisonResult)compare:(NSNumber *)other { return [[self _ferryNumber] compare:other]; }
+- (BOOL)isEqual:(id)other { return other == self || [[self _ferryNumber] isEqual:other]; }
+- (NSUInteger)hash { return [[self _ferryNumber] hash]; }
+- (NSString *)description { return [[self _ferryNumber] description]; }
+- (NSString *)stringValue { return [[self _ferryNumber] stringValue]; }
+@end
+
 static id ferry_plain_number(id n)
 {
-    static Class constant;
-    if (!constant)
-        constant = [NSConstantIntegerNumber class];
-    return n && object_getClass(n) == constant ? [(NSConstantIntegerNumber *)n _ferryNumber] : n;
+    static Class integer, dbl, flt;
+    if (!integer) {
+        integer = [NSConstantIntegerNumber class];
+        dbl = [NSConstantDoubleNumber class];
+        flt = [NSConstantFloatNumber class];
+    }
+    if (!n)
+        return n;
+    Class c = object_getClass(n);
+    if (c == integer)
+        return [(NSConstantIntegerNumber *)n _ferryNumber];
+    if (c == dbl)
+        return [(NSConstantDoubleNumber *)n _ferryNumber];
+    if (c == flt)
+        return [(NSConstantFloatNumber *)n _ferryNumber];
+    return n;
 }
 
 /* Newer clang refers to the two booleans' own storage, __kCFBooleanTrue and

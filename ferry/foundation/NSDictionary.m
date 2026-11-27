@@ -532,6 +532,58 @@ static void put_pairs(struct fmap *m, const id *objects, const id *keys, NSUInte
 }
 @end
 
+/* ---- NSConstantDictionary: a literal dictionary kept in the program ------------
+ * Newer clang writes a literal such as @{@"a": @YES} into the program itself,
+ * as an object of the class NSConstantDictionary: the class, an options word,
+ * the count, then pointers to the keys and to the objects. kitty's GLFW holds
+ * these. The fields sit right after the class pointer, read by hand. */
+@interface NSConstantDictionary : NSDictionary
+@end
+
+struct ferry_constant_dictionary {
+    Class isa;
+    NSUInteger options;
+    NSUInteger count;
+    const id *keys;
+    const id *objects;
+};
+#define CONSTANT_DICT(d) ((const struct ferry_constant_dictionary *)(const void *)(d))
+
+@implementation NSConstantDictionary
+- (id)retain { return self; }
+- (oneway void)release {}
+- (id)autorelease { return self; }
+- (NSUInteger)retainCount { return NSUIntegerMax; }
+- (void)dealloc { /* kept in the program, never freed */ if (0) [super dealloc]; }
+- (id)copyWithZone:(NSZone *)zone { return self; }
+- (NSUInteger)count { return CONSTANT_DICT(self)->count; }
+- (id)objectForKey:(id)key
+{
+    if (!key)
+        return nil;
+    const struct ferry_constant_dictionary *d = CONSTANT_DICT(self);
+    for (NSUInteger i = 0; i < d->count; i++)
+        if (d->keys[i] == key || [d->keys[i] isEqual:key])
+            return d->objects[i];
+    return nil;
+}
+- (NSEnumerator *)keyEnumerator
+{
+    return [[NSArray arrayWithObjects:CONSTANT_DICT(self)->keys count:CONSTANT_DICT(self)->count] objectEnumerator];
+}
+- (NSUInteger)countByEnumeratingWithState:(NSFastEnumerationState *)state objects:(id *)buffer count:(NSUInteger)len
+{
+    const struct ferry_constant_dictionary *d = CONSTANT_DICT(self);
+    state->mutationsPtr = &never_mutated;
+    if (state->state >= d->count)
+        return 0;
+    state->itemsPtr = (id *)d->keys + state->state;
+    NSUInteger n = d->count - state->state;
+    state->state = d->count;
+    return n;
+}
+@end
+
 F_EXPORT id __NSDictionary0__;
 id __NSDictionary0__;
 

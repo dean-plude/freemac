@@ -34,6 +34,7 @@ NSDictionary *GFontDescriptorAttributes(CTFontDescriptorRef descriptor);
     unsigned index;
     float weight;   /* 100 to 900 */
     BOOL italic;
+    BOOL mono;      /* every glyph as wide as the next: a terminal's font */
 }
 @end
 @implementation GFace
@@ -93,6 +94,9 @@ static void read_file(NSString *path, NSMutableArray *out)
             f->postscript = [face_name(hf, 6) ?: [f->full stringByReplacingOccurrencesOfString:@" " withString:@""]
                 copy];
             hb_font_t *font = hb_font_create(hf);
+            hb_codepoint_t gi, gm;
+            if (hb_font_get_nominal_glyph(font, 'i', &gi) && hb_font_get_nominal_glyph(font, 'M', &gm))
+                f->mono = hb_font_get_glyph_h_advance(font, gi) == hb_font_get_glyph_h_advance(font, gm);
             f->weight = hb_style_get_value(font, HB_TAG('w', 'g', 'h', 't'));
             f->italic = hb_style_get_value(font, HB_TAG('i', 't', 'a', 'l')) > 0 ||
                         hb_style_get_value(font, HB_TAG('s', 'l', 'n', 't')) != 0;
@@ -137,6 +141,8 @@ static BOOL same(NSString *a, id b)
 
 /* the installed face a font name names: its PostScript name, its full name,
  * or the name Ferry's CTFontCopyPostScriptName gives it */
+static NSArray *stand_in_faces(void);
+
 static GFace *face_named(NSString *name)
 {
     if (![name isKindOfClass:[NSString class]])
@@ -147,6 +153,9 @@ static GFace *face_named(NSString *name)
             return f;
     for (GFace *f in faces)
         if (same(f->full, name) || same(f->ferryName, name))
+            return f;
+    for (GFace *f in stand_in_faces())
+        if (same(f->postscript, name) || same(f->full, name))
             return f;
     return nil;
 }
@@ -179,7 +188,8 @@ static NSDictionary *face_attributes(GFace *f)
             (id)kCTFontWeightTrait : @(weight_trait(f->weight)),
             (id)kCTFontSlantTrait : @(f->italic ? 0.07 : 0.0),
             (id)kCTFontSymbolicTrait : @((f->italic ? kCTFontTraitItalic : 0) |
-                                        (f->weight >= 600 ? kCTFontTraitBold : 0)),
+                                        (f->weight >= 600 ? kCTFontTraitBold : 0) |
+                                        (f->mono ? kCTFontTraitMonoSpace : 0)),
         },
     };
 }
@@ -198,6 +208,7 @@ id GFontInstalledFaceAttribute(NSDictionary *attributes, NSString *attribute)
 @interface GFontCollection : NSObject {
 @public
     NSArray *descriptors;
+    BOOL available;   /* the list of every font: matching it gives the list itself */
 }
 @end
 @implementation GFontCollection
@@ -216,16 +227,67 @@ CTFontCollectionRef CTFontCollectionCreateWithFontDescriptors(CFArrayRef descrip
     return (CTFontCollectionRef)c;
 }
 
+/* The classic Mac families an app may look for by name in the list of
+ * available fonts (kitty takes Menlo when nothing else fits). Where one isn't
+ * installed, its stand-in's faces are listed under the Mac name too, with
+ * Mac-style PostScript names ("Menlo-Bold") that Ferry maps back to them. */
+static const char *const listed_mac_families[] = {"Menlo", "Monaco", "Courier", "Helvetica", "Helvetica Neue", "Times"};
+
+static NSArray *stand_in_faces(void)
+{
+    static NSArray *listed;
+    if (listed)
+        return listed;
+    NSMutableArray *out = [[NSMutableArray alloc] init];
+    NSArray *faces = installed_faces();
+    for (size_t i = 0; i < sizeof listed_mac_families / sizeof listed_mac_families[0]; i++) {
+        NSString *mac = @(listed_mac_families[i]);
+        BOOL installed = NO;
+        for (GFace *f in faces)
+            if (same(f->family, mac))
+                installed = YES;
+        NSString *standin = installed ? nil : GFontMacFamily(mac);
+        GFont *font = standin ? GFontCreate(standin, 400, 0, 12) : nil;
+        NSString *family = font ? [[font->family copy] autorelease] : nil;
+        [font release];
+        for (GFace *f in faces) {
+            if (!family || !same(f->family, family))
+                continue;
+            GFace *g = [[GFace alloc] init];
+            g->path = [f->path copy];
+            g->index = f->index;
+            g->family = [mac copy];
+            g->style = [f->style copy];
+            BOOL regular = [f->style caseInsensitiveCompare:@"Regular"] == NSOrderedSame || ![f->style length];
+            g->full = regular ? [mac copy] : [[NSString alloc] initWithFormat:@"%@ %@", mac, f->style];
+            g->postscript = [[NSString alloc] initWithFormat:@"%@-%@",
+                [mac stringByReplacingOccurrencesOfString:@" " withString:@""],
+                regular ? @"Regular" : [f->style stringByReplacingOccurrencesOfString:@" " withString:@""]];
+            g->ferryName = [f->ferryName copy];
+            g->weight = f->weight;
+            g->italic = f->italic;
+            g->mono = f->mono;
+            [out addObject:g];
+            [g release];
+        }
+    }
+    listed = out;
+    return listed;
+}
+
 CTFontCollectionRef CTFontCollectionCreateFromAvailableFonts(CFDictionaryRef options)
 {
     (void)options;
     NSMutableArray *all = [NSMutableArray array];
-    for (GFace *f in installed_faces()) {
-        CTFontDescriptorRef d = descriptor(face_attributes(f));
-        [all addObject:(id)d];
-        CFRelease(d);
-    }
-    return CTFontCollectionCreateWithFontDescriptors((CFArrayRef)all, NULL);
+    for (NSArray *list in @[installed_faces(), stand_in_faces()])
+        for (GFace *f in list) {
+            CTFontDescriptorRef d = descriptor(face_attributes(f));
+            [all addObject:(id)d];
+            CFRelease(d);
+        }
+    GFontCollection *c = (GFontCollection *)CTFontCollectionCreateWithFontDescriptors((CFArrayRef)all, NULL);
+    c->available = YES;
+    return (CTFontCollectionRef)c;
 }
 
 static BOOL face_matches(GFace *f, NSDictionary *query)
@@ -241,6 +303,8 @@ static BOOL face_matches(GFace *f, NSDictionary *query)
 CFArrayRef CTFontCollectionCreateMatchingFontDescriptors(CTFontCollectionRef collection)
 {
     NSArray *queries = ((GFontCollection *)collection)->descriptors;
+    if (((GFontCollection *)collection)->available)
+        return [queries count] ? (CFArrayRef)[queries copy] : NULL;
     NSMutableArray *out = [[NSMutableArray alloc] init];
     for (GFace *f in installed_faces())
         for (id q in queries)
