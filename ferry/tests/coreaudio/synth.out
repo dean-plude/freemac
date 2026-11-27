@@ -1,0 +1,38 @@
+component: Apple: DLSMusicDevice
+component: Apple: AUMIDISynth
+component: Apple: AUPeakLimiter
+new graph: 0
+nodes: 0 0 0
+second output node: -10862
+unit before open: none
+open: 0
+connect: 0 0
+interactions: 2, the limiter's: 2
+synth node: DLS, open
+output format: 0
+initialize: 0
+initialized: 1
+start: 0
+limiter input: 44100 Hz, 2 channels, float 1, split 1
+silence: 0, quiet 1
+program: 0
+note on: 0
+playing: 0, heard 1, under full scale 1
+note off: 0
+let go: quiet 1
+offset note: first half quiet 1, second half heard 1
+stop: 0
+running: 0
+dispose: 0
+missing bank: -10871
+synth inputs: 0
+midi synth initialize: 0
+start note: 0, id 67
+note heard: 1
+stop note: 0
+sysex: 0
+limiter input: 0
+attack: 0.012 s, bad value -66743
+limiter initialize: 0
+limited: under full scale 1, settled near it 1
+exit=0

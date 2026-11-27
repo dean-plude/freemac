@@ -49,11 +49,12 @@ case $framework in
     CoreImage) pattern='^_(OBJC_(METACLASS|CLASS)_\$_CI[A-Z][A-Za-z]*$|kCI|CI(Detector|Feature)[A-Z])' ;;
     Quartz) pattern='^_(OBJC_(METACLASS|CLASS)_\$_(QL|QC)|QL|kQL|QC)' ;;
     # Core Audio's file serves AudioToolbox (with the audio objects' calls
-    # its header brings in, 1.232) and AudioUnit (freemac 1.234)
-    AudioToolbox) pattern='^_(AudioObject|AudioHardware|AudioComponent|AudioUnit|AudioOutputUnit|AudioQueue|AudioFormat|AudioConverter|AudioServices|AU(Event|Parameter)?Listener|AUParameterSet)' ;;
+    # its header brings in, 1.232) and AudioUnit (freemac 1.234); AUGraph and
+    # MusicDevice calls join both (freemac 1.NEXT)
+    AudioToolbox) pattern='^_(AudioObject|AudioHardware|AudioComponent|AudioUnit|AudioOutputUnit|AudioQueue|AudioFormat|AudioConverter|AudioServices|AU(Event|Parameter)?Listener|AUParameterSet|AUGraph|NewAUGraph|DisposeAUGraph|MusicDevice)' ;;
     # and Core MIDI, with no devices (freemac 1.263)
     CoreMIDI) pattern='^_(MIDI|kMIDI)' ;;
-    AudioUnit) pattern='^_(AudioComponent|AudioUnit|AudioOutputUnit)' ;;
+    AudioUnit) pattern='^_(AudioComponent|AudioUnit|AudioOutputUnit|MusicDevice)' ;;
     *) echo "gen-alias-tbd.sh: unknown framework $framework" >&2; exit 2 ;;
 esac
 {

@@ -346,6 +346,17 @@ static AudioComponentMethod plugin_method(AudioUnit u, SInt16 selector)
     return u->plugin && u->plugin->Lookup ? u->plugin->Lookup(selector) : NULL;
 }
 
+/* a plug-in unit's own method for a call that only plug-ins have, such as a
+ * music device's (CAMusicDevice.m), and the plug-in to call it on; NULL for
+ * Ferry's own output units */
+AudioComponentMethod ca_unit_method(AudioUnit u, SInt16 selector, void **plugin)
+{
+    if (!u || !u->plugin)
+        return NULL;
+    *plugin = u->plugin;
+    return plugin_method(u, selector);
+}
+
 Boolean AudioComponentInstanceCanDo(AudioComponentInstance u, SInt16 selector)
 {
     if (!u)
