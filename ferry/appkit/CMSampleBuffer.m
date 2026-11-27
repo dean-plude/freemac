@@ -126,6 +126,7 @@ FKEY(kCMFormatDescriptionExtension_TransferFunction, "CVImageBufferTransferFunct
 FKEY(kCMFormatDescriptionExtension_YCbCrMatrix, "CVImageBufferYCbCrMatrix")
 FKEY(kCMFormatDescriptionExtension_FullRangeVideo, "FullRangeVideo")
 FKEY(kCMFormatDescriptionExtension_BytesPerRow, "CVBytesPerRow")
+FKEY(kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms, "SampleDescriptionExtensionAtoms")
 
 @interface FerryCMFormatDescription : NSObject {
   @public

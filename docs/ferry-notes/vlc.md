@@ -442,11 +442,35 @@ standing in for the file manager:
 - The Dock menu reads Pause while a video plays; choosing it pauses the
   video and the item turns back into Play.
 
+## VLC's VideoToolbox and cvpx modules (freemac 1.NEXT)
+
+VLC's own Mac build carries a VideoToolbox decoder, which it tries before
+FFmpeg, and the cvpx converter. Neither built for Ferry, because the SDK had
+no VideoToolbox header. Now both build and load:
+
+- `sdk/include/VideoToolbox/VideoToolbox.h` and `VTErrors.h` declare the
+  decoding and pixel transfer calls, flags and error codes.
+- `appkit/VideoToolbox.m` adds VTDecompressionSessionCanAcceptFormatDescription,
+  VTDecompressionSessionFinishDelayedFrames, the pixel transfer session calls
+  and the field and deinterlace keys. A pixel transfer session fails with
+  kVTPixelTransferNotSupportedErr, as Apple documents for a transfer it can't do.
+- `appkit/CMSampleBuffer.m` and CMFormatDescription.h add
+  kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms.
+- QuartzCore.h can be included from C (cvpx.c does). From C it gives the time
+  and 3D transform calls and Core Video, and the rest stays Objective-C.
+- `<sys/types.h>` brings in `<machine/endian.h>`, which now holds htonl,
+  ntohl, htons and ntohs, as a Mac's does. `<netinet/in.h>` takes them from
+  there.
+
+When playing, VLC's videotoolbox decoder parses the stream, gets
+kVTCouldNotFindVideoDecoderErr from the session and hands over to avcodec,
+and the video plays as before. Test: `tests/appkit/videotoolbox_vlc.c`.
+
 ## Still to do
 
 - The MIDI module (AudioToolbox's AUGraph) doesn't build yet.
-- VideoToolbox decoding, the keychain, speech, the CD module and
-  SecureTransport don't build yet.
+- The keychain, speech, the CD module and SecureTransport don't build
+  yet.
 - The download doesn't include Ferry's VLC build yet; this is Ferry's test
   setup only. Installing from VideoLAN's own disk image is untried.
 - Auto Layout places views by their frames, not their alignment rectangles,

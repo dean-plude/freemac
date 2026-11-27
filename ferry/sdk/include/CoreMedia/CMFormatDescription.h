@@ -61,6 +61,7 @@ extern const CFStringRef kCMFormatDescriptionExtension_TransferFunction;
 extern const CFStringRef kCMFormatDescriptionExtension_YCbCrMatrix;
 extern const CFStringRef kCMFormatDescriptionExtension_FullRangeVideo;
 extern const CFStringRef kCMFormatDescriptionExtension_BytesPerRow;
+extern const CFStringRef kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms;
 
 CFTypeID CMFormatDescriptionGetTypeID(void);
 OSStatus CMFormatDescriptionCreate(CFAllocatorRef allocator, CMMediaType mediaType, FourCharCode mediaSubType,

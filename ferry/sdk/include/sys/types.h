@@ -28,4 +28,5 @@ typedef int errno_t;
 typedef unsigned int fsblkcnt_t;
 typedef unsigned int fsfilcnt_t;
 #include <sys/_pthread_types.h>
+#include <machine/endian.h>
 #endif
