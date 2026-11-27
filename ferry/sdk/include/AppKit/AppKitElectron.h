@@ -48,7 +48,6 @@ typedef NS_OPTIONS(NSUInteger, NSCursorFrameResizeDirections) {
 /* Ferry shows each tab as a window of its own */
 - (void)addTabbedWindow:(NSWindow *)window ordered:(NSWindowOrderingMode)ordered;
 @property (readonly) BOOL isOnActiveSpace;   /* freemac has one space: when visible */
-@property (readonly) NSUserInterfaceLayoutDirection windowTitlebarLayoutDirection;
 @property (readonly) NSSelectionDirection keyViewSelectionDirection;
 - (NSTimeInterval)animationResizeTime:(NSRect)newFrame;
 @property NSInteger orderedIndex;

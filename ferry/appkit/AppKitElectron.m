@@ -55,7 +55,6 @@ static char key_hidden, key_on_image, key_off_image, key_mixed_image;
         [window makeKeyAndOrderFront:nil];
 }
 - (BOOL)isOnActiveSpace { return [self isVisible]; }
-- (NSUserInterfaceLayoutDirection)windowTitlebarLayoutDirection { return NSUserInterfaceLayoutDirectionLeftToRight; }
 - (NSSelectionDirection)keyViewSelectionDirection { return NSDirectSelection; }
 - (NSTimeInterval)animationResizeTime:(NSRect)newFrame { return 0.2; }
 - (NSInteger)orderedIndex
