@@ -550,8 +550,9 @@ static NSArray *sorted_paths(NSArray *paths)
     [_arrangedProxy _sourceWillChange];
     [self _apply:plan node:_rootNode];
     [self _watchObjects:plan->objects];
-    [_selection release];
+    id wasSelection = _selection;
     _selection = [selection copy];
+    [wasSelection release];
     [_arrangedProxy _sourceDidChange];
     [self didChangeValueForKey:@"arrangedObjects"];
     if (changes) {
@@ -573,8 +574,9 @@ static NSArray *sorted_paths(NSArray *paths)
 - (void)setSortDescriptors:(NSArray *)d
 {
     [self willChangeValueForKey:@"sortDescriptors"];
-    [_sortDescriptors release];
+    id wasSortDescriptors = _sortDescriptors;
     _sortDescriptors = [d copy];
+    [wasSortDescriptors release];
     [self didChangeValueForKey:@"sortDescriptors"];
     ABindingPush(self, NSSortDescriptorsBinding);
     [self rearrangeObjects];
@@ -640,8 +642,9 @@ static NSArray *sorted_paths(NSArray *paths)
     for (NSString *k in selection_keys())
         [self willChangeValueForKey:k];
     [_selectionProxy _sourceWillChange];
-    [_selection release];
+    id wasSelection = _selection;
     _selection = [valid copy];
+    [wasSelection release];
     [_selectionProxy _sourceDidChange];
     for (NSString *k in [selection_keys() reverseObjectEnumerator])
         [self didChangeValueForKey:k];

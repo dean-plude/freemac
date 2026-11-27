@@ -449,8 +449,9 @@ static NSUserDefaultsController *shared;
 - (NSDictionary *)initialValues { return _initialValues; }
 - (void)setInitialValues:(NSDictionary *)v
 {
-    [_initialValues release];
+    id wasInitialValues = _initialValues;
     _initialValues = [v copy];
+    [wasInitialValues release];
 }
 - (BOOL)appliesImmediately { return _appliesImmediately; }
 - (void)setAppliesImmediately:(BOOL)yes { _appliesImmediately = yes; }

@@ -113,8 +113,9 @@ COPY_PROPERTY(tagNames, setTagNames, _tagNames)
 - (NSString *)nameFieldStringValue { return _nameField; }
 - (void)setNameFieldStringValue:(NSString *)s
 {
-    [_nameField release];
+    id wasNameField = _nameField;
     _nameField = [s ?: @"" copy];
+    [wasNameField release];
 }
 - (BOOL)allowsOtherFileTypes { return _otherTypes; }
 - (void)setAllowsOtherFileTypes:(BOOL)f { _otherTypes = f; }
@@ -474,8 +475,9 @@ static const char **cstrings(NSArray *strings)
 - (NSModalResponse)runModal
 {
     [_chosen removeAllObjects];
-    [_startTypes release];
+    id wasStartTypes = _startTypes;
     _startTypes = [_types copy];
+    [wasStartTypes release];
     if (ADisplayAvailable())
         return [self _runChooser];
     const char *answer = getenv("FERRY_PANEL_ANSWER");

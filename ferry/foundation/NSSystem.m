@@ -87,8 +87,9 @@ static NSOperatingSystemVersion FSystemVersion(const char **build)
 }
 - (void)setProcessName:(NSString *)name
 {
-    [_name release];
+    id wasName = _name;
     _name = [name copy];
+    [wasName release];
 }
 - (int)processIdentifier { return getpid(); }
 - (NSString *)hostName

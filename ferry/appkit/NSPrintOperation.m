@@ -164,20 +164,23 @@ static const char *nonempty_env(const char *name)
 - (NSString *)jobStyleHint { return _hint; }
 - (void)setJobStyleHint:(NSString *)h
 {
-    [_hint release];
+    id wasHint = _hint;
     _hint = [h copy];
+    [wasHint release];
 }
 - (NSString *)helpAnchor { return _anchor; }
 - (void)setHelpAnchor:(NSString *)a
 {
-    [_anchor release];
+    id wasAnchor = _anchor;
     _anchor = [a copy];
+    [wasAnchor release];
 }
 - (NSString *)defaultButtonTitle { return _button ?: @"Print"; }
 - (void)setDefaultButtonTitle:(NSString *)t
 {
-    [_button release];
+    id wasButton = _button;
     _button = [t copy];
+    [wasButton release];
 }
 - (NSPrintInfo *)printInfo { return _info; }
 - (void)addAccessoryController:(NSViewController *)c
@@ -527,8 +530,9 @@ static NSPrintInfo *copying_info(NSRect rect)
 - (NSString *)jobTitle { return _title ?: [_view printJobTitle]; }
 - (void)setJobTitle:(NSString *)t
 {
-    [_title release];
+    id wasTitle = _title;
     _title = [t copy];
+    [wasTitle release];
 }
 - (BOOL)showsPrintPanel { return _showsPanel; }
 - (void)setShowsPrintPanel:(BOOL)f { _showsPanel = f; }
@@ -555,8 +559,9 @@ static NSPrintInfo *copying_info(NSRect rect)
 {
     if (!info || info == _info)
         return;
-    [_info release];
+    id wasInfo = _info;
     _info = [info copy];
+    [wasInfo release];
 }
 - (NSView *)view { return _view; }
 - (NSInteger)currentPage { return _page; }

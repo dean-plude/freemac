@@ -122,6 +122,10 @@ static const struct twin {
     /* libffi (p11-kit, freemac 1.262): the same types and the same x86-64
      * calling conventions, numbered alike in libffi's own headers */
     {"/usr/lib/libffi.dylib", "libffi.so.8"},
+    /* CUPS, the printing system both use (darktable's print view, freemac
+     * Ferry test apps): Apple's libcups and Linux's are the same project */
+    {"/usr/lib/libcups.2.dylib", "libcups.so.2"},
+    {"/usr/lib/libcups.dylib", "libcups.so.2"},
     /* ICU's C calls (regular expressions, collation, breaking), which
      * Linux builds name with the version, as uregex_open_74 */
     {"/usr/lib/libicucore.A.dylib", "icu"},
@@ -150,7 +154,7 @@ static const char *const takes_a_file[] = {
     "BZ2_bzReadOpen", "BZ2_bzWriteOpen", "xmlDocDump", "xmlDocFormatDump", "xmlElemDump", "xmlBufferDump",
     "htmlDocDump", "xmlParserInputBufferCreateFile", "xmlOutputBufferCreateFile", "xmlCatalogDump",
     "xmlACatalogDump", "xmlLsOneNode", "xmlShell", "xmlPrintURI", "xmlMemDisplay", "xmlMemShow",
-    "xmlDebugDumpString", "xmlDebugDumpAttr", "xmlDebugDumpAttrList", "xmlDebugDumpOneNode", "xmlDebugDumpNode",
+    "xmlDebugDumpString", "ppdOpen", "xmlDebugDumpAttr", "xmlDebugDumpAttrList", "xmlDebugDumpOneNode", "xmlDebugDumpNode",
     "xmlDebugDumpNodeList", "xmlDebugDumpDocumentHead", "xmlDebugDumpDocument", "xmlDebugDumpDTD",
     "xmlDebugDumpEntities", "xmlDebugCheckDocument", "xmlRegexpPrint", "xmlNanoHTTPSave", NULL,
 };

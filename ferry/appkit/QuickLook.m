@@ -150,8 +150,9 @@ static NSString *details_of(NSString *path)
 {
     if (item == _item)
         return;
-    [_item release];
+    id wasItem = _item;
     _item = [item retain];
+    [wasItem release];
     [self _build];
 }
 - (void)refreshPreviewItem { [self _build]; }

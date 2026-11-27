@@ -132,14 +132,16 @@ static double coder_double(NSCoder *c, NSString *key, double fallback)
 - (NSImage *)ratingImage { return _ratingImage; }
 - (void)setRatingImage:(NSImage *)i
 {
-    [_ratingImage release];
+    id wasRatingImage = _ratingImage;
     _ratingImage = [i retain];
+    [wasRatingImage release];
 }
 - (NSImage *)ratingPlaceholderImage { return _ratingPlaceholder; }
 - (void)setRatingPlaceholderImage:(NSImage *)i
 {
-    [_ratingPlaceholder release];
+    id wasRatingPlaceholder = _ratingPlaceholder;
     _ratingPlaceholder = [i retain];
+    [wasRatingPlaceholder release];
 }
 - (double)doubleValue
 {

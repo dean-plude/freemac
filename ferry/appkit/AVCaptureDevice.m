@@ -218,8 +218,9 @@ static AVCaptureDeviceFormat *best_format(NSArray<AVCaptureDeviceFormat *> *form
             [formats addObject:f];
         [f release];
     }
-    [_formats release];
+    id wasFormats = _formats;
     _formats = [formats copy];
+    [wasFormats release];
     AVCaptureDeviceFormat *keep = _active && [_formats containsObject:_active]
                                       ? [_formats objectAtIndex:[_formats indexOfObject:_active]]
                                       : best_format(_formats);
@@ -311,8 +312,9 @@ static void watch(void)
             BOOL changed = ![nodes isEqualToArray:video_nodes];
             NSMutableArray *came = [NSMutableArray array], *went = [NSMutableArray array];
             if (changed) {
-                [video_nodes release];
+                id wasVideo_nodes = video_nodes;
                 video_nodes = [nodes copy];
+                [wasVideo_nodes release];
                 refresh(came, went);
             }
             pthread_mutex_unlock(&cameras_lock);
@@ -330,8 +332,9 @@ static NSArray<AVCaptureDevice *> *cameras(void)
     NSArray *nodes = current_nodes();
     pthread_mutex_lock(&cameras_lock);
     NSMutableArray *came = [NSMutableArray array], *went = [NSMutableArray array];
-    [video_nodes release];
+    id wasVideo_nodes = video_nodes;
     video_nodes = [nodes copy];
+    [wasVideo_nodes release];
     refresh(came, went);
     for (NSString *key in order)
         if (by_id[key]->_connected)

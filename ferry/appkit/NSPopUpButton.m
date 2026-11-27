@@ -766,8 +766,9 @@ static BOOL choosable(NSMenuItem *item)
 - (void)setTitle:(NSString *)title
 {
     if (!_usesItemFromMenu) {
-        [_ownTitle release];
+        id wasOwnTitle = _ownTitle;
         _ownTitle = [title copy];
+        [wasOwnTitle release];
     } else if (_pullsDown) {
         if ([_menu numberOfItems] > 0)
             [[_menu itemAtIndex:0] setTitle:title ?: @""];

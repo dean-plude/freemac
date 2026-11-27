@@ -235,8 +235,9 @@ static void snapshot_own_windows(void)
         if ([w windowNumber] > 0)
             [list addObject:@{@"number" : @([w windowNumber]), @"title" : [w title] ?: @"", @"level" : @([w level])}];
     pthread_mutex_lock(&own_lock);
-    [own_snapshot release];
+    id wasOwn_snapshot = own_snapshot;
     own_snapshot = [list copy];
+    [wasOwn_snapshot release];
     own_refresh_pending = NO;
     pthread_mutex_unlock(&own_lock);
 }
@@ -771,8 +772,9 @@ static void store(CVPixelBufferRef pb, const uint32_t *argb, size_t w, size_t h,
                       ![exceptions containsObject:@(w->number)];
         [rects addObject:@[ [NSValue valueWithRect:NSRectFromCGRect(w->pixelFrame)], @(picked != c->excluding) ]];
     }
-    [_maskRects release];
+    id wasMaskRects = _maskRects;
     _maskRects = [rects copy];
+    [wasMaskRects release];
     _maskRead = now;
     return _maskRects;
 }

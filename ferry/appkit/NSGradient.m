@@ -362,8 +362,9 @@ static void line_through(NSRect r, CGFloat angle, NSPoint *start, NSPoint *end)
 {
     if (c == _color)
         return;
-    [_color release];
+    id wasColor = _color;
     _color = [c copy];
+    [wasColor release];
 }
 
 /* Applies to what is drawn next, until another shadow is set or the

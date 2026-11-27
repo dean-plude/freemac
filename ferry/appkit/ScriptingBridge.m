@@ -51,8 +51,9 @@ static NSError *not_handled(void)
 - (void)_setApplication:(SBApplication *)app { _app = app; }
 - (void)_failed
 {
-    [_error release];
+    id wasError = _error;
     _error = [not_handled() retain];
+    [wasError release];
     id<SBApplicationDelegate> d = [_app delegate];
     if ([d respondsToSelector:@selector(eventDidFail:withError:)])
         [d eventDidFail:NULL withError:_error];

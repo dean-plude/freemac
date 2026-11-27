@@ -148,8 +148,9 @@ static void say_once(void)
 - (NSDictionary *)arguments { return _arguments ?: @{}; }
 - (void)setArguments:(NSDictionary *)a
 {
-    [_arguments release];
+    id wasArguments = _arguments;
     _arguments = [a copy];
+    [wasArguments release];
 }
 /* no object specifiers to evaluate: the arguments as they are */
 - (NSDictionary *)evaluatedArguments { return [self arguments]; }
@@ -160,8 +161,9 @@ static void say_once(void)
 - (NSString *)scriptErrorString { return _errorString; }
 - (void)setScriptErrorString:(NSString *)s
 {
-    [_errorString release];
+    id wasErrorString = _errorString;
     _errorString = [s copy];
+    [wasErrorString release];
 }
 - (id)scriptErrorExpectedTypeDescriptor { return _expected; }
 - (void)setScriptErrorExpectedTypeDescriptor:(id)d

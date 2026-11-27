@@ -405,8 +405,9 @@ BOOL AValidateItem(id target, id item)
 - (NSString *)title { return _title; }
 - (void)setTitle:(NSString *)t
 {
-    [_title release];
+    id wasTitle = _title;
     _title = [t ?: @"" copy];
+    [wasTitle release];
 }
 - (SEL)action { return _action; }
 - (void)setAction:(SEL)a { _action = a; }
@@ -415,8 +416,9 @@ BOOL AValidateItem(id target, id item)
 - (NSString *)keyEquivalent { return _key; }
 - (void)setKeyEquivalent:(NSString *)k
 {
-    [_key release];
+    id wasKey = _key;
     _key = [k ?: @"" copy];
+    [wasKey release];
 }
 - (NSEventModifierFlags)keyEquivalentModifierMask { return _mask; }
 - (void)setKeyEquivalentModifierMask:(NSEventModifierFlags)m { _mask = m; }
@@ -472,8 +474,9 @@ BOOL AValidateItem(id target, id item)
 - (NSString *)toolTip { return _tip; }
 - (void)setToolTip:(NSString *)t
 {
-    [_tip release];
+    id wasTip = _tip;
     _tip = [t copy];
+    [wasTip release];
 }
 @end
 
@@ -545,8 +548,9 @@ BOOL AValidateItem(id target, id item)
 - (NSString *)title { return _title; }
 - (void)setTitle:(NSString *)t
 {
-    [_title release];
+    id wasTitle = _title;
     _title = [t ?: @"" copy];
+    [wasTitle release];
 }
 - (NSArray *)itemArray { return [[_items copy] autorelease]; }
 - (NSInteger)numberOfItems { return [_items count]; }

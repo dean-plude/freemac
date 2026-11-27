@@ -140,8 +140,9 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 
 - (void)registerForDraggedTypes:(NSArray *)types
 {
-    [_draggedTypes release];
+    id wasDraggedTypes = _draggedTypes;
     _draggedTypes = [types copy];
+    [wasDraggedTypes release];
     [self _enableDrops];
 }
 - (void)unregisterDraggedTypes
@@ -295,8 +296,9 @@ static char subtitle_key;
 }
 - (void)setTitle:(NSString *)title
 {
-    [_title release];
+    NSString *old = _title;   /* (copied before the old one goes: they may be the same string) */
     _title = [title ?: @"" copy];
+    [old release];
     if (_gtk)
         gtk_window_set_title(_gtk, [[self _shownTitle] UTF8String]);
 }
@@ -397,8 +399,9 @@ NSColor *ADarkText(NSColor *c)
 }
 - (void)setBackgroundColor:(NSColor *)color
 {
-    [_background release];
+    id wasBackground = _background;
     _background = [color retain];
+    [wasBackground release];
     [self _noteNeedsDisplay];
 }
 - (NSResponder *)firstResponder { return _first ?: self; }
@@ -469,8 +472,9 @@ NSColor *ADarkText(NSColor *c)
 {
     if ([name isEqualToString:_autosaveName])
         return YES;
-    [_autosaveName release];
+    id wasAutosaveName = _autosaveName;
     _autosaveName = [name copy];
+    [wasAutosaveName release];
     /* a frame saved under the name before is the window's again (1.229) */
     if ([name length])
         [self setFrameUsingName:name];

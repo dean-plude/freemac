@@ -117,8 +117,9 @@ static BOOL editable_kind(SegKind k) { return k != SegLiteral && k != SegEra && 
         [self setFont:ADefaultFont()];
     id d = [coder decodeObjectForKey:@"NSContents"];
     if ([d isKindOfClass:[NSDate class]]) {
-        [_date release];
+        id wasDate = _date;
         _date = [d copy];
+        [wasDate release];
     }
     if ([coder containsValueForKey:@"NSDatePickerElements"])
         _elements = [coder decodeIntegerForKey:@"NSDatePickerElements"];
@@ -1216,8 +1217,9 @@ FORWARD(NSColor *, textColor, setTextColor:)
         NSDate *day = [c _dayAt:p frame:b view:self];
         if (!day)
             return;
-        [_anchor release];
+        id wasAnchor = _anchor;
         _anchor = [day retain];
+        [wasAnchor release];
         _dragging = YES;
         [self _chooseDaysFrom:day to:day];
         return;

@@ -184,22 +184,25 @@ static NSError *write_error(int err, NSString *path)
 {
     if (name == _preferred)
         return;
-    [_preferred release];
+    id wasPreferred = _preferred;
     _preferred = [name copy];
+    [wasPreferred release];
 }
 - (NSString *)filename { return _filename; }
 - (void)setFilename:(NSString *)name
 {
     if (name == _filename)
         return;
-    [_filename release];
+    id wasFilename = _filename;
     _filename = [name copy];
+    [wasFilename release];
 }
 - (NSDictionary *)fileAttributes { return _attributes ?: @{}; }
 - (void)setFileAttributes:(NSDictionary *)attributes
 {
-    [_attributes release];
+    id wasAttributes = _attributes;
     _attributes = [attributes copy];
+    [wasAttributes release];
 }
 - (NSData *)regularFileContents
 {

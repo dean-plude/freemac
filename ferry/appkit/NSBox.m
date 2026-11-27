@@ -248,8 +248,9 @@
 - (NSFont *)titleFont { return _titleFont ?: [NSFont systemFontOfSize:11]; }
 - (void)setTitleFont:(NSFont *)f
 {
-    [_titleFont release];
+    id wasTitleFont = _titleFont;
     _titleFont = [f retain];
+    [wasTitleFont release];
     [self setNeedsDisplay:YES];
 }
 - (NSRect)titleRect
@@ -282,8 +283,9 @@
 - (NSString *)title { return _title; }
 - (void)setTitle:(NSString *)t
 {
-    [_title release];
+    id wasTitle = _title;
     _title = [t copy];
+    [wasTitle release];
     [self setNeedsDisplay:YES];
 }
 - (NSTitlePosition)titlePosition { return _position; }
@@ -310,8 +312,9 @@
     if (v == _content)
         return;
     [_content removeFromSuperview];
-    [_content release];
+    id wasContent = _content;
     _content = [v retain];
+    [wasContent release];
     if (v) {
         [v setFrame:[self _contentRect]];
         [self addSubview:v];
@@ -320,15 +323,17 @@
 - (NSColor *)fillColor { return _fill ?: [NSColor clearColor]; }
 - (void)setFillColor:(NSColor *)c
 {
-    [_fill release];
+    id wasFill = _fill;
     _fill = [c copy];
+    [wasFill release];
     [self setNeedsDisplay:YES];
 }
 - (NSColor *)borderColor { return _borderColor ?: [NSColor separatorColor]; }
 - (void)setBorderColor:(NSColor *)c
 {
-    [_borderColor release];
+    id wasBorderColor = _borderColor;
     _borderColor = [c copy];
+    [wasBorderColor release];
     [self setNeedsDisplay:YES];
 }
 - (CGFloat)borderWidth { return _borderWidth; }

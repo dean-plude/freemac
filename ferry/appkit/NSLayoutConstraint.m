@@ -390,8 +390,9 @@ NSDictionary *_NSDictionaryOfVariableBindings(NSString *keys, id first, ...)
 - (NSString *)identifier { return _identifier; }
 - (void)setIdentifier:(NSString *)identifier
 {
-    [_identifier release];
+    id wasIdentifier = _identifier;
     _identifier = [identifier copy];
+    [wasIdentifier release];
 }
 - (BOOL)shouldBeArchived { return _archived; }
 - (void)setShouldBeArchived:(BOOL)flag { _archived = flag; }
@@ -841,8 +842,9 @@ static NSUInteger read_predicates(vfl *p, predicate *out, NSUInteger max, BOOL v
 - (NSUserInterfaceItemIdentifier)identifier { return _identifier; }
 - (void)setIdentifier:(NSUserInterfaceItemIdentifier)identifier
 {
-    [_identifier release];
+    id wasIdentifier = _identifier;
     _identifier = [identifier copy];
+    [wasIdentifier release];
 }
 #define ANCHOR(name, cls, attr) \
     -(cls *)name { return [cls _anchorFor:self attribute:attr]; }

@@ -62,7 +62,7 @@
 
 struct mac_mutex { long sig; pthread_mutex_t m; char pad[64 - 8 - sizeof(pthread_mutex_t)]; };
 struct mac_mutexattr { long sig; pthread_mutexattr_t a; char pad[16 - 8 - sizeof(pthread_mutexattr_t)]; };
-struct mac_cond { long sig; pthread_cond_t *c; char pad[32]; };
+struct mac_cond { long sig; pthread_cond_t *c; unsigned long wakes; char pad[24]; };
 struct mac_condattr { long sig; pthread_condattr_t a; char pad[16 - 8 - sizeof(pthread_condattr_t)]; };
 struct mac_rwlock { long sig; pthread_rwlock_t r; char pad[200 - 8 - sizeof(pthread_rwlock_t)]; };
 struct mac_rwlockattr { long sig; pthread_rwlockattr_t a; char pad[24 - 8 - sizeof(pthread_rwlockattr_t)]; };
@@ -771,12 +771,15 @@ static int mac_pthread_cond_destroy(struct mac_cond *c)
  * they wait. A thread of the program's own whose cancellation is enabled
  * waits in tenths of a second, and between them leaves as a cancelled
  * thread if pthread_cancel has marked it, its mutex held again as a Mac's
- * would be for its cleanup handlers. The end of a slice returns as a
- * spurious wakeup would (POSIX allows them, and a program's waits check
- * their condition again): a wake that a slice's end took (glibc may give
- * ETIMEDOUT for a wait it was also signalled in) is then never lost. Before
- * that, FFmpeg's decoding threads could hang under VLC's window. Other
- * threads, the main one among them, wait as before. */
+ * would be for its cleanup handlers. If the condition was signalled during
+ * a slice, the end of the slice returns as a spurious wakeup would (POSIX
+ * allows them): a wake that a slice's end took (glibc may give ETIMEDOUT
+ * for a wait it was also signalled in) is then never lost. Before that,
+ * FFmpeg's decoding threads could hang under VLC's window. A quiet slice
+ * waits again, as a Mac's wait would go on: some programs don't check
+ * their condition again (darktable's Lua calls into its interface took a
+ * slice's end for the answer and crashed). Other threads, the main one
+ * among them, wait as before. */
 static __thread struct known *self_known;
 static __thread int self_known_looked;
 
@@ -804,11 +807,15 @@ static int cancel_marked(struct known *k)
     return marked;
 }
 
-static int wait_cancellable(pthread_cond_t *c, pthread_mutex_t *m, const struct timespec *deadline)
+static int wait_cancellable(pthread_cond_t *c, pthread_mutex_t *m, const struct timespec *deadline,
+                            unsigned long *wakes)
 {
     struct known *k = cancel_disabled ? NULL : known_self();
     if (!k)
         return deadline ? pthread_cond_timedwait(c, m, deadline) : pthread_cond_wait(c, m);
+    /* any signal from here on ends the wait, even one sent between slices */
+    unsigned long before = __atomic_load_n(wakes, __ATOMIC_ACQUIRE);
+again:
     if (!cancel_disabled && cancel_marked(k))
         mac_pthread_exit(MAC_PTHREAD_CANCELED);
     struct timespec slice;
@@ -823,17 +830,22 @@ static int wait_cancellable(pthread_cond_t *c, pthread_mutex_t *m, const struct 
     int r = pthread_cond_timedwait(c, m, last ? deadline : &slice);
     if (!cancel_disabled && cancel_marked(k))
         mac_pthread_exit(MAC_PTHREAD_CANCELED);
-    return r == ETIMEDOUT && !last ? 0 : r;
+    if (r == ETIMEDOUT && !last) {
+        if (__atomic_load_n(wakes, __ATOMIC_ACQUIRE) != before)
+            return 0;
+        goto again;
+    }
+    return r;
 }
 
 static int mac_pthread_cond_wait(struct mac_cond *c, struct mac_mutex *m)
 {
-    return err(wait_cancellable(cond_of(c), mutex_of(m), NULL));
+    return err(wait_cancellable(cond_of(c), mutex_of(m), NULL, &c->wakes));
 }
 
 static int mac_pthread_cond_timedwait(struct mac_cond *c, struct mac_mutex *m, const struct timespec *t)
 {
-    return err(wait_cancellable(cond_of(c), mutex_of(m), t));
+    return err(wait_cancellable(cond_of(c), mutex_of(m), t, &c->wakes));
 }
 
 /* macOS's own: a wait for at most a length of time */
@@ -852,8 +864,16 @@ static int mac_pthread_cond_timedwait_relative_np(struct mac_cond *c, struct mac
     return mac_pthread_cond_timedwait(c, m, &t);
 }
 
-static int mac_pthread_cond_signal(struct mac_cond *c) { return err(pthread_cond_signal(cond_of(c))); }
-static int mac_pthread_cond_broadcast(struct mac_cond *c) { return err(pthread_cond_broadcast(cond_of(c))); }
+static int mac_pthread_cond_signal(struct mac_cond *c)
+{
+    __atomic_add_fetch(&c->wakes, 1, __ATOMIC_ACQ_REL);
+    return err(pthread_cond_signal(cond_of(c)));
+}
+static int mac_pthread_cond_broadcast(struct mac_cond *c)
+{
+    __atomic_add_fetch(&c->wakes, 1, __ATOMIC_ACQ_REL);
+    return err(pthread_cond_broadcast(cond_of(c)));
+}
 /* waking one particular thread can't be asked of this system: wake them all */
 static int mac_pthread_cond_signal_thread_np(struct mac_cond *c, pthread_t t)
 {

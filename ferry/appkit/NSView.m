@@ -44,8 +44,9 @@ NSNotificationName const NSViewBoundsDidChangeNotification = @"NSViewBoundsDidCh
     for (NSString *t in types)
         if (![all containsObject:t])
             [all addObject:t];
-    [_draggedTypes release];
+    id wasDraggedTypes = _draggedTypes;
     _draggedTypes = [all copy];
+    [wasDraggedTypes release];
     [_window _enableDrops];
 }
 - (void)unregisterDraggedTypes
@@ -355,7 +356,33 @@ void AViewDecode(NSView *v, NSCoder *c)
     [self setNeedsDisplay:YES];
 }
 - (CALayer *)makeBackingLayer { return [CALayer layer]; }
-- (CALayer *)layer { return _layer; }
+/* A class may say it wants a layer by overriding wantsLayer rather than
+ * calling setWantsLayer: (GTK's GdkQuartzView, darktable): AppKit then gives
+ * it a backing layer all the same, the first time the layer is asked for or
+ * the view is drawn. */
+static IMP view_wants_layer;
+- (void)_takeWantedLayer
+{
+    static __thread BOOL asking;
+    if (_layer || _wantsLayer || asking)
+        return;
+    if (!view_wants_layer)
+        view_wants_layer = class_getMethodImplementation([NSView class], @selector(wantsLayer));
+    if (class_getMethodImplementation(object_getClass(self), @selector(wantsLayer)) == view_wants_layer)
+        return;
+    asking = YES;
+    BOOL wants = [self wantsLayer];
+    asking = NO;
+    if (!wants)
+        return;
+    _wantsLayer = YES;
+    [self setLayer:[self makeBackingLayer]];
+}
+- (CALayer *)layer
+{
+    [self _takeWantedLayer];
+    return _layer;
+}
 - (void)setLayer:(CALayer *)layer
 {
     if (layer == _layer)
@@ -443,8 +470,9 @@ static int layers_drawing;   /* changes made while a view draws its layer don't 
 - (NSDictionary *)animations { return _animations ?: @{}; }
 - (void)setAnimations:(NSDictionary *)animations
 {
-    [_animations release];
+    id wasAnimations = _animations;
     _animations = [animations copy];
+    [wasAnimations release];
 }
 - (id)animationForKey:(NSString *)key
 {
@@ -464,14 +492,16 @@ static int layers_drawing;   /* changes made while a view draws its layer don't 
 - (NSString *)toolTip { return _toolTip; }
 - (void)setToolTip:(NSString *)tip
 {
-    [_toolTip release];
+    id wasToolTip = _toolTip;
     _toolTip = [tip copy];
+    [wasToolTip release];
 }
 - (NSUserInterfaceItemIdentifier)identifier { return _identifier; }
 - (void)setIdentifier:(NSUserInterfaceItemIdentifier)identifier
 {
-    [_identifier release];
+    id wasIdentifier = _identifier;
     _identifier = [identifier copy];
+    [wasIdentifier release];
 }
 - (NSFocusRingType)focusRingType { return _focusRing; }
 - (void)setFocusRingType:(NSFocusRingType)type { _focusRing = type; }
@@ -878,6 +908,7 @@ static void add_dirty(NSRect r, NSRect *rects, int *n, int max)
 - (void)_drawContentInContext:(CGContextRef)ctx dirty:(NSRect)dirty screen:(BOOL)screen
 {
     dirty = NSIntersectionRect(dirty, _bounds);
+    [self _takeWantedLayer];
     BOOL wanted = _needsDisplay;
     _needsDisplay = NO;
     _dirtyRect = NSZeroRect;

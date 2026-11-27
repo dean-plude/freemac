@@ -161,6 +161,23 @@ OSStatus UCCompareText(CollatorRef collatorRef, const UniChar *text1Ptr, UniChar
     return noErr;
 }
 
+/* Comparing with the default locale's collator, or with none: Ferry's one
+ * collator serves both (GLib's g_utf8_collate on a Mac; darktable) */
+OSStatus UCCompareTextDefault(UCCollateOptions options, const UniChar *text1Ptr, UniCharCount text1Length,
+                              const UniChar *text2Ptr, UniCharCount text2Length, Boolean *equivalent,
+                              SInt32 *order)
+{
+    struct OpaqueCollatorRef c = {options};
+    return UCCompareText(&c, text1Ptr, text1Length, text2Ptr, text2Length, equivalent, order);
+}
+
+OSStatus UCCompareTextNoLocale(UCCollateOptions options, const UniChar *text1Ptr, UniCharCount text1Length,
+                               const UniChar *text2Ptr, UniCharCount text2Length, Boolean *equivalent,
+                               SInt32 *order)
+{
+    return UCCompareTextDefault(options, text1Ptr, text1Length, text2Ptr, text2Length, equivalent, order);
+}
+
 OSStatus UCCompareCollationKeys(const UCCollationValue *key1Ptr, ItemCount key1Length,
                                 const UCCollationValue *key2Ptr, ItemCount key2Length, Boolean *equivalent,
                                 SInt32 *order)

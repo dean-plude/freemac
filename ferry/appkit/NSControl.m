@@ -484,8 +484,9 @@ static char made_cell_key;
 - (void)setTitle:(NSString *)t
 {
     _titleSet = YES;
-    [_title release];
+    id wasTitle = _title;
     _title = [t ?: @"" copy];
+    [wasTitle release];
     [_attributedTitle release];
     _attributedTitle = nil;
     [self setNeedsDisplay:YES];
@@ -493,15 +494,17 @@ static char made_cell_key;
 - (NSString *)alternateTitle { return _alternateTitle; }
 - (void)setAlternateTitle:(NSString *)t
 {
-    [_alternateTitle release];
+    id wasAlternateTitle = _alternateTitle;
     _alternateTitle = [t ?: @"" copy];
+    [wasAlternateTitle release];
 }
 - (NSAttributedString *)attributedTitle { return _attributedTitle ?: AAttributed(_title, [self font], nil); }
 - (void)setAttributedTitle:(NSAttributedString *)t
 {
     _titleSet = YES;
-    [_attributedTitle release];
+    id wasAttributedTitle = _attributedTitle;
     _attributedTitle = [t copy];
+    [wasAttributedTitle release];
     [self setNeedsDisplay:YES];
 }
 - (NSBezelStyle)bezelStyle { return _bezel; }
@@ -527,8 +530,9 @@ static char made_cell_key;
 - (NSString *)keyEquivalent { return _key; }
 - (void)setKeyEquivalent:(NSString *)k
 {
-    [_key release];
+    id wasKey = _key;
     _key = [k ?: @"" copy];
+    [wasKey release];
     [self setNeedsDisplay:YES];
 }
 - (NSEventModifierFlags)keyEquivalentModifierMask { return _keyMask; }
@@ -536,14 +540,16 @@ static char made_cell_key;
 - (NSColor *)contentTintColor { return _tint; }
 - (void)setContentTintColor:(NSColor *)c
 {
-    [_tint release];
+    id wasTint = _tint;
     _tint = [c retain];
+    [wasTint release];
 }
 - (NSColor *)bezelColor { return _bezelColor; }
 - (void)setBezelColor:(NSColor *)c
 {
-    [_bezelColor release];
+    id wasBezelColor = _bezelColor;
     _bezelColor = [c retain];
+    [wasBezelColor release];
 }
 - (NSImage *)image { return _image; }
 - (void)setImage:(NSImage *)image
@@ -1149,15 +1155,17 @@ static BOOL keeps_state(NSButtonType t)
 - (NSString *)placeholderString { return _placeholder; }
 - (void)setPlaceholderString:(NSString *)s
 {
-    [_placeholder release];
+    id wasPlaceholder = _placeholder;
     _placeholder = [s copy];
+    [wasPlaceholder release];
     [self setNeedsDisplay:YES];
 }
 - (NSAttributedString *)placeholderAttributedString { return _placeholderAttributed; }
 - (void)setPlaceholderAttributedString:(NSAttributedString *)s
 {
-    [_placeholderAttributed release];
+    id wasPlaceholderAttributed = _placeholderAttributed;
     _placeholderAttributed = [s copy];
+    [wasPlaceholderAttributed release];
     [self setNeedsDisplay:YES];
 }
 - (BOOL)isEditable { return _editable; }
@@ -1199,15 +1207,17 @@ static BOOL keeps_state(NSButtonType t)
 - (NSColor *)backgroundColor { return _background ?: [NSColor textBackgroundColor]; }
 - (void)setBackgroundColor:(NSColor *)c
 {
-    [_background release];
+    id wasBackground = _background;
     _background = [c retain];
+    [wasBackground release];
     [self setNeedsDisplay:YES];
 }
 - (NSColor *)textColor { return _textColor ?: [NSColor textColor]; }
 - (void)setTextColor:(NSColor *)c
 {
-    [_textColor release];
+    id wasTextColor = _textColor;
     _textColor = [c retain];
+    [wasTextColor release];
     [self setNeedsDisplay:YES];
 }
 - (id)delegate { return _delegate; }

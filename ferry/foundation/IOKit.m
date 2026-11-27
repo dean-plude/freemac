@@ -511,6 +511,19 @@ kern_return_t IOMasterPort(mach_port_t bootstrapPort, mach_port_t *mainPort)
     return kIOReturnSuccess;
 }
 kern_return_t IOMainPort(mach_port_t bootstrapPort, mach_port_t *mainPort) { return IOMasterPort(bootstrapPort, mainPort); }
+/* Waiting for the registry to settle (libgphoto2's USB search, darktable):
+ * Ferry's registry has nothing in motion, so it is quiet at once */
+kern_return_t IOKitWaitQuiet(mach_port_t mainPort, mach_timespec_t *waitTime)
+{
+    (void)mainPort;
+    (void)waitTime;
+    return kIOReturnSuccess;
+}
+kern_return_t IOServiceWaitQuiet(io_service_t service, mach_timespec_t *waitTime)
+{
+    (void)waitTime;
+    return service == IO_OBJECT_NULL ? kIOReturnBadArgument : kIOReturnSuccess;
+}
 kern_return_t IORegistryEntryCreateCFProperties(io_registry_entry_t entry, CFMutableDictionaryRef *properties,
                                                 CFAllocatorRef allocator, IOOptionBits options)
 {

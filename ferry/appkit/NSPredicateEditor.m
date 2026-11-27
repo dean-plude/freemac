@@ -462,8 +462,9 @@ enum { kInt16 = 100, kInt32 = 200, kInt64 = 300, kDecimal = 400, kDouble = 500, 
     NSMutableArray *left = [NSMutableArray array];
     for (id k in [coder decodeObjectForKey:@"NSPredicateTemplateLeftKeyPaths"] ?: @[])
         [left addObject:[NSExpression expressionForKeyPath:k]];
-    [_left release];
+    id wasLeft = _left;
     _left = [left copy];
+    [wasLeft release];
     NSArray *constants = [coder decodeObjectForKey:@"NSPredicateTemplateRightConstants"];
     if ([constants count]) {
         NSMutableArray *right = [NSMutableArray array];
@@ -474,8 +475,9 @@ enum { kInt16 = 100, kInt32 = 200, kInt64 = 300, kDecimal = 400, kDouble = 500, 
     _attributeType = (NSUInteger)[coder decodeIntegerForKey:@"NSPredicateTemplateRightAttributeType"];
     NSArray *ops = [coder decodeObjectForKey:@"NSPredicateTemplateOperators"];
     if (ops) {
-        [_operators release];
+        id wasOperators = _operators;
         _operators = [ops copy];
+        [wasOperators release];
     }
     _modifier = (NSComparisonPredicateModifier)[coder decodeIntegerForKey:@"NSPredicateTemplateModifier"];
     _options = (NSUInteger)[coder decodeIntegerForKey:@"NSPredicateTemplateOptions"];

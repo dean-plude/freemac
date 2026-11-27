@@ -190,8 +190,9 @@ static const CGFloat arrow_length = 9, arrow_half = 9, corner = 9, margin = 4;
         BOOL dummy;
         v = [self _viewAt:[e locationInWindow] inside:&dummy];
     }
-    [_target release];
+    id wasTarget = _target;
     _target = [v retain];
+    [wasTarget release];
     if (!v)
         return;
     if (v != (NSView *)[w firstResponder] && [v acceptsFirstResponder])

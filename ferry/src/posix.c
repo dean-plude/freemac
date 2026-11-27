@@ -148,6 +148,20 @@ static int mac_open(const char *path, int flags, ...)
     return open(path, open_to_linux(flags), mode);
 }
 
+/* POSIX shared memory: the same named objects as here, the Mac's O_ flags
+ * turned into this system's (darktable, its GTK, freemac Ferry test apps) */
+static int mac_shm_open(const char *name, int flags, ...)
+{
+    mode_t mode = 0;
+    if (flags & 0x200) {
+        va_list ap;
+        va_start(ap, flags);
+        mode = va_arg(ap, int);
+        va_end(ap);
+    }
+    return shm_open(name, open_to_linux(flags), mode);
+}
+
 static int mac_openat(int fd, const char *path, int flags, ...)
 {
     char font[PATH_MAX];
@@ -1336,6 +1350,8 @@ const struct ferry_symbol ferry_posix_symbols[] = {
     {"OSAtomicCompareAndSwapLong", mac_OSAtomicCompareAndSwap64},
     {"OSAtomicCompareAndSwapLongBarrier", mac_OSAtomicCompareAndSwap64},
     {"open", mac_open},
+    {"shm_open", mac_shm_open},
+    {"shm_unlink", shm_unlink},
     {"openat", mac_openat},
     {"renamex_np", mac_renamex_np},
     {"renameat", mac_renameat},

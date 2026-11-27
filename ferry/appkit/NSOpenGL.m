@@ -481,8 +481,9 @@ void AGLViewDidDraw(NSView *view, CGContextRef ctx)
     if (context == _context)
         return;
     [_context clearDrawable];
-    [_context release];
+    id wasContext = _context;
     _context = [context retain];
+    [wasContext release];
     _prepared = NO;
     _needsReshape = YES;
     [_context setView:self];

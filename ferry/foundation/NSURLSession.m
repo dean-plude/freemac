@@ -1421,8 +1421,9 @@ static NSData *percent_decoded_bytes(NSString *s)
 
 - (void)_give:(NSURLResponse *)response data:(NSData *)data
 {
-    [delivered release];
+    id wasDelivered = delivered;
     delivered = [response retain];
+    [wasDelivered release];
     [owner _load:self receivedResponse:response];
     if ([data length] && !done)
         [owner _load:self receivedBytes:[data bytes] length:[data length]];
@@ -1607,8 +1608,9 @@ static NSData *percent_decoded_bytes(NSString *s)
         [self _finish:e];
         return;
     }
-    [load release];
+    id wasLoad = load;
     load = [l retain];
+    [wasLoad release];
     if (paused)
         pause_load(l, YES);
 }
@@ -1643,8 +1645,9 @@ static NSData *percent_decoded_bytes(NSString *s)
     else if (h && status == 304 && cached)
         hold = HOLD_NOT_MODIFIED;
     if (hold != HOLD_NONE) {
-        [held release];
+        id wasHeld = held;
         held = [response retain];
+        [wasHeld release];
         [heldBody release];
         heldBody = [[NSMutableData alloc] init];
         return;
@@ -1762,8 +1765,9 @@ static NSData *percent_decoded_bytes(NSString *s)
       } else if (!chosen) {
           [self _giveHeld];
       } else {
-          [request release];
+          id wasRequest = request;
           request = [chosen copy];
+          [wasRequest release];
           [self _begin];
       }
       UNLOCK_ENGINE();
@@ -1797,8 +1801,9 @@ static NSData *percent_decoded_bytes(NSString *s)
     found = dig ?: basic;
     if (!found)
         return NO;
-    [pendingMethod release];
+    id wasPendingMethod = pendingMethod;
     pendingMethod = [(found == dig ? NSURLAuthenticationMethodHTTPDigest : NSURLAuthenticationMethodHTTPBasic) retain];
+    [wasPendingMethod release];
     [pendingParams release];
     pendingParams = [[found objectAtIndex:1] copy];
     [pendingRealm release];
@@ -1852,8 +1857,9 @@ static NSData *percent_decoded_bytes(NSString *s)
     if (same && sentCredential && !retriedStale && [pendingMethod isEqualToString:NSURLAuthenticationMethodHTTPDigest] &&
         [[[pendingParams objectForKey:@"stale"] lowercaseString] isEqualToString:@"true"]) {
         retriedStale = YES;
-        [digest release];
+        id wasDigest = digest;
         digest = [pendingParams retain];
+        [wasDigest release];
         nonceCount = 0;
         [self _begin];
         return;
@@ -1862,10 +1868,12 @@ static NSData *percent_decoded_bytes(NSString *s)
         failures++;
     else if (!same)
         failures = 0;
-    [space release];
+    id wasSpace = space;
     space = [s retain];
-    [digest release];
+    [wasSpace release];
+    id wasDigest = digest;
     digest = [pendingParams retain];
+    [wasDigest release];
     nonceCount = 0;
     NSURLCredential *proposed = failures && credential ? credential : nil;
     if (!proposed && !triedURLCredential && [[url user] length])
@@ -2047,8 +2055,9 @@ static FURLExchange *new_exchange(NSURLRequest *request, id owner)
 }
 - (void)_load:(id)load receivedResponse:(NSURLResponse *)r
 {
-    [response release];
+    id wasResponse = response;
     response = [r retain];
+    [wasResponse release];
     [data setLength:0];
 }
 - (void)_load:(id)load receivedBytes:(const void *)bytes length:(size_t)length
@@ -2588,8 +2597,9 @@ enum { KIND_DATA, KIND_UPLOAD, KIND_DOWNLOAD };
 
 - (void)_load:(id)load receivedResponse:(NSURLResponse *)response
 {
-    [_response release];
+    id wasResponse = _response;
     _response = [response retain];
+    [wasResponse release];
     _expectReceive = [response expectedContentLength];
     if (_kind == KIND_DOWNLOAD) {
         [self _openFile];
@@ -2723,8 +2733,9 @@ enum { KIND_DATA, KIND_UPLOAD, KIND_DOWNLOAD };
     if (_ended)
         return;
     _ended = YES;
-    [_error release];
+    id wasError = _error;
     _error = [error retain];
+    [wasError release];
     [_exchange autorelease];
     _exchange = nil;
     if (_kind == KIND_DOWNLOAD && !error)
@@ -3151,8 +3162,9 @@ static NSURLRequest *request_for(NSURL *url) { return url ? [NSURLRequest reques
         return;
     }
     if (request != _request) {
-        [_current release];
+        id wasCurrent = _current;
         _current = [request copy];
+        [wasCurrent release];
     }
     FURLExchange *x = [new_exchange(request, self) retain];
     x->cancelCode = NSURLErrorUserCancelledAuthentication;

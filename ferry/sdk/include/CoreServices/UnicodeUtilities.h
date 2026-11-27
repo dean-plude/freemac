@@ -74,6 +74,12 @@ OSStatus UCCreateCollator(LocaleRef locale, LocaleOperationVariant opVariant, UC
 OSStatus UCDisposeCollator(CollatorRef *collatorRef);
 OSStatus UCCompareText(CollatorRef collatorRef, const UniChar *text1Ptr, UniCharCount text1Length,
                        const UniChar *text2Ptr, UniCharCount text2Length, Boolean *equivalent, SInt32 *order);
+OSStatus UCCompareTextDefault(UCCollateOptions options, const UniChar *text1Ptr, UniCharCount text1Length,
+                              const UniChar *text2Ptr, UniCharCount text2Length, Boolean *equivalent,
+                              SInt32 *order);
+OSStatus UCCompareTextNoLocale(UCCollateOptions options, const UniChar *text1Ptr, UniCharCount text1Length,
+                               const UniChar *text2Ptr, UniCharCount text2Length, Boolean *equivalent,
+                               SInt32 *order);
 OSStatus UCGetCollationKey(CollatorRef collatorRef, const UniChar *textPtr, UniCharCount textLength,
                            ItemCount maxKeySize, ItemCount *actualKeySize, UCCollationValue collationKey[]);
 OSStatus UCCompareCollationKeys(const UCCollationValue *key1Ptr, ItemCount key1Length,

@@ -571,8 +571,9 @@ static id decoded(NSCoder *c, NSString *key, Class cls)
     }
     NSCell *data = decoded(coder, @"NSDataCell", [NSCell class]);
     if (data) {
-        [_dataCell release];
+        id wasDataCell = _dataCell;
         _dataCell = [data retain];
+        [wasDataCell release];
     }
     if ([coder containsValueForKey:@"NSResizingMask"])
         _resizing = (NSTableColumnResizingOptions)[coder decodeIntegerForKey:@"NSResizingMask"];
@@ -621,8 +622,9 @@ static id decoded(NSCoder *c, NSString *key, Class cls)
 - (NSUserInterfaceItemIdentifier)identifier { return _identifier; }
 - (void)setIdentifier:(NSUserInterfaceItemIdentifier)i
 {
-    [_identifier release];
+    id wasIdentifier = _identifier;
     _identifier = [i copy];
+    [wasIdentifier release];
 }
 - (NSTableView *)tableView { return _tableView; }
 - (void)setTableView:(NSTableView *)t { _tableView = t; }
@@ -661,8 +663,9 @@ static id decoded(NSCoder *c, NSString *key, Class cls)
 - (NSString *)headerToolTip { return _toolTip; }
 - (void)setHeaderToolTip:(NSString *)t
 {
-    [_toolTip release];
+    id wasToolTip = _toolTip;
     _toolTip = [t copy];
+    [wasToolTip release];
 }
 - (id)headerCell { return _headerCell; }
 - (void)setHeaderCell:(NSTableHeaderCell *)c
@@ -700,8 +703,9 @@ static id decoded(NSCoder *c, NSString *key, Class cls)
 - (NSSortDescriptor *)sortDescriptorPrototype { return _prototype; }
 - (void)setSortDescriptorPrototype:(NSSortDescriptor *)d
 {
-    [_prototype release];
+    id wasPrototype = _prototype;
     _prototype = [d copy];
+    [wasPrototype release];
 }
 - (void)sizeToFit
 {
@@ -980,8 +984,9 @@ static id decoded(NSCoder *c, NSString *key, Class cls)
 - (NSColor *)backgroundColor { return _background; }
 - (void)setBackgroundColor:(NSColor *)c
 {
-    [_background release];
+    id wasBackground = _background;
     _background = [c copy];
+    [wasBackground release];
     [self setNeedsDisplay:YES];
 }
 - (CGFloat)indentationForDropOperation { return _dropIndent; }
@@ -1080,8 +1085,9 @@ static id decoded(NSCoder *c, NSString *key, Class cls)
 - (NSArray *)draggingImageComponents { return _dragImages; }
 - (void)setDraggingImageComponents:(NSArray *)a
 {
-    [_dragImages release];
+    id wasDragImages = _dragImages;
     _dragImages = [a retain];
+    [wasDragImages release];
 }
 - (NSBackgroundStyle)backgroundStyle { return _backgroundStyle; }
 /* Passed on to the controls inside, so their text turns white on a
@@ -2119,15 +2125,17 @@ enum {
 - (NSColor *)backgroundColor { return _background ?: [NSColor controlBackgroundColor]; }
 - (void)setBackgroundColor:(NSColor *)c
 {
-    [_background release];
+    id wasBackground = _background;
     _background = [c copy];
+    [wasBackground release];
     [self setNeedsDisplay:YES];
 }
 - (NSColor *)gridColor { return _grid ?: [NSColor gridColor]; }
 - (void)setGridColor:(NSColor *)c
 {
-    [_grid release];
+    id wasGrid = _grid;
     _grid = [c copy];
+    [wasGrid release];
     [self setNeedsDisplay:YES];
 }
 - (NSTableViewGridLineStyle)gridStyleMask { return _gridMask; }
@@ -2171,8 +2179,9 @@ enum {
 - (NSString *)autosaveName { return _autosaveName; }
 - (void)setAutosaveName:(NSString *)n
 {
-    [_autosaveName release];
+    id wasAutosaveName = _autosaveName;
     _autosaveName = [n copy];
+    [wasAutosaveName release];
 }
 - (BOOL)autosaveTableColumns { return _autosaveColumns; }
 - (void)setAutosaveTableColumns:(BOOL)f { _autosaveColumns = f; }
@@ -3103,8 +3112,9 @@ enum {
     if (![self _putRows:rows onPasteboard:pb])
         return NO;
     _clickDeferred = NO;
-    [_dragRows release];
+    id wasDragRows = _dragRows;
     _dragRows = [rows retain];
+    [wasDragRows release];
     NSMutableArray *items = [NSMutableArray array];
     [rows enumerateIndexesUsingBlock:^(NSUInteger r, BOOL *stop) {
         NSDraggingItem *item = [[[NSDraggingItem alloc] initWithPasteboardWriter:nil] autorelease];

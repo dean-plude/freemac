@@ -718,8 +718,9 @@ typedef struct {
     if (c == _container)
         return;
     [_container setTextView:nil];
-    [_container release];
+    id wasContainer = _container;
     _container = [c retain];
+    [wasContainer release];
     [c setTextView:self];
     if (![c layoutManager])
         [_manager addTextContainer:c];
@@ -767,21 +768,24 @@ typedef struct {
 - (NSColor *)backgroundColor { return _background ?: [NSColor textBackgroundColor]; }
 - (void)setBackgroundColor:(NSColor *)c
 {
-    [_background release];
+    id wasBackground = _background;
     _background = [c copy];
+    [wasBackground release];
     [self setNeedsDisplay:YES];
 }
 - (NSColor *)insertionPointColor { return _insertionColor ?: [NSColor textColor]; }
 - (void)setInsertionPointColor:(NSColor *)c
 {
-    [_insertionColor release];
+    id wasInsertionColor = _insertionColor;
     _insertionColor = [c copy];
+    [wasInsertionColor release];
 }
 - (NSDictionary *)typingAttributes { return _typing; }
 - (void)setTypingAttributes:(NSDictionary *)a
 {
-    [_typing release];
+    id wasTyping = _typing;
     _typing = [a copy];
+    [wasTyping release];
 }
 #define ATTRS(get, set, ivar)                                                                                    \
     -(NSDictionary *)get { return ivar; }                                                                        \
@@ -796,8 +800,9 @@ ATTRS(markedTextAttributes, setMarkedTextAttributes, _markedAttrs)
 - (NSParagraphStyle *)defaultParagraphStyle { return _paragraph; }
 - (void)setDefaultParagraphStyle:(NSParagraphStyle *)p
 {
-    [_paragraph release];
+    id wasParagraph = _paragraph;
     _paragraph = [p copy];
+    [wasParagraph release];
 }
 - (NSFont *)font
 {

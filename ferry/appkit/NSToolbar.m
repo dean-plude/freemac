@@ -195,27 +195,31 @@ static BOOL is_space(NSString *ident)
 - (NSString *)label { return _label; }
 - (void)setLabel:(NSString *)s
 {
-    [_label release];
+    id wasLabel = _label;
     _label = [s ?: @"" copy];
+    [wasLabel release];
     [self _changed];
 }
 - (NSString *)paletteLabel { return [_paletteLabel length] ? _paletteLabel : _label; }
 - (void)setPaletteLabel:(NSString *)s
 {
-    [_paletteLabel release];
+    id wasPaletteLabel = _paletteLabel;
     _paletteLabel = [s ?: @"" copy];
+    [wasPaletteLabel release];
 }
 - (NSString *)toolTip { return _toolTip; }
 - (void)setToolTip:(NSString *)s
 {
-    [_toolTip release];
+    id wasToolTip = _toolTip;
     _toolTip = [s copy];
+    [wasToolTip release];
 }
 - (NSString *)title { return _title; }
 - (void)setTitle:(NSString *)s
 {
-    [_title release];
+    id wasTitle = _title;
     _title = [s ?: @"" copy];
+    [wasTitle release];
     [self _changed];
 }
 - (NSMenuItem *)menuFormRepresentation { return _menuForm; }
@@ -446,8 +450,9 @@ static BOOL is_space(NSString *ident)
 - (NSArray *)subitems { return _subitems ?: @[]; }
 - (void)setSubitems:(NSArray *)items
 {
-    [_subitems release];
+    id wasSubitems = _subitems;
     _subitems = [items copy];
+    [wasSubitems release];
     for (NSToolbarItem *i in _subitems)
         [i _setToolbar:[self toolbar]];
     [self _changed];
@@ -873,8 +878,9 @@ static NSArray *identifiers_of(NSArray *items)
 - (NSToolbarItemIdentifier)selectedItemIdentifier { return _selected; }
 - (void)setSelectedItemIdentifier:(NSToolbarItemIdentifier)ident
 {
-    [_selected release];
+    id wasSelected = _selected;
     _selected = [ident copy];
+    [wasSelected release];
     [_view setNeedsDisplay:YES];
     for (NSView *b in [_view subviews])
         [b setNeedsDisplay:YES];
@@ -882,8 +888,9 @@ static NSArray *identifiers_of(NSArray *items)
 - (NSToolbarItemIdentifier)centeredItemIdentifier { return _centered; }
 - (void)setCenteredItemIdentifier:(NSToolbarItemIdentifier)ident
 {
-    [_centered release];
+    id wasCentered = _centered;
     _centered = [ident copy];
+    [wasCentered release];
     [_view invalidate];
 }
 - (BOOL)customizationPaletteIsRunning { return NO; }

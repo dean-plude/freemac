@@ -728,8 +728,9 @@ static void call_back(ADocumentCallback *c, id object, BOOL flag)
         } else {
             if (ext && ![[url pathExtension] length])
                 url = [url URLByAppendingPathExtension:ext];
-            [_lastPanelType release];
+            id wasLastPanelType = _lastPanelType;
             _lastPanelType = [type copy];
+            [wasLastPanelType release];
             [self saveToURL:url ofType:type forSaveOperation:operation delegate:cb->delegate
                  didSaveSelector:cb->selector contextInfo:cb->context];
         }
@@ -963,8 +964,9 @@ static NSURL *autosave_url(NSString *name, NSString *what, NSString *ext)
     NSURL *copy = autosave_url([[url path] lastPathComponent], @"Last Saved", [[url path] pathExtension]);
     if (![fm copyItemAtPath:[url path] toPath:[copy path] error:error])
         return NO;
-    [_lastSaved release];
+    id wasLastSaved = _lastSaved;
     _lastSaved = [copy retain];
+    [wasLastSaved release];
     return YES;
 }
 - (void)_forgetLastSavedVersion

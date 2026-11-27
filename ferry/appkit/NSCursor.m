@@ -193,8 +193,9 @@ static void show_everywhere(void)
 - (void)set
 {
     if (current != self) {
-        [current release];
+        id wasCurrent = current;
         current = [self retain];
+        [wasCurrent release];
     }
     show_everywhere();
 }
