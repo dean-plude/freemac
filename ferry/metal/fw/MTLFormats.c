@@ -420,6 +420,12 @@ unsigned int __ferry_tex_atomic(const struct __ferry_tex *t, int x, int y, int z
               return o; }
     case 6: return __atomic_exchange_n(p, v, __ATOMIC_SEQ_CST);
     case 7: { unsigned o = cmp; __atomic_compare_exchange_n(p, &o, v, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); return o; }
+    case 8: { int o = __atomic_load_n((int *)p, __ATOMIC_SEQ_CST);   /* signed min and max */
+              while ((int)v < o && !__atomic_compare_exchange_n((int *)p, &o, (int)v, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {}
+              return (unsigned)o; }
+    case 9: { int o = __atomic_load_n((int *)p, __ATOMIC_SEQ_CST);
+              while ((int)v > o && !__atomic_compare_exchange_n((int *)p, &o, (int)v, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {}
+              return (unsigned)o; }
     }
     return 0;
 }

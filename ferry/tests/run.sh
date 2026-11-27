@@ -180,6 +180,14 @@ run_one() {
         coreaudio_pulse)
             env -u FERRY_AUDIO PULSE_SERVER="unix:$pulse_dir/native" HOME="$pulse_dir/home" XDG_RUNTIME_DIR="$pulse_dir" \
                 FERRY_TEST_PACTL="$pulse_pactl" timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        # MIDI synthesis (freemac 1.NEXT): as if FluidSynth weren't installed,
+        # and with the FluidSynth and General MIDI SoundFont found below
+        coreaudio_synth_missing)
+            FERRY_AUDIO=null FERRY_FLUIDSYNTH_LIBRARY="$build/none/libfluidsynth.so.3" \
+                timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        coreaudio_synth)
+            FERRY_AUDIO=null FERRY_FLUIDSYNTH_LIBRARY="$synth_library" FERRY_SOUNDFONT="$synth_bank" \
+                timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         coreaudio_*) FERRY_AUDIO=null timeout 60 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         # WebKit (freemac 1.214, Ferry 0.40.0): two tests with no display
         # (one as if WebKitGTK weren't installed), and the others on the X
@@ -1489,6 +1497,11 @@ run_one foundation_framework_calls "$here/foundation/framework_calls.m" "$here/f
 run_one foundation_keycastr_calls "$here/foundation/keycastr_calls.m" "$here/foundation/keycastr_calls.out" \
     -fobjc-arc -fblocks -framework Foundation -framework ServiceManagement -framework Security \
     -framework SystemConfiguration
+# What the Godot engine's Mac build calls besides (freemac Godot work): a HID
+# manager and Force Feedback that find no devices, registry IDs, the
+# program's segments, whole-vector math, colour spaces and volume keys.
+run_one foundation_godot_calls "$here/foundation/godot_calls.m" "$here/foundation/godot_calls.out" \
+    -fobjc-arc -framework Foundation -framework IOKit -framework ForceFeedback -framework CoreGraphics
 # What MacPass, MacDown and their frameworks call (freemac 1.225, Ferry
 # 0.49.0): the Darwin and ObjectiveC modules, KVC through indexed and set
 # accessors, NSValue's bytes, URL components, binary search, an attributed
@@ -1825,6 +1838,24 @@ if ls /lib/x86_64-linux-gnu/libavcodec.so.* /usr/lib/x86_64-linux-gnu/libavcodec
     run_one coreaudio_codec "$here/coreaudio/codec.c" "$here/coreaudio/codec.out" -fblocks $ca_frameworks
 else
     echo "skip coreaudio_codec (it needs this system's FFmpeg libraries)"
+fi
+# the synth units and AUGraph, as VLC's MIDI decoder uses them: always as if
+# FluidSynth weren't installed, and with this system's FluidSynth and a
+# General MIDI SoundFont where it has them (FERRY_TEST_FLUIDSYNTH and
+# FERRY_TEST_SOUNDFONT name others)
+run_one coreaudio_synth_missing "$here/coreaudio/synth.c" "$here/coreaudio/synth_missing.out" -fblocks $ca_frameworks
+synth_library=${FERRY_TEST_FLUIDSYNTH:-}
+for lib in /usr/lib/x86_64-linux-gnu/libfluidsynth.so.3 /usr/lib64/libfluidsynth.so.3 /usr/lib/libfluidsynth.so.3; do
+    [ -z "$synth_library" ] && [ -f "$lib" ] && synth_library=$lib
+done
+synth_bank=${FERRY_TEST_SOUNDFONT:-}
+for bank in /usr/share/sounds/sf2/FluidR3_GM.sf2 /usr/share/sounds/sf2/default-GM.sf2 /usr/share/soundfonts/default.sf2; do
+    [ -z "$synth_bank" ] && [ -f "$bank" ] && synth_bank=$bank
+done
+if [ -n "$synth_library" ] && [ -n "$synth_bank" ]; then
+    run_one coreaudio_synth "$here/coreaudio/synth.c" "$here/coreaudio/synth.out" -fblocks $ca_frameworks
+else
+    echo "skip coreaudio_synth (it needs FluidSynth's libfluidsynth and a General MIDI SoundFont)"
 fi
 pulse_bin=${FERRY_TEST_PULSEAUDIO:-$(command -v pulseaudio || true)}
 pulse_pactl=${FERRY_TEST_PACTL:-$(command -v pactl || true)}

@@ -164,7 +164,8 @@ static NSArray *arguments_of(NSDictionary *info)
             MTLArgument *a = [[MTLArgument alloc] init];
             a->_name = [b[@"name"] copy];
             a->_type = types[k];
-            a->_index = [b[@"index"] unsignedIntegerValue];
+            id index = b[@"index"]; /* null: set by a function constant not yet given */
+            a->_index = [index isKindOfClass:[NSNumber class]] ? [index unsignedIntegerValue] : 0;
             [out addObject:a];
             [a release];
         }
@@ -408,6 +409,17 @@ static NSString *compile(NSString *source, MTLCompileOptions *options, NSArray *
     if (stat([mslc fileSystemRepresentation], &st) == 0) {
         fnv(&h, &st.st_mtime, sizeof st.st_mtime);
         fnv(&h, &st.st_size, sizeof st.st_size);
+    }
+    /* and on the headers it compiles against, so a changed header rebuilds */
+    NSString *mslc_dir = [mslc stringByDeletingLastPathComponent];
+    for (NSString *d in @[ [mslc_dir stringByAppendingPathComponent:@"msl"], @"/usr/share/ferry/metal/msl" ]) {
+        NSArray *names = [[[NSFileManager defaultManager] contentsOfDirectoryAtPath:d error:NULL]
+            sortedArrayUsingSelector:@selector(compare:)];
+        for (NSString *n in names) {
+            if (stat([[d stringByAppendingPathComponent:n] fileSystemRepresentation], &st) != 0) continue;
+            fnv(&h, &st.st_mtime, sizeof st.st_mtime);
+            fnv(&h, &st.st_size, sizeof st.st_size);
+        }
     }
     const char *src = [source UTF8String];
     fnv(&h, src, strlen(src) + 1);
@@ -683,10 +695,22 @@ static MTLDataType slot_type(const struct ferry_slot *s)
     return d;
 }
 id<MTLArgumentEncoder> FerryMTLNewArgumentEncoder(NSArray *arguments);
+id<MTLArgumentEncoder> FerryMTLNewArgumentEncoderLaidOut(const struct ferry_arg *a, int n, int size);
 - (id<MTLArgumentEncoder>)newArgumentEncoderWithBufferIndex:(NSUInteger)index
 {
-    mtl_log("%s: an argument encoder made from a function's buffer %lu isn't done yet "
-            "(one made from argument descriptors is)", [_name UTF8String], (unsigned long)index);
+    /* the shader lists where its struct's [[id(n)]] members are */
+    for (NSDictionary *b in _info[@"buffers"]) {
+        NSNumber *bi = nonnull(b[@"index"]);
+        NSString *sym = nonnull(b[@"arguments"]);
+        if (![bi isKindOfClass:[NSNumber class]] || [bi unsignedIntegerValue] != index || !sym) continue;
+        int (*fill)(struct ferry_arg *, int, int *) = dlsym(_library->_handle, [sym UTF8String]);
+        if (!fill) break;
+        struct ferry_arg a[64];
+        int size = 0, n = fill(a, 64, &size);
+        return FerryMTLNewArgumentEncoderLaidOut(a, n < 0 ? 0 : n > 64 ? 64 : n, size);
+    }
+    mtl_log("%s: buffer %lu isn't an argument buffer (a struct with [[id(n)]] members)", [_name UTF8String],
+            (unsigned long)index);
     return FerryMTLNewArgumentEncoder(@[]);
 }
 - (id<MTLArgumentEncoder>)newArgumentEncoderWithBufferIndex:(NSUInteger)index
@@ -803,6 +827,13 @@ FERRY_DESC_ARRAY(MTLPipelineBufferDescriptorArray, MTLPipelineBufferDescriptor, 
     }
     return self;
 }
+/* Like Metal's, an empty vertex descriptor is there to fill in from the start
+ * (programs such as Blender set desc.vertexDescriptor.attributes[i] directly). */
+- (MTLVertexDescriptor *)vertexDescriptor
+{
+    if (!_vertexDescriptor) _vertexDescriptor = [[MTLVertexDescriptor alloc] init];
+    return _vertexDescriptor;
+}
 - (void)dealloc { FerryMTLReleaseIvars(self); [super dealloc]; }
 - (id)copyWithZone:(NSZone *)zone { return FerryMTLCopyDescriptor(self, zone); }
 - (void)reset
@@ -893,10 +924,18 @@ id<MTLRenderPipelineState> FerryMTLNewRenderPipeline(MTLRenderPipelineDescriptor
     if (fs && (![fs isKindOfClass:[FerryMTLFunction class]] || fs->_fn.stage != 2 || !fs->_fn.fs))
         return fail(error, MTLRenderPipelineErrorDomain, MTLRenderPipelineErrorInvalidInput,
                     @"the render pipeline's fragment function isn't one");
-    if ([vs->_info[@"stage_in"] count] && !d.vertexDescriptor)
-        return fail(error, MTLRenderPipelineErrorDomain, MTLRenderPipelineErrorInvalidInput,
-                    [NSString stringWithFormat:@"%@ reads [[stage_in]] but the pipeline has no vertex descriptor",
-                                               vs->_name]);
+    if ([vs->_info[@"stage_in"] count]) {
+        MTLVertexDescriptor *vd = d.vertexDescriptor;
+        int any = 0;
+        for (unsigned i = 0; i < 31 && !any; i++) {
+            MTLVertexAttributeDescriptor *a = [vd->_attributes ferryPeek:i];
+            any = a && a.format != MTLVertexFormatInvalid;
+        }
+        if (!any)
+            return fail(error, MTLRenderPipelineErrorDomain, MTLRenderPipelineErrorInvalidInput,
+                        [NSString stringWithFormat:@"%@ reads [[stage_in]] but the pipeline's vertex descriptor has no attributes",
+                                                   vs->_name]);
+    }
     FerryMTLRenderPipelineState *ps = [[FerryMTLRenderPipelineState alloc] init];
     struct mtl_rpipe *p = &ps->_p;
     ps->_label = [d.label copy];
@@ -936,6 +975,8 @@ id<MTLRenderPipelineState> FerryMTLNewRenderPipeline(MTLRenderPipelineDescriptor
                     if (k >= FERRY_VS_VARYINGS) p->interp[k - FERRY_VS_VARYINGS] = FERRY_I_FLAT;
             break;
         case FERRY_W_POINT_SIZE: p->has_point_size = 1; break;
+        case FERRY_W_LAYER: p->writes_layer = 1; break;
+        case FERRY_W_VIEWPORT: p->writes_viewport = 1; break;
         case FERRY_W_CLIP_DISTANCE:
             if (end - FERRY_VS_CLIP > p->nclip) p->nclip = end - FERRY_VS_CLIP;
             break;
@@ -1168,5 +1209,23 @@ id<MTLArgumentEncoder> FerryMTLNewArgumentEncoder(NSArray *arguments)
     }
     e->_length = off;
     e->_align = maxalign;
+    return e;
+}
+
+id<MTLArgumentEncoder> FerryMTLNewArgumentEncoderLaidOut(const struct ferry_arg *a, int n, int size)
+{
+    FerryMTLArgumentEncoder *e = [[FerryMTLArgumentEncoder alloc] init];
+    e->_n = (NSUInteger)n;
+    e->_slots = calloc(n ? (size_t)n : 1, sizeof(struct argslot));
+    for (int i = 0; i < n; i++) {
+        MTLDataType t = a[i].type == FERRY_A_SAMPLER ? MTLDataTypeSampler
+                        : a[i].type == FERRY_A_TEXTURE ? MTLDataTypeTexture
+                        : a[i].type == FERRY_A_BUFFER  ? MTLDataTypePointer
+                                                        : MTLDataTypeStruct;
+        e->_slots[i] = (struct argslot){(NSUInteger)a[i].id, a[i].count > 0 ? (NSUInteger)a[i].count : 1,
+                                        (NSUInteger)a[i].offset, (NSUInteger)a[i].stride, t};
+    }
+    e->_length = (NSUInteger)size;
+    e->_align = 16;
     return e;
 }

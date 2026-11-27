@@ -1314,6 +1314,14 @@ APPKIT_EXTERN void NSEnableScreenUpdates(void);
 @property (readonly, copy) NSString *localizedName;
 @property (readonly, copy) NSDictionary *deviceDescription;
 @end
+/* a device description's keys (freemac Godot work) */
+typedef NSString *NSDeviceDescriptionKey;
+APPKIT_EXTERN NSDeviceDescriptionKey const NSDeviceResolution;
+APPKIT_EXTERN NSDeviceDescriptionKey const NSDeviceColorSpaceName;
+APPKIT_EXTERN NSDeviceDescriptionKey const NSDeviceBitsPerSample;
+APPKIT_EXTERN NSDeviceDescriptionKey const NSDeviceIsScreen;
+APPKIT_EXTERN NSDeviceDescriptionKey const NSDeviceIsPrinter;
+APPKIT_EXTERN NSDeviceDescriptionKey const NSDeviceSize;
 /* to and from the screen's pixels (freemac 1.238, Ferry 0.62.0; appkit/ACapture.m) */
 @interface NSScreen (FerryBacking)
 - (NSRect)convertRectToBacking:(NSRect)rect;
@@ -1487,6 +1495,7 @@ enum { NSModalResponseStop = -1000, NSModalResponseAbort = -1001, NSModalRespons
 @end
 APPKIT_EXTERN NSApplication *NSApp;
 int NSApplicationMain(int argc, const char *argv[]);
+BOOL NSApplicationLoad(void);
 APPKIT_EXTERN NSNotificationName const NSApplicationWillFinishLaunchingNotification;
 APPKIT_EXTERN NSNotificationName const NSApplicationDidFinishLaunchingNotification;
 APPKIT_EXTERN NSNotificationName const NSApplicationWillTerminateNotification;
@@ -4750,6 +4759,8 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidUpdateNotification;
 
 /* ---- what IINA calls besides (AppKitIINA.m), (freemac 1.262, Ferry 0.85.0) */
 #import <AppKit/AppKitIINA.h>
+/* ---- what the Godot engine calls besides (AppKitGodot.m), (freemac Godot work) */
+#import <AppKit/AppKitGodot.h>
 
 /* ---- OpenGL: NSOpenGLPixelFormat, NSOpenGLContext, NSOpenGLView (NSOpenGL.m)
  * (freemac 1.235, Ferry 0.59.0) */

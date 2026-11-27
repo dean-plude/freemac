@@ -919,7 +919,7 @@ static void *trie_lookup(struct image *im, const char *raw, int depth)
  * directory named by $FERRY_FRAMEWORKS, next to the ferry program
  * (frameworks/), or in /usr/lib/ferry/frameworks. A few Apple libraries are
  * served by one of Ferry's: CoreFoundation, SystemConfiguration and
- * CoreServices (Gestalt and login items), ServiceManagement, IOKit (foundation/IOKit.m) and
+ * CoreServices (Gestalt and login items), ServiceManagement, IOKit and ForceFeedback (foundation/IOKit.m) and
  * UniformTypeIdentifiers live inside Foundation, and CoreText, ApplicationServices and ImageIO inside CoreGraphics, and Carbon
  * (the few calls Cocoa apps still make, appkit/Carbon.m) inside AppKit, and
  * AudioToolbox and AudioUnit inside CoreAudio. */
@@ -931,6 +931,7 @@ static const struct { const char *name, *served_by; } framework_aliases[] = {
     {"CoreServices", "Foundation"}, /* Gestalt, next to NSProcessInfo, and login items (LoginItems.m) */
     {"ServiceManagement", "Foundation"}, /* SMLoginItemSetEnabled, foundation/LoginItems.m */
     {"IOKit", "Foundation"},             /* the registry and power assertions, foundation/IOKit.m */
+    {"ForceFeedback", "Foundation"},     /* no force feedback devices, foundation/IOKit.m (Godot) */
     {"UniformTypeIdentifiers", "Foundation"}, /* UTType, foundation/UTTypes.m (freemac 1.225) */
     {"CoreText", "CoreGraphics"},
     {"ApplicationServices", "CoreGraphics"},
@@ -1384,6 +1385,68 @@ const char *ferry_image_nearest(struct image *im, const void *addr, void **symbo
         return NULL;
     *symbol_addr = (void *)best_value;
     return best[0] == '_' ? best + 1 : best;
+}
+
+/* Each function or datum the image defines, local or exported, by its
+ * Mach-O name and address. */
+void ferry_image_each_symbol(struct image *im, void (*fn)(const char *name, void *addr, void *ctx), void *ctx)
+{
+    if (!im || !im->symtab)
+        return;
+    const struct macho_nlist *syms = (const void *)(im->file + im->symtab->symoff);
+    const char *strs = (const char *)im->file + im->symtab->stroff;
+    for (uint32_t i = 0; i < im->symtab->nsyms; i++) {
+        const struct macho_nlist *sym = &syms[i];
+        if ((sym->n_type & N_STAB_MASK) || (sym->n_type & N_TYPE_MASK) != N_SECT || sym->n_strx >= im->symtab->strsize)
+            continue;
+        fn(strs + sym->n_strx, (void *)(sym->n_value + im->slide), ctx);
+    }
+}
+
+static int address_order(const void *a, const void *b)
+{
+    uintptr_t x = *(const uintptr_t *)a, y = *(const uintptr_t *)b;
+    return x < y ? -1 : x > y;
+}
+
+/* Points every pointer in the image's data (its sections outside __TEXT,
+ * zero-filled ones aside) that holds from[i] at to[i] instead, as virtual
+ * tables hold their functions. from is sorted here, with to alongside. */
+int ferry_image_replace_pointers(struct image *im, uintptr_t (*pairs)[2], int n)
+{
+    if (!im || n <= 0)
+        return 0;
+    qsort(pairs, (size_t)n, sizeof *pairs, address_order);
+    int replaced = 0;
+    for (int i = 0; i < im->nsect; i++) {
+        struct section *sec = &im->sect[i];
+        uint8_t type = sec->flags & 0xff;
+        if (!strcmp(sec->segname, "__TEXT") || !strcmp(sec->segname, "__LINKEDIT") || type == 0x1 ||
+            type == 0xc || type == 0x12 || sec->size < 8)
+            continue;
+        uintptr_t start = sec->addr + im->slide, end = start + sec->size;
+        uintptr_t page = start & ~(PAGE - 1), page_end = ALIGN_UP(end);
+        int opened = 0;
+        for (uintptr_t *w = (uintptr_t *)((start + 7) & ~(uintptr_t)7); (uintptr_t)(w + 1) <= end; w++) {
+            uintptr_t key = *w;
+            uintptr_t (*hit)[2] = bsearch(&key, pairs, (size_t)n, sizeof *pairs, address_order);
+            if (!hit)
+                continue;
+            if (!opened) {
+                if (mprotect((void *)page, page_end - page, PROT_READ | PROT_WRITE))
+                    break;
+                opened = 1;
+            }
+            *w = (*hit)[1];
+            replaced++;
+        }
+        if (opened && im->complete) {
+            for (int s = 0; s < im->nseg; s++)
+                if (!strcmp(im->seg[s].name, sec->segname))
+                    mprotect((void *)page, page_end - page, to_prot(im->seg[s].prot));
+        }
+    }
+    return replaced;
 }
 
 /* NSBundle's principal class when Info.plist names none: the first class

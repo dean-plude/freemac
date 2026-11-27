@@ -175,6 +175,40 @@ static struct mac_zone *mac_malloc_create_zone(size_t start, unsigned flags)
     return z;
 }
 
+/* malloc_get_all_zones: the default zone alone, which serves every block
+ * here. malloc_zone_register and _unregister take note of nothing, since
+ * a zone a program brings is not asked for memory (this system's malloc
+ * serves it all). malloc_zone_statistics reports this system's figures
+ * (freemac Blender work). */
+static int mac_malloc_get_all_zones(unsigned task, void *reader, uintptr_t **addresses, unsigned *count)
+{
+    static uintptr_t zones[1];
+    zones[0] = (uintptr_t)&default_zone;
+    if (addresses)
+        *addresses = zones;
+    if (count)
+        *count = 1;
+    return 0;
+}
+static void mac_malloc_zone_register(void *zone) { (void)zone; }
+static void mac_malloc_zone_unregister(void *zone) { (void)zone; }
+
+struct mac_malloc_statistics {
+    unsigned blocks_in_use;
+    size_t size_in_use, max_size_in_use, size_allocated;
+};
+
+static void mac_malloc_zone_statistics(void *zone, struct mac_malloc_statistics *st)
+{
+    if (!st)
+        return;
+    struct mallinfo2 mi = mallinfo2();
+    st->blocks_in_use = (unsigned)(mi.ordblks + mi.hblks);
+    st->size_in_use = mi.uordblks + mi.hblkhd;
+    st->max_size_in_use = st->size_in_use;
+    st->size_allocated = mi.arena + mi.hblkhd;
+}
+
 static void mac_malloc_destroy_zone(struct mac_zone *z)
 {
     if (z && z != &default_zone && z != &purgeable_zone)
@@ -1161,6 +1195,10 @@ const struct ferry_symbol ferry_libc_more_symbols[] = {
     {"memset_pattern16", mac_memset_pattern16},
     {"memset_s", mac_memset_s},
     {"malloc_default_zone", mac_malloc_default_zone},
+    {"malloc_get_all_zones", mac_malloc_get_all_zones},
+    {"malloc_zone_register", mac_malloc_zone_register},
+    {"malloc_zone_unregister", mac_malloc_zone_unregister},
+    {"malloc_zone_statistics", mac_malloc_zone_statistics},
     {"malloc_default_purgeable_zone", mac_malloc_default_purgeable_zone},
     {"malloc_create_zone", mac_malloc_create_zone},
     {"malloc_destroy_zone", mac_malloc_destroy_zone},

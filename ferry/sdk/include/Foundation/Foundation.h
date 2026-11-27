@@ -2304,6 +2304,10 @@ FOUNDATION_EXPORT NSURLResourceKey const NSURLNameKey, NSURLLocalizedNameKey, NS
 FOUNDATION_EXPORT NSURLResourceKey const NSURLVolumeIdentifierKey;
 /* freemac 1.262: whether the volume is on this computer, not a network share */
 FOUNDATION_EXPORT NSURLResourceKey const NSURLVolumeIsLocalKey;
+FOUNDATION_EXPORT NSURLResourceKey const NSURLVolumeURLKey;
+FOUNDATION_EXPORT NSURLResourceKey const NSURLVolumeSupportsCaseSensitiveNamesKey;
+FOUNDATION_EXPORT NSURLResourceKey const NSURLIsSystemImmutableKey;
+FOUNDATION_EXPORT NSURLResourceKey const NSURLIsUserImmutableKey;
 /* a volume's size and free space, in bytes (freemac OBS work); the free
  * space is the same for important and opportunistic use */
 FOUNDATION_EXPORT NSURLResourceKey const NSURLVolumeTotalCapacityKey, NSURLVolumeAvailableCapacityKey,

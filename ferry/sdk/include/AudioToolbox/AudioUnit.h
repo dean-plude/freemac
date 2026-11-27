@@ -9,4 +9,5 @@
 #include <AudioToolbox/AudioOutputUnit.h>
 #include <AudioToolbox/AudioUnitProperties.h>
 #include <AudioToolbox/AudioUnitParameters.h>
+#include <AudioToolbox/MusicDevice.h>
 #endif

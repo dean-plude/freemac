@@ -466,9 +466,42 @@ When playing, VLC's videotoolbox decoder parses the stream, gets
 kVTCouldNotFindVideoDecoderErr from the session and hands over to avcodec,
 and the video plays as before. Test: `tests/appkit/videotoolbox_vlc.c`.
 
+## MIDI files, with a free General MIDI bank (freemac 1.NEXT)
+
+VLC plays .mid files with its audiotoolbox_midi decoder, which builds an
+AUGraph (a DLS or MIDI synth into a peak limiter into a generic output),
+sends it MIDI events and pulls the sound out. It didn't build, because
+Ferry had no AUGraph or MusicDevice. Now it builds and plays:
+
+- `coreaudio/CAGraph.m` is AUGraph: nodes, connections, render callbacks
+  and notifies. Initializing passes the head's MaximumFramesPerSlice to
+  every node and each source's output format to the input it feeds.
+- `coreaudio/CAMusicDevice.m` registers three units: Apple's DLS synth and
+  AUMIDISynth (both play through FluidSynth) and AUPeakLimiter. The synth
+  takes MIDI events at their sample offsets, SysEx, StartNote and StopNote,
+  and kMusicDeviceProperty_SoundBankURL for an app's own .sf2 bank.
+- FluidSynth is the host's libfluidsynth (LGPL-2.1+), reached through
+  `ferry_synth_symbol` in `src/host.c`, as Ferry reaches the host's sound.
+- The bank, when the app names none, is FluidR3_GM (MIT licence, Debian's
+  fluid-soundfont-gm) at /usr/share/sounds/sf2/FluidR3_GM.sf2, then
+  default-GM.sf2, then a few other free banks. `FERRY_SOUNDFONT` names
+  another, and `FERRY_FLUIDSYNTH_LIBRARY` another library.
+- With no FluidSynth or no bank, AUGraphInitialize fails with
+  kAudioUnitErr_FailedInitialization and VLC says it can't play the file,
+  rather than crashing.
+- AUGraph and MusicDevice calls are now in AudioToolbox's and AudioUnit's
+  link stubs (`sdk/gen-alias-tbd.sh`).
+
+The download needs `libfluidsynth3` and `fluid-soundfont-gm` in
+`build/packages/desktop.list` for MIDI to play there.
+
+Tests: `tests/coreaudio/synth.c` runs VLC's graph, a note at an offset,
+the MIDI synth and the limiter. Without FluidSynth and a bank it checks
+the failure (synth_missing.out); with them (on the machine, or named by
+`FERRY_TEST_FLUIDSYNTH` and `FERRY_TEST_SOUNDFONT`) it checks the sound.
+
 ## Still to do
 
-- The MIDI module (AudioToolbox's AUGraph) doesn't build yet.
 - The keychain, speech, the CD module and SecureTransport don't build
   yet.
 - The download doesn't include Ferry's VLC build yet; this is Ferry's test

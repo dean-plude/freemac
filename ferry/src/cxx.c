@@ -90,8 +90,10 @@ static void describe(uint64_t header)
 
 void ferry_cxx_image_loaded(struct image *im)
 {
-    if (ferry_cxx_active && im)
+    if (ferry_cxx_active && im) {
         describe((uint64_t)ferry_image_header(im));
+        ferry_cxx_wrap_image_seeks(im);
+    }
 }
 
 void *ferry_cxx_symbol(const char *name)

@@ -264,6 +264,8 @@ typedef struct BigEndianUInt32 { UInt32 bigEndianValue; } BigEndianUInt32;
 #endif
 typedef BigEndianUInt32 KeyMap[4];
 UInt32 GetCurrentEventKeyModifiers(void);
+UInt32 GetCurrentEventButtonState(void);
+UInt32 GetCurrentButtonState(void);
 UInt32 GetCurrentKeyModifiers(void);
 void GetKeys(KeyMap theKeys);
 

@@ -265,6 +265,9 @@ NSNotificationName const NSWorkspaceAccessibilityDisplayOptionsDidChangeNotifica
 - (BOOL)accessibilityDisplayShouldReduceTransparency { return NO; }
 - (BOOL)accessibilityDisplayShouldReduceMotion { return NO; }
 - (BOOL)accessibilityDisplayShouldInvertColors { return NO; }
+/* VoiceOver and Switch Control are a Mac's own (freemac Godot work) */
+- (BOOL)isVoiceOverEnabled { return NO; }
+- (BOOL)isSwitchControlEnabled { return NO; }
 @end
 
 @implementation NSView (FerryReuse)

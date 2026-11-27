@@ -48,9 +48,33 @@ enum {
     kAudioUnitSubType_StereoMixer = 'smxr',
     kAudioUnitSubType_SpatialMixer = '3dem',
     kAudioUnitSubType_DLSSynth = 'dls ',
+    kAudioUnitSubType_MIDISynth = 'msyn',
+    kAudioUnitSubType_PeakLimiter = 'lmtr',
     kAudioUnitSubType_Sampler = 'samp',
     kAudioUnitSubType_AudioFilePlayer = 'afpl',
     kAudioUnitSubType_ScheduledSoundPlayer = 'sspl',
+};
+
+/* the selectors of the calls on an audio unit, which a plug-in's Lookup is
+ * asked for (freemac 1.NEXT) */
+enum {
+    kAudioUnitRange = 0x0000,
+    kAudioUnitInitializeSelect = 0x0001,
+    kAudioUnitUninitializeSelect = 0x0002,
+    kAudioUnitGetPropertyInfoSelect = 0x0003,
+    kAudioUnitGetPropertySelect = 0x0004,
+    kAudioUnitSetPropertySelect = 0x0005,
+    kAudioUnitGetParameterSelect = 0x0006,
+    kAudioUnitSetParameterSelect = 0x0007,
+    kAudioUnitResetSelect = 0x0009,
+    kAudioUnitAddPropertyListenerSelect = 0x000A,
+    kAudioUnitRemovePropertyListenerSelect = 0x000B,
+    kAudioUnitRenderSelect = 0x000E,
+    kAudioUnitAddRenderNotifySelect = 0x000F,
+    kAudioUnitRemoveRenderNotifySelect = 0x0010,
+    kAudioUnitScheduleParametersSelect = 0x0011,
+    kAudioUnitRemovePropertyListenerWithUserDataSelect = 0x0012,
+    kAudioUnitProcessSelect = 0x0014,
 };
 
 typedef UInt32 AudioUnitRenderActionFlags;

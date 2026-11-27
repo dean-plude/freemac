@@ -109,6 +109,7 @@ struct mtl_rpipe {
     unsigned char interp[256];      /* per varying float: FERRY_I_* */
     int stage_in_map[64];
     int writes_depth, writes_mask, writes_stencil, has_point_size, nclip;
+    int writes_layer, writes_viewport;  /* the vertex function picks a render target layer, a viewport */
     unsigned color_formats[8];
     struct mtl_blend blend[8];
     int color_kind[8];              /* the fragment's result kind for each color, -1 none */
@@ -138,7 +139,11 @@ struct mtl_draw_state {
     const struct mtl_rpipe *p;
     const struct mtl_dsstate *ds;
     struct mtl_bindings vb, fb;
-    double vp[6];
+    unsigned vstride[31];           /* strides of setVertexBuffer:...attributeStride: */
+    uint32_t vstride_set;           /* which of them are set (else the pipeline's own) */
+    double vp[6];                   /* viewport 0 */
+    double vpx[15][6];              /* viewports 1 to 15, of setViewports */
+    unsigned nvp;                   /* how many viewports; 0 or 1 is only vp */
     int scissor[4];
     unsigned cull, winding, fill, clip_mode;
     float depth_bias, slope, bias_clamp;

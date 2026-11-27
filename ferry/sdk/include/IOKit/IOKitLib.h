@@ -31,6 +31,11 @@ kern_return_t IOServiceGetMatchingServices(mach_port_t mainPort, CFDictionaryRef
 io_object_t IOIteratorNext(io_iterator_t iterator);
 boolean_t IOIteratorIsValid(io_iterator_t iterator);
 kern_return_t IOObjectRelease(io_object_t object);
+boolean_t IOObjectIsEqualTo(io_object_t object, io_object_t anObject);
+kern_return_t IORegistryEntryGetParentEntry(io_registry_entry_t entry, const io_name_t plane,
+                                            io_registry_entry_t *parent);
+kern_return_t IORegistryEntryGetRegistryEntryID(io_registry_entry_t entry, uint64_t *entryID);
+CFMutableDictionaryRef IORegistryEntryIDMatching(uint64_t entryID);
 kern_return_t IOObjectRetain(io_object_t object);
 io_registry_entry_t IORegistryEntryFromPath(mach_port_t mainPort, const io_string_t path);
 io_registry_entry_t IORegistryGetRootEntry(mach_port_t mainPort);

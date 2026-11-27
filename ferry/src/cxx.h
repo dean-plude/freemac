@@ -22,6 +22,7 @@ int ferry_cxx_library(const char *install_name); /* libc++.1.dylib, libc++abi.dy
 void *ferry_cxx_lookup(const char *name);       /* a C++ name a program imports, or NULL */
 void *ferry_unwind_lookup(const char *name);    /* _Unwind_RaiseException and the like, or NULL */
 void ferry_cxx_image_loaded(struct image *im);  /* its unwind tables, for the unwinder */
+void ferry_cxx_wrap_image_seeks(struct image *im); /* its own stream buffers' seeks, callable both ways */
 void *ferry_cxx_symbol(const char *name);       /* this system's libc++ (and libc++abi), by name */
 
 /* The unwinder's calls (the Itanium C++ ABI's level 1), from this

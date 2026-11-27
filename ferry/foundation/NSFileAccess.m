@@ -65,6 +65,10 @@ NSString *const NSURLLinkCountKey = @"NSURLLinkCountKey";
 NSString *const NSURLFileResourceIdentifierKey = @"NSURLFileResourceIdentifierKey";
 NSString *const NSURLVolumeIdentifierKey = @"NSURLVolumeIdentifierKey";
 NSString *const NSURLVolumeIsLocalKey = @"NSURLVolumeIsLocalKey";
+NSString *const NSURLVolumeURLKey = @"NSURLVolumeURLKey";
+NSString *const NSURLVolumeSupportsCaseSensitiveNamesKey = @"NSURLVolumeSupportsCaseSensitiveNamesKey";
+NSString *const NSURLIsSystemImmutableKey = @"NSURLIsSystemImmutableKey";
+NSString *const NSURLIsUserImmutableKey = @"NSURLIsUserImmutableKey";
 NSString *const NSURLVolumeTotalCapacityKey = @"NSURLVolumeTotalCapacityKey";
 NSString *const NSURLVolumeAvailableCapacityKey = @"NSURLVolumeAvailableCapacityKey";
 NSString *const NSURLVolumeAvailableCapacityForImportantUsageKey = @"NSURLVolumeAvailableCapacityForImportantUsageKey";
@@ -603,6 +607,10 @@ NSDictionary *FFileAttributes(NSString *path, NSError **error)
                     : [NSNumber numberWithLongLong:(long long)(n * block)];
         }
     }
+    else if (IS(NSURLIsSystemImmutableKey) || IS(NSURLIsUserImmutableKey))
+        /* freemac Godot work: this system's immutable flag (chattr +i) is
+         * the system one; nothing here sets a user one */
+        v = BOOLV(IS(NSURLIsSystemImmutableKey) && (st.st_flags & 0x00020000 /* SF_IMMUTABLE */));
     else if (IS(NSURLVolumeURLKey) || IS(NSURLVolumeNameKey) || IS(NSURLVolumeLocalizedNameKey) ||
              IS(NSURLVolumeIsReadOnlyKey) || IS(NSURLVolumeSupportsCaseSensitiveNamesKey) ||
              IS(NSURLVolumeIsRemovableKey)) {

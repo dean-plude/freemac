@@ -16,4 +16,11 @@ enum {
     kMultiChannelMixerParam_Pan = 2,
 };
 
+/* the peak limiter (freemac 1.NEXT) */
+enum {
+    kLimiterParam_AttackTime = 0,
+    kLimiterParam_DecayTime = 1,
+    kLimiterParam_PreGain = 2,
+};
+
 #endif

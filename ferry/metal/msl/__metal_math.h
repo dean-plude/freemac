@@ -59,6 +59,9 @@ __FERRY_F1(round, __builtin_roundf(x)) __FERRY_F1(rint, __builtin_rintf(x))
 __FERRY_F1(fract, __builtin_fminf(x - __builtin_floorf(x), 0x1.fffffep-1f))
 __FERRY_F1(fabs, __builtin_fabsf(x)) __FERRY_F1(saturate, __builtin_fminf(__builtin_fmaxf(x, 0.0f), 1.0f))
 __FERRY_F1(sign, x > 0.0f ? 1.0f : x < 0.0f ? -1.0f : x)
+/* sign on integers too: SPIRV-Cross (MoltenVK) writes it for GLSL's sign(ivec) */
+template<class T, enable_if_t<__is_int<T>::value, int> = 0> T sign(T x) { return T(x > 0 ? 1 : x < 0 ? -1 : 0); }
+__FERRY_V1(sign, int)
 __FERRY_F1(cbrt, __builtin_cbrtf(x))
 __FERRY_F2(pow, __builtin_powf(x, y)) __FERRY_F2(powr, __builtin_powf(x, y)) __FERRY_F2(atan2, __builtin_atan2f(x, y))
 __FERRY_F2(fmod, __builtin_fmodf(x, y)) __FERRY_F2(fmin, __builtin_fminf(x, y)) __FERRY_F2(fmax, __builtin_fmaxf(x, y))
@@ -149,6 +152,24 @@ template<class T, int N> vec<T, N> refract(const vec<T, N> &i, const vec<T, N> &
 }
 template<class T, int N> vec<T, N> faceforward(const vec<T, N> &n, const vec<T, N> &i, const vec<T, N> &nref)
 { return dot(nref, i) < T(0) ? n : -n; }
+/* a packed vector works in them as the vector it holds */
+#define __FERRY_PK1(f) \
+    template<class T, int N> auto f(const packed_vec<T, N> &a) { return f(vec<T, N>(a)); }
+#define __FERRY_PK2(f) \
+    template<class T, int N> auto f(const packed_vec<T, N> &a, const packed_vec<T, N> &b) \
+    { return f(vec<T, N>(a), vec<T, N>(b)); } \
+    template<class T, int N> auto f(const packed_vec<T, N> &a, const vec<T, N> &b) { return f(vec<T, N>(a), b); } \
+    template<class T, int N> auto f(const vec<T, N> &a, const packed_vec<T, N> &b) { return f(a, vec<T, N>(b)); }
+__FERRY_PK1(length) __FERRY_PK1(length_squared) __FERRY_PK1(normalize)
+__FERRY_PK2(dot) __FERRY_PK2(cross) __FERRY_PK2(distance) __FERRY_PK2(distance_squared) __FERRY_PK2(reflect)
+#undef __FERRY_PK1
+#undef __FERRY_PK2
+template<class T, int N> vec<T, N> refract(const packed_vec<T, N> &i, const packed_vec<T, N> &n, T eta)
+{ return refract(vec<T, N>(i), vec<T, N>(n), eta); }
+template<class T, int N> vec<T, N> refract(const packed_vec<T, N> &i, const vec<T, N> &n, T eta)
+{ return refract(vec<T, N>(i), n, eta); }
+template<class T, int N> vec<T, N> refract(const vec<T, N> &i, const packed_vec<T, N> &n, T eta)
+{ return refract(i, vec<T, N>(n), eta); }
 inline float length(float x) { return __builtin_fabsf(x); }
 inline float normalize(float x) { return x < 0.0f ? -1.0f : 1.0f; }
 inline float dot(float a, float b) { return a * b; }
@@ -266,6 +287,14 @@ inline float4 unpack_unorm10a2_to_float(uint x)
 { return float4(__unorm(x & 1023, 10), __unorm(x >> 10 & 1023, 10), __unorm(x >> 20 & 1023, 10), __unorm(x >> 30, 2)); }
 inline uint pack_float_to_unorm10a2(float4 v)
 { return __to_unorm(v.x, 10) | __to_unorm(v.y, 10) << 10 | __to_unorm(v.z, 10) << 20 | __to_unorm(v.w, 2) << 30; }
+/* red in the top five bits, then six of green and five of blue */
+inline float3 unpack_unorm565_to_float(ushort x)
+{ return float3(__unorm(x >> 11 & 31, 5), __unorm(x >> 5 & 63, 6), __unorm(x & 31, 5)); }
+inline half3 unpack_unorm565_to_half(ushort x) { return half3(unpack_unorm565_to_float(x)); }
+inline ushort pack_float_to_unorm565(float3 v) { return ushort(__to_unorm(v.x, 5) << 11 | __to_unorm(v.y, 6) << 5 | __to_unorm(v.z, 5)); }
+inline ushort pack_half_to_unorm565(half3 v) { return pack_float_to_unorm565(float3(v)); }
+inline half4 unpack_unorm10a2_to_half(uint x) { return half4(unpack_unorm10a2_to_float(x)); }
+inline uint pack_half_to_unorm10a2(half4 v) { return pack_float_to_unorm10a2(float4(v)); }
 
 #undef __FERRY_V1
 #undef __FERRY_V2

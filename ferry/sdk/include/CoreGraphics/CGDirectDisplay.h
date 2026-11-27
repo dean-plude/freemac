@@ -166,5 +166,11 @@ CGError CGDisplayFade(CGDisplayFadeReservationToken token, CGDisplayFadeInterval
                       float greenBlend, float blueBlend, boolean_t synchronous);
 boolean_t CGDisplayFadeOperationInProgress(void);
 
+/* the GPU that drives a display (CGDirectDisplayMetal.h): Ferry's one Metal
+ * device, when the program has Metal loaded (freemac Godot work) */
+#ifdef __OBJC__
+@protocol MTLDevice;
+id<MTLDevice> CGDirectDisplayCopyCurrentMetalDevice(CGDirectDisplayID display);
+#endif
 __FERRY_END
 #endif

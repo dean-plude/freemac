@@ -9,6 +9,7 @@ typedef int IOReturn;
 #define kIOReturnError ((IOReturn)0xe00002bc)
 #define kIOReturnNoMemory ((IOReturn)0xe00002bd)
 #define kIOReturnNoResources ((IOReturn)0xe00002be)
+#define kIOReturnNoDevice ((IOReturn)0xe00002c0)
 #define kIOReturnBadArgument ((IOReturn)0xe00002c2)
 #define kIOReturnUnsupported ((IOReturn)0xe00002c7)
 #define kIOReturnNotPrivileged ((IOReturn)0xe00002c1)

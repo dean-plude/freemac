@@ -236,6 +236,22 @@ static struct image *caller_image(const void *ret) { return ferry_image_containi
 typedef void (*add_image_fn)(const void *header, intptr_t slide);
 static add_image_fn add_callbacks[32];
 static int nadd_callbacks;
+/* How many images, in load order, each callback has been told of. A
+ * library's initializer can register one while its own dlopen is still
+ * under way (USD does, freemac Blender work): the callback is told of that
+ * library then, so it isn't told again when the dlopen ends, since a Mac
+ * calls each callback once for each image. */
+static int add_told[32];
+
+static void tell_add_callbacks(void)
+{
+    int n = ferry_image_count();
+    for (int c = 0; c < nadd_callbacks; c++)
+        while (add_told[c] < n) {
+            struct image *im = ferry_image_at(add_told[c]++);
+            add_callbacks[c](ferry_image_header(im), ferry_image_slide(im));
+        }
+}
 
 static void *open_path(const char *path, int mode, struct image *caller)
 {
@@ -283,19 +299,15 @@ static void *open_path(const char *path, int mode, struct image *caller)
         return NULL;
     }
     if (!im) {
-        int before = ferry_image_count();
         char why[1024];
         im = ferry_image_load(full, why, sizeof why);
         if (!im) {
             set_error("dlopen(%s, 0x%04X): %s", path, mode, why);
             return NULL;
         }
-        int after = ferry_image_count();
         if (mode & MAC_RTLD_LOCAL && !(mode & MAC_RTLD_GLOBAL) && nlocal < (int)(sizeof local_images / sizeof *local_images))
             local_images[nlocal++] = im;
-        for (int i = before; i < after; i++)
-            for (int c = 0; c < nadd_callbacks; c++)
-                add_callbacks[c](ferry_image_header(ferry_image_at(i)), ferry_image_slide(ferry_image_at(i)));
+        tell_add_callbacks();
     } else if (mode & MAC_RTLD_GLOBAL)
         set_global(im);
     return image_handle(im, first);
@@ -510,13 +522,12 @@ static void mac_dyld_register_func_for_add_image(add_image_fn fn)
     if (!fn)
         return;
     pthread_mutex_lock(&lock);
-    if (nadd_callbacks < (int)(sizeof add_callbacks / sizeof *add_callbacks))
+    if (nadd_callbacks < (int)(sizeof add_callbacks / sizeof *add_callbacks)) {
+        add_told[nadd_callbacks] = 0;
         add_callbacks[nadd_callbacks++] = fn;
-    else
+        tell_add_callbacks();
+    } else
         fprintf(stderr, "ferry: the program registered too many image callbacks; one is left out\n");
-    int n = ferry_image_count();
-    for (int i = 0; i < n; i++)
-        fn(ferry_image_header(ferry_image_at(i)), ferry_image_slide(ferry_image_at(i)));
     pthread_mutex_unlock(&lock);
 }
 
@@ -605,6 +616,25 @@ static const void *mac_getsectbynamefromheader_64(const void *mh, const char *se
     return mac_find_section(mh, segname, sectname, &slide);
 }
 
+/* The main program's segment of that name, as its unslid load command
+ * (freemac Godot work). */
+static const void *mac_getsegbyname(const char *segname)
+{
+    const struct mac_seg64 *segs[64];
+    intptr_t slide;
+    int n = mac_segments(mac_dyld_get_image_header(0), segs, 64, &slide);
+    for (int i = 0; i < n; i++)
+        if (!strncmp(segs[i]->segname, segname, 16))
+            return segs[i];
+    return NULL;
+}
+
+/* The main program's section of that name, as its unslid record. */
+static const void *mac_getsectbyname(const char *segname, const char *sectname)
+{
+    return mac_getsectbynamefromheader_64(mac_dyld_get_image_header(0), segname, sectname);
+}
+
 /* Ferry's own, for Foundation's NSBundle: the first class a loaded bundle
  * defines (its principal class when Info.plist names none). */
 static void *ferry_dl_first_class(void *h)
@@ -630,6 +660,8 @@ const struct ferry_symbol ferry_dyld_symbols[] = {
     {"getsectiondata", mac_getsectiondata},
     {"getsegmentdata", mac_getsegmentdata},
     {"getsectbynamefromheader_64", mac_getsectbynamefromheader_64},
+    {"getsegbyname", mac_getsegbyname},
+    {"getsectbyname", mac_getsectbyname},
     {"ferry_dl_first_class", ferry_dl_first_class},
     {NULL, NULL},
 };

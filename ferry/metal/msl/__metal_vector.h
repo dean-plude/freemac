@@ -14,7 +14,7 @@ template<class T, int N> struct __vstore;
 #define __FERRY_SWG(name, n, ...) \
     vec<T, n> __g_##name() const { return vec<T, n>(__VA_ARGS__); }
 #define __FERRY_SWS(name, n, ...) \
-    void __s_##name(vec<T, n> __v) { __VA_ARGS__ }
+    vec<T, n> __s_##name(vec<T, n> __v) { __VA_ARGS__ return __v; }   /* (a.xy = b.xy = c chains) */
 
 template<class T> struct __vstore<T, 1> {
     union { T c[1]; struct { T x; }; struct { T r; }; };
@@ -48,6 +48,9 @@ template<class T, int N> struct alignas(sizeof(T) * (N == 3 ? 4 : N)) vec : __vs
     explicit vec(U s) { for (int i = 0; i < N; i++) this->c[i] = T(s); }
     template<class U, __ferry::enable_if_t<!__ferry::is_same<U, T>::value, int> = 0>
     explicit vec(const vec<U, N> &o) { for (int i = 0; i < N; i++) this->c[i] = T(o.c[i]); }
+    /* float3(packed_int3): a packed vector of another type, converted */
+    template<class U, __ferry::enable_if_t<!__ferry::is_same<U, T>::value, int> = 0>
+    explicit vec(const __vstore<U, N> &o) { for (int i = 0; i < N; i++) this->c[i] = T(o.c[i]); }
     template<class A, class B, class... R,
              __ferry::enable_if_t<(__comps<A>::n + __comps<B>::n + (0 + ... + __comps<R>::n)) == N, int> = 0>
     vec(const A &a, const B &b, const R &...r)
@@ -97,6 +100,25 @@ template<class T, int N> struct __ncomp<packed_vec<T, N>> { static constexpr int
 __FERRY_VBIN(+) __FERRY_VBIN(-) __FERRY_VBIN(*) __FERRY_VBIN(/) __FERRY_VBIN(%)
 __FERRY_VBIN(&) __FERRY_VBIN(|) __FERRY_VBIN(^) __FERRY_VBIN(<<) __FERRY_VBIN(>>)
 #undef __FERRY_VBIN
+/* A packed vector in arithmetic works as the vector it holds. */
+#define __FERRY_PBIN(op) \
+    template<class T, int N> vec<T, N> operator op(const packed_vec<T, N> &a, const packed_vec<T, N> &b) \
+    { return vec<T, N>(a) op vec<T, N>(b); } \
+    template<class T, int N> vec<T, N> operator op(const packed_vec<T, N> &a, const vec<T, N> &b) \
+    { return vec<T, N>(a) op b; } \
+    template<class T, int N> vec<T, N> operator op(const vec<T, N> &a, const packed_vec<T, N> &b) \
+    { return a op vec<T, N>(b); } \
+    template<class T, int N, class U, __ferry::enable_if_t<__ferry::is_scalar<U>::value, int> = 0> \
+    vec<T, N> operator op(const packed_vec<T, N> &a, U b) { return vec<T, N>(a) op b; } \
+    template<class T, int N, class U, __ferry::enable_if_t<__ferry::is_scalar<U>::value, int> = 0> \
+    vec<T, N> operator op(U a, const packed_vec<T, N> &b) { return a op vec<T, N>(b); } \
+    template<class T, int N, class X> packed_vec<T, N> &operator op##=(packed_vec<T, N> &a, const X &b) \
+    { a = vec<T, N>(a) op b; return a; } \
+    template<class T, int N> vec<T, N> &operator op##=(vec<T, N> &a, const packed_vec<T, N> &b) \
+    { a = a op vec<T, N>(b); return a; }
+__FERRY_PBIN(+) __FERRY_PBIN(-) __FERRY_PBIN(*) __FERRY_PBIN(/)
+#undef __FERRY_PBIN
+template<class T, int N> vec<T, N> operator-(const packed_vec<T, N> &a) { return -vec<T, N>(a); }
 /* % on floating-point vectors is fmod in MSL's GLSL-derived code; C++ has none. */
 template<int N> vec<float, N> operator%(const vec<float, N> &a, const vec<float, N> &b)
 { vec<float, N> r; for (int i = 0; i < N; i++) r.c[i] = __builtin_fmodf(a.c[i], b.c[i]); return r; }
@@ -258,5 +280,13 @@ using ::int2; using ::int3; using ::int4; using ::uint2; using ::uint3; using ::
 using ::bool2; using ::bool3; using ::bool4;
 using ::float2x2; using ::float3x3; using ::float4x4;
 }
+
+/* ferry-mslc passes each side of a ?: in a program's code through this. In
+ * C++ for OpenCL a local vector is a "__private vec" and a function's result
+ * a plain "vec", which ?: won't mix (Metal's own compiler does); by value
+ * both are plain, and a packed vector gives the vector it holds. */
+template<class T> struct __ferry_unpacked { typedef T type; };
+template<class T, int N> struct __ferry_unpacked<metal::packed_vec<T, N>> { typedef metal::vec<T, N> type; };
+template<class T> constexpr typename __ferry_unpacked<__ferry::plain<T>>::type __ferry_value(const T &x) { return x; }
 
 #endif

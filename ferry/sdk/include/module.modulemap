@@ -19,6 +19,7 @@ module AppKit [system] {
     header "AppKit/AppKit.h"
     header "AppKit/AppKitApps.h"
     header "AppKit/AppKitDocumentApps.h"
+    header "AppKit/AppKitGodot.h"
     header "AppKit/AppKitIINA.h"
     header "AppKit/AppKitMore.h"
     header "AppKit/AppKitNewer.h"
@@ -106,6 +107,7 @@ module AudioToolbox [system] {
     header "AudioToolbox/AudioToolbox.h"
     header "AudioToolbox/AUComponent.h"
     header "AudioToolbox/AudioCodec.h"
+    header "AudioToolbox/AUGraph.h"
     header "AudioToolbox/AudioComponent.h"
     header "AudioToolbox/AudioConverter.h"
     header "AudioToolbox/AudioFormat.h"
@@ -115,6 +117,7 @@ module AudioToolbox [system] {
     header "AudioToolbox/AudioUnit.h"
     header "AudioToolbox/AudioUnitParameters.h"
     header "AudioToolbox/AudioUnitProperties.h"
+    header "AudioToolbox/MusicDevice.h"
     export *
     link framework "CoreAudio"
 }
@@ -126,6 +129,7 @@ module AudioUnit [system] {
     header "AudioUnit/AudioOutputUnit.h"
     header "AudioUnit/AudioUnitParameters.h"
     header "AudioUnit/AudioUnitProperties.h"
+    header "AudioUnit/MusicDevice.h"
     export *
     link framework "CoreAudio"
 }

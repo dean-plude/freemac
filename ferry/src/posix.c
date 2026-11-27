@@ -453,6 +453,25 @@ static struct mac_dirent *mac_readdir(struct mac_DIR *m)
     return &m->entry;
 }
 
+/* readdir_r(3): the next entry copied into the caller's Mac dirent, or
+ * *result NULL at the end. */
+static int mac_readdir_r(struct mac_DIR *m, struct mac_dirent *entry, struct mac_dirent **result)
+{
+    int saved = errno;
+    errno = 0;
+    struct mac_dirent *e = mac_readdir(m);
+    if (!e) {
+        *result = NULL;
+        int err = errno;
+        errno = saved;
+        return err;
+    }
+    memcpy(entry, e, __builtin_offsetof(struct mac_dirent, name) + e->namlen + 1);
+    *result = entry;
+    errno = saved;
+    return 0;
+}
+
 static int mac_closedir(struct mac_DIR *m)
 {
     int rc = closedir(m->dir);
@@ -1328,6 +1347,7 @@ const struct ferry_symbol ferry_posix_symbols[] = {
     {"opendir$INODE64", mac_opendir},
     {"fdopendir$INODE64", mac_fdopendir},
     {"readdir$INODE64", mac_readdir},
+    {"readdir_r$INODE64", mac_readdir_r},
     {"rewinddir$INODE64", mac_rewinddir},
     {"telldir$INODE64", mac_telldir},
     {"seekdir$INODE64", mac_seekdir},

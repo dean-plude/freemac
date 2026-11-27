@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Writes the link stub for a Mac framework that one of Ferry's own framework
 # files serves (CoreText, ApplicationServices and ImageIO live in CoreGraphics' file,
-# SystemConfiguration, CoreServices, CFNetwork, ServiceManagement, IOKit and
+# SystemConfiguration, CoreServices, CFNetwork, ServiceManagement, IOKit, ForceFeedback and
 # UniformTypeIdentifiers in Foundation's,
 # Cocoa, Quartz, QuickLook, ScriptingBridge, CoreImage, MediaPlayer, CoreMedia, CoreMediaIO,
 # VideoToolbox, PIP (a private framework) and AddressBook in AppKit's, AudioToolbox and AudioUnit in CoreAudio's): the calls the
@@ -34,6 +34,7 @@ case $framework in
     CoreServices) pattern='^_(Gestalt$|LS[A-Z]|kLSSharedFileList|FS[A-Z]|AE[A-Z]|UT[A-Z]|kUT|GetIconRefFromFileInfo$|AcquireIconRef$|ReleaseIconRef$|Create(ObjSpecifier|OffsetDescriptor|CompDescriptor|LogicalDescriptor|RangeDescriptor)$|UpTime$|AbsoluteTo(Nanoseconds|Duration)$|(Nanoseconds|Duration)To(Absolute|Nanoseconds|Duration)$|(Add|Sub)(Absolute|Nanoseconds|Duration)(To|From)Absolute$|AbsoluteDeltaTo)|^_(Gestalt$|UC(CreateCollator|DisposeCollator|CompareText|GetCollationKey|CompareCollationKeys)$|LocaleRefFromLocaleString$|LS[A-Z]|kLSSharedFileList|FS[A-Z]|AE[A-Z]|UT[A-Z]|kUT|GetIconRefFromFileInfo$|AcquireIconRef$|ReleaseIconRef$|Create(ObjSpecifier|OffsetDescriptor|CompDescriptor|LogicalDescriptor|RangeDescriptor)$|UpTime$|AbsoluteTo(Nanoseconds|Duration)$|(Nanoseconds|Duration)To(Absolute|Nanoseconds|Duration)$|(Add|Sub)(Absolute|Nanoseconds|Duration)(To|From)Absolute$|AbsoluteDeltaTo)' ;;
     ServiceManagement) pattern='^_(OBJC_(METACLASS|CLASS)_\$_SM|SM|kSM)' ;;
     IOKit) pattern='^_(IO[A-Z]|kIO)' ;;
+    ForceFeedback) pattern='^_FF[A-Z]' ;;
     Cocoa) pattern='.' ;;
     Carbon) pattern='^_(Gestalt$|LS[A-Z]|kLSSharedFileList|FS[A-Z]|AE[A-Z]|UT[A-Z]|kUT|GetIconRefFromFileInfo$|AcquireIconRef$|ReleaseIconRef$|Create(ObjSpecifier|OffsetDescriptor|CompDescriptor|LogicalDescriptor|RangeDescriptor)$|UpTime$|AbsoluteTo(Nanoseconds|Duration)$|(Nanoseconds|Duration)To(Absolute|Nanoseconds|Duration)$|(Add|Sub)(Absolute|Nanoseconds|Duration)(To|From)Absolute$|AbsoluteDeltaTo|SameProcess$|CopyProcessName$|ShowHideProcess$|IsProcessVisible$|LaunchApplication$|KillProcess$|PushSymbolicHotKeyMode|PopSymbolicHotKeyMode|GetSymbolicHotKeyMode|kHISymbolicHotKey|GetCurrentEventKeyModifiers|GetCurrentKeyModifiers|GetKeys$|GetApplicationEventTarget|GetEvent|InstallEventHandler|RemoveEventHandler|RegisterEventHotKey|UnregisterEventHotKey|CallNextEventHandler|NewEventHandlerUPP|DisposeEventHandlerUPP|InvokeEventHandlerUPP|AddEventTypesToHandler|RemoveEventTypesFromHandler|RetainEvent$|ReleaseEvent$|CopySymbolicHotKeys|TIS|UCKeyTranslate|LMGetKbdType|GetMBarHeight|GetCurrentProcess|GetFrontProcess|GetNextProcess|GetProcess|TransformProcessType|SetFrontProcess|ProcessInformationCopyDictionary|GetMacOSStatus|AX|kAX|kTIS)|^_(Gestalt$|UC(CreateCollator|DisposeCollator|CompareText|GetCollationKey|CompareCollationKeys)$|LocaleRefFromLocaleString$|LS[A-Z]|kLSSharedFileList|FS[A-Z]|AE[A-Z]|UT[A-Z]|kUT|GetIconRefFromFileInfo$|AcquireIconRef$|ReleaseIconRef$|Create(ObjSpecifier|OffsetDescriptor|CompDescriptor|LogicalDescriptor|RangeDescriptor)$|UpTime$|AbsoluteTo(Nanoseconds|Duration)$|(Nanoseconds|Duration)To(Absolute|Nanoseconds|Duration)$|(Add|Sub)(Absolute|Nanoseconds|Duration)(To|From)Absolute$|AbsoluteDeltaTo|SameProcess$|CopyProcessName$|ShowHideProcess$|IsProcessVisible$|LaunchApplication$|KillProcess$|PushSymbolicHotKeyMode|PopSymbolicHotKeyMode|GetSymbolicHotKeyMode|kHISymbolicHotKey|GetCurrentEventKeyModifiers|GetCurrentKeyModifiers|GetKeys$|GetApplicationEventTarget|GetEvent|InstallEventHandler|RemoveEventHandler|RegisterEventHotKey|UnregisterEventHotKey|CallNextEventHandler|NewEventHandlerUPP|DisposeEventHandlerUPP|InvokeEventHandlerUPP|AddEventTypesToHandler|RemoveEventTypesFromHandler|RetainEvent$|ReleaseEvent$|CopySymbolicHotKeys|TIS|UCKeyTranslate|LMGetKbdType|GetMBarHeight|GetCurrentProcess|GetFrontProcess|GetNextProcess|GetProcess|TransformProcessType|SetFrontProcess|ProcessInformationCopyDictionary|GetMacOSStatus|AX|kAX|kTIS)' ;;
     AVFoundation) pattern='^_(OBJC_(METACLASS|CLASS)_\$_AV|AVFileType|AVMediaType|AVCapture(Device|Session)[A-Za-z0-9]*(Notification|Key|Type[A-Za-z]*|Preset[A-Za-z0-9]*)$|AVFoundationErrorDomain$)' ;;
@@ -49,11 +50,12 @@ case $framework in
     CoreImage) pattern='^_(OBJC_(METACLASS|CLASS)_\$_CI[A-Z][A-Za-z]*$|kCI|CI(Detector|Feature)[A-Z])' ;;
     Quartz) pattern='^_(OBJC_(METACLASS|CLASS)_\$_(QL|QC)|QL|kQL|QC)' ;;
     # Core Audio's file serves AudioToolbox (with the audio objects' calls
-    # its header brings in, 1.232) and AudioUnit (freemac 1.234)
-    AudioToolbox) pattern='^_(AudioObject|AudioHardware|AudioComponent|AudioUnit|AudioOutputUnit|AudioQueue|AudioFormat|AudioConverter|AudioServices|AU(Event|Parameter)?Listener|AUParameterSet)' ;;
+    # its header brings in, 1.232) and AudioUnit (freemac 1.234); AUGraph and
+    # MusicDevice calls join both (freemac 1.NEXT)
+    AudioToolbox) pattern='^_(AudioObject|AudioHardware|AudioComponent|AudioUnit|AudioOutputUnit|AudioQueue|AudioFormat|AudioConverter|AudioServices|AU(Event|Parameter)?Listener|AUParameterSet|AUGraph|NewAUGraph|DisposeAUGraph|MusicDevice)' ;;
     # and Core MIDI, with no devices (freemac 1.263)
     CoreMIDI) pattern='^_(MIDI|kMIDI)' ;;
-    AudioUnit) pattern='^_(AudioComponent|AudioUnit|AudioOutputUnit)' ;;
+    AudioUnit) pattern='^_(AudioComponent|AudioUnit|AudioOutputUnit|MusicDevice)' ;;
     *) echo "gen-alias-tbd.sh: unknown framework $framework" >&2; exit 2 ;;
 esac
 {

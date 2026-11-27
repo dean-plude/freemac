@@ -40,6 +40,8 @@ int ferry_image_is_bundle(struct image *im);
 void *ferry_image_symbol(struct image *im, const char *macho_name); /* what it exports */
 int ferry_image_dependencies(struct image *im, struct image **out, int max, int *builtin);
 const char *ferry_image_nearest(struct image *im, const void *addr, void **symbol_addr);
+void ferry_image_each_symbol(struct image *im, void (*fn)(const char *name, void *addr, void *ctx), void *ctx);
+int ferry_image_replace_pointers(struct image *im, uintptr_t (*pairs)[2], int n); /* sorts pairs by [0] */
 void *ferry_image_first_class(struct image *im); /* its first Objective-C class Ferry kept */
 /* Loads a library or bundle while the program runs (path already expanded
  * by ferry_image_resolve); NULL with the reason in err if it can't be. */
@@ -90,6 +92,7 @@ void *ferry_bus_symbol(const char *name);           /* GIO's D-Bus, for distribu
 void *ferry_webkit_symbol(const char *name);        /* WebKitGTK, for Ferry's WebKit (webkit/) */
 void *ferry_jsc_symbol(const char *name);           /* JavaScriptCore, for Ferry's (javascriptcore/) */
 void *ferry_sound_symbol(const char *name);         /* libpulse, for Ferry's Core Audio (coreaudio/) */
+void *ferry_synth_symbol(const char *name);         /* FluidSynth, for Core Audio's synth units */
 void *ferry_gl_symbol(const char *name);            /* EGL and OpenGL, for Ferry's OpenGL (opengl/) */
 void *ferry_capture_symbol(const char *name);       /* Xlib and its extensions, for screen capture (1.238) */
 void *ferry_camera_symbol(const char *name);        /* cameras, for AVFoundation's capture (camera.c, 1.257) */
@@ -158,6 +161,7 @@ int ferry_open_flags_to_linux(int mac_flags); /* open(2)'s O_ flags (freemac 1.2
 /* libc_apps.c: posix_spawn, glob, fnmatch, termios and mach_wait_until (freemac 1.233) */
 extern const struct ferry_symbol ferry_libc_apps_symbols[];
 extern const struct ferry_symbol ferry_libc_audacity_symbols[]; /* libc_audacity.c (freemac 1.263) */
+extern const struct ferry_symbol ferry_libc_blender_symbols[];
 
 /* socket.c: BSD sockets, name lookups and interfaces with the Mac's layouts */
 extern const struct ferry_symbol ferry_socket_symbols[];

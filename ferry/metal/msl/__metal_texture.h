@@ -64,6 +64,7 @@ template<class T> T simd_prefix_exclusive_sum(T v) { return T(0); }
 template<class T> T simd_prefix_inclusive_product(T v) { return v; }
 template<class T> T simd_prefix_exclusive_product(T) { return T(1); }
 struct simd_vote {
+    typedef ulong vote_t;
     ulong v;
     explicit simd_vote(ulong x = 0) : v(x) {}
     bool all() const { return v != 0; }
@@ -333,7 +334,45 @@ template<class T, int C> struct __texbase {
     uint get_num_samples() const { return __ferry_tex_size(__t, 5, 0); }
     void fence() const {}
     bool is_null() const { return __t == 0; }
+    /* Texture atomics on 32-bit int and uint texels: x, y, z as a read passes
+     * them. Op numbers are Metal.framework's (__ferry_tex_atomic). */
+    struct __aop {
+        T v;
+        __aop(T x) : v(x) {}
+        __aop(const vec<T, 4> &x) : v(x.c[0]) {}
+    };
+    texel __atom(int x, int y, int z, int op, T v, T cmp = T(0)) const
+    {
+        if (op == 4 || op == 5) op += __texel_kind<T>::is_int == 1 ? 4 : 0;
+        return texel(T(__ferry_tex_atomic(__t, x, y, z, op, (unsigned int)v, (unsigned int)cmp)));
+    }
+    template<class E> bool __acas(int x, int y, int z, E *expected, T desired) const
+    {
+        T e;
+        if constexpr (sizeof(E) == sizeof(texel)) e = expected->c[0]; else e = T(*expected);
+        T old = __atom(x, y, z, 7, desired, e).c[0];
+        if (old == e) return true;
+        if constexpr (sizeof(E) == sizeof(texel)) *expected = texel(old); else *expected = old;
+        return false;
+    }
 };
+
+/* The atomic members of a texture shape, given how its coordinates map to x, y, z. */
+#define __FERRY_TATOM(X, Y, Z, ...) \
+    typedef typename __texbase<T, __ferry_tc>::__aop __aop; \
+    texel atomic_fetch_add(__VA_ARGS__, __aop v, memory_order = memory_order_relaxed) const { return this->__atom(X, Y, Z, 0, v.v); } \
+    texel atomic_fetch_sub(__VA_ARGS__, __aop v, memory_order = memory_order_relaxed) const { return this->__atom(X, Y, Z, 0, T(0) - v.v); } \
+    texel atomic_fetch_and(__VA_ARGS__, __aop v, memory_order = memory_order_relaxed) const { return this->__atom(X, Y, Z, 1, v.v); } \
+    texel atomic_fetch_or(__VA_ARGS__, __aop v, memory_order = memory_order_relaxed) const { return this->__atom(X, Y, Z, 2, v.v); } \
+    texel atomic_fetch_xor(__VA_ARGS__, __aop v, memory_order = memory_order_relaxed) const { return this->__atom(X, Y, Z, 3, v.v); } \
+    texel atomic_fetch_min(__VA_ARGS__, __aop v, memory_order = memory_order_relaxed) const { return this->__atom(X, Y, Z, 4, v.v); } \
+    texel atomic_fetch_max(__VA_ARGS__, __aop v, memory_order = memory_order_relaxed) const { return this->__atom(X, Y, Z, 5, v.v); } \
+    texel atomic_exchange(__VA_ARGS__, __aop v, memory_order = memory_order_relaxed) const { return this->__atom(X, Y, Z, 6, v.v); } \
+    texel atomic_load(__VA_ARGS__, memory_order = memory_order_relaxed) const { return this->__atom(X, Y, Z, 2, T(0)); } \
+    void atomic_store(__aop v, __VA_ARGS__, memory_order = memory_order_relaxed) const { this->__atom(X, Y, Z, 6, v.v); } \
+    template<class E> bool atomic_compare_exchange_weak(__VA_ARGS__, E *expected, __aop desired, \
+        memory_order = memory_order_relaxed, memory_order = memory_order_relaxed) const \
+    { return this->__acas(X, Y, Z, expected, desired.v); }
 
 /* Integer coordinates in any of the widths MSL allows. */
 template<class V> struct __icoord { static constexpr bool value = false; };
@@ -346,12 +385,16 @@ template<int N> struct __icoord<vec<short, N>> { static constexpr bool value = t
 
 template<class T, access A = access::sample> struct texture1d : __texbase<T, 1> {
     typedef vec<T, 4> texel;
+    static constexpr int __ferry_tc = 1;
+    __FERRY_TATOM(int(p), 0, 0, uint p)
     texel sample(sampler s, float c) const { return __texbase<T, 1>::sample(s, vec<float, 1>(c), level(0)); }
     __FERRY_IS texel read(P p, uint lod = 0) const { return this->__read(int(p), 0, 0, int(lod), 0); }
     __FERRY_IS void write(texel v, P p, uint lod = 0) const { this->__write(v, int(p), 0, 0, int(lod)); }
 };
 template<class T, access A = access::sample> struct texture1d_array : __texbase<T, 1> {
     typedef vec<T, 4> texel;
+    static constexpr int __ferry_tc = 1;
+    __FERRY_TATOM(int(p), int(layer), 0, uint p, uint layer)
     texel sample(sampler s, float c, uint layer) const
     { return __texbase<T, 1>::sample(s, vec<float, 1>(c), layer, level(0)); }
     __FERRY_IS texel read(P p, uint layer, uint lod = 0) const { return this->__read(int(p), int(layer), 0, int(lod), 0); }
@@ -359,11 +402,15 @@ template<class T, access A = access::sample> struct texture1d_array : __texbase<
 };
 template<class T, access A = access::sample> struct texture2d : __texbase<T, 2> {
     typedef vec<T, 4> texel;
+    static constexpr int __ferry_tc = 2;
+    __FERRY_TATOM(int(p.x), int(p.y), 0, uint2 p)
     __FERRY_IC(2) texel read(P p, uint lod = 0) const { return this->__read(int(p.x), int(p.y), 0, int(lod), 0); }
     __FERRY_IC(2) void write(texel v, P p, uint lod = 0) const { this->__write(v, int(p.x), int(p.y), 0, int(lod)); }
 };
 template<class T, access A = access::sample> struct texture2d_array : __texbase<T, 2> {
     typedef vec<T, 4> texel;
+    static constexpr int __ferry_tc = 2;
+    __FERRY_TATOM(int(p.x), int(p.y), int(layer), uint2 p, uint layer)
     __FERRY_IC(2) texel read(P p, uint layer, uint lod = 0) const
     { return this->__read(int(p.x), int(p.y), int(layer), int(lod), 0); }
     __FERRY_IC(2) void write(texel v, P p, uint layer, uint lod = 0) const
@@ -371,6 +418,8 @@ template<class T, access A = access::sample> struct texture2d_array : __texbase<
 };
 template<class T, access A = access::sample> struct texture3d : __texbase<T, 3> {
     typedef vec<T, 4> texel;
+    static constexpr int __ferry_tc = 3;
+    __FERRY_TATOM(int(p.x), int(p.y), int(p.z), uint3 p)
     __FERRY_IC(3) texel read(P p, uint lod = 0) const { return this->__read(int(p.x), int(p.y), int(p.z), int(lod), 0); }
     __FERRY_IC(3) void write(texel v, P p, uint lod = 0) const { this->__write(v, int(p.x), int(p.y), int(p.z), int(lod)); }
 };
@@ -445,6 +494,10 @@ template<class T, unsigned long N> struct array {
     T __a[N ? N : 1];
     T &operator[](unsigned long i) { return __a[i]; }
     const T &operator[](unsigned long i) const { return __a[i]; }
+    /* an array in device or constant memory gives elements there, so
+     * &args.samplers[i] is a constant sampler * (Blender's argument buffers) */
+    __global T &operator[](unsigned long i) __global { return __a[i]; }
+    const __global T &operator[](unsigned long i) const __global { return __a[i]; }
     constexpr unsigned long size() const { return N; }
 };
 template<class T> struct numeric_limits;
@@ -481,7 +534,48 @@ template<class T> struct is_vector { static constexpr bool value = false; };
 template<class T, int N> struct is_vector<vec<T, N>> { static constexpr bool value = true; };
 template<class T> struct vec_elements { static constexpr int value = 1; };
 template<class T, int N> struct vec_elements<vec<T, N>> { static constexpr int value = N; };
+template<bool B, class T, class F> struct conditional { typedef T type; };
+template<class T, class F> struct conditional<false, T, F> { typedef F type; };
+template<bool B, class T, class F> using conditional_t = typename conditional<B, T, F>::type;
+
+template<class T, T V> struct integral_constant { static constexpr T value = V; typedef T value_type; constexpr operator T() const { return V; } };
+typedef integral_constant<bool, true> true_type;
+typedef integral_constant<bool, false> false_type;
+template<class T> struct remove_cv { typedef typename __ferry::remove_cv<T>::type type; };
+template<class T> struct remove_reference { typedef typename __ferry::remove_reference<T>::type type; };
+template<class T> struct is_integral { static constexpr bool value = __ferry::is_scalar<T>::value && !__ferry::is_floating<T>::value; };
+template<class T> struct is_arithmetic { static constexpr bool value = __ferry::is_scalar<T>::value; };
+template<class T> struct make_scalar { typedef T type; };
+template<class T, int N> struct make_scalar<vec<T, N>> { typedef T type; };
+template<class T> using make_scalar_t = typename make_scalar<T>::type;
+template<class T, bool S = __ferry::is_scalar<T>::value> struct __ferry_is_signed { static constexpr bool value = false; };
+template<class T> struct __ferry_is_signed<T, true> { static constexpr bool value = __ferry::plain<T>(-1) < __ferry::plain<T>(0); };
+template<class T> struct is_signed { static constexpr bool value = __ferry_is_signed<T>::value; };
+template<class T> struct is_unsigned { static constexpr bool value = __ferry::is_scalar<T>::value && !__ferry_is_signed<T>::value; };
+template<class A, class B> constexpr bool is_same_v = __ferry::is_same<A, B>::value;
+template<class T> constexpr bool is_integral_v = is_integral<T>::value;
+template<class T> constexpr bool is_floating_point_v = is_floating_point<T>::value;
+template<class T> constexpr bool is_arithmetic_v = is_arithmetic<T>::value;
+template<class T> constexpr bool is_scalar_v = is_scalar<T>::value;
+template<class T> constexpr bool is_vector_v = is_vector<T>::value;
+template<class T> constexpr bool is_signed_v = is_signed<T>::value;
+template<class T> constexpr bool is_unsigned_v = is_unsigned<T>::value;
+template<class T> constexpr int vec_elements_v = vec_elements<T>::value;
 } // namespace metal
+
+/* The argument layouts of indirect draws and dispatches and of tessellation
+ * factors (MSL "tessellation and indirect" structures), which a kernel
+ * writes for the GPU to read (MoltenVK's own kernels do; freemac Godot work). */
+struct MTLDrawPrimitivesIndirectArguments { uint vertexCount, instanceCount, vertexStart, baseInstance; };
+struct MTLDrawIndexedPrimitivesIndirectArguments {
+    uint indexCount, instanceCount, indexStart;
+    int baseVertex;
+    uint baseInstance;
+};
+struct MTLDrawPatchIndirectArguments { uint patchCount, instanceCount, patchStart, baseInstance; };
+struct MTLDispatchThreadgroupsIndirectArguments { uint threadgroupsPerGrid[3]; };
+struct MTLQuadTessellationFactorsHalf { half edgeTessellationFactor[4], insideTessellationFactor[2]; };
+struct MTLTriangleTessellationFactorsHalf { half edgeTessellationFactor[3], insideTessellationFactor; };
 
 #endif
 

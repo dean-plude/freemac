@@ -20,6 +20,8 @@ SRC += src/libc_vlc.c
 SRC += src/libc_apps.c
 # Mach ports and exception ports that fail as when exhausted, confstr and more, for Audacity (freemac 1.263)
 SRC += src/libc_audacity.c
+# NXArchInfo, Mach clocks, regex, syslog and more, for Blender
+SRC += src/libc_blender.c
 # cameras, for AVFoundation's capture (freemac 1.257)
 SRC += src/camera.c
 # AAC and other sound codecs through this system's FFmpeg, for Core Audio (freemac 1.264)
@@ -276,6 +278,8 @@ $(FOUNDATION): $(FOUNDATION_OBJ) $(TBD)
 	sdk/gen-alias-tbd.sh CFNetwork $@ > frameworks/CFNetwork.framework/CFNetwork.tbd
 	@mkdir -p frameworks/IOKit.framework
 	sdk/gen-alias-tbd.sh IOKit $@ > frameworks/IOKit.framework/IOKit.tbd
+	@mkdir -p frameworks/ForceFeedback.framework
+	sdk/gen-alias-tbd.sh ForceFeedback $@ > frameworks/ForceFeedback.framework/ForceFeedback.tbd
 	@mkdir -p frameworks/UniformTypeIdentifiers.framework
 	sdk/gen-alias-tbd.sh UniformTypeIdentifiers $@ > frameworks/UniformTypeIdentifiers.framework/UniformTypeIdentifiers.tbd
 
@@ -472,7 +476,7 @@ install: install-metal ferry $(TBD) $(TBD_ALIASES) $(TWIN_TBD) $(SDK_LIBXML2) $(
 	install -Dm755 $(QUARTZCORE) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/QuartzCore.framework/QuartzCore
 	install -Dm755 $(SECURITY) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/Security.framework/Security
 	install -Dm755 $(APPKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/AppKit.framework/AppKit
-	for f in CoreText ApplicationServices ImageIO Cocoa SystemConfiguration Carbon CoreServices CFNetwork ServiceManagement IOKit AVFoundation UserNotifications ScriptingBridge Quartz QuickLook UniformTypeIdentifiers CoreImage MediaPlayer CoreMedia CoreMediaIO AddressBook VideoToolbox PIP; do \
+	for f in CoreText ApplicationServices ImageIO Cocoa SystemConfiguration Carbon CoreServices CFNetwork ServiceManagement IOKit ForceFeedback AVFoundation UserNotifications ScriptingBridge Quartz QuickLook UniformTypeIdentifiers CoreImage MediaPlayer CoreMedia CoreMediaIO AddressBook VideoToolbox PIP; do \
 	    install -Dm644 frameworks/$$f.framework/$$f.tbd $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/$$f.framework/$$f.tbd; \
 	done
 	install -Dm644 binfmt/ferry.conf $(DESTDIR)$(PREFIX)/lib/binfmt.d/ferry.conf

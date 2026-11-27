@@ -131,6 +131,8 @@ typedef NS_ENUM(NSUInteger, MTLVertexFormat) {
     MTLVertexFormatFloatRG11B10 = 54, MTLVertexFormatFloatRGB9E5 = 55,
 };
 typedef MTLVertexFormat MTLAttributeFormat;
+/* a buffer binding that keeps the pipeline's own stride (attributeStride:) */
+static const NSUInteger MTLAttributeStrideStatic = NSUIntegerMax;
 typedef NS_ENUM(NSUInteger, MTLVertexStepFunction) {
     MTLVertexStepFunctionConstant = 0, MTLVertexStepFunctionPerVertex = 1, MTLVertexStepFunctionPerInstance = 2,
     MTLVertexStepFunctionPerPatch = 3, MTLVertexStepFunctionPerPatchControlPoint = 4,
@@ -583,6 +585,14 @@ typedef id<MTLResource> MTLAllocation_;
 - (void)setVertexBytes:(const void *)bytes length:(NSUInteger)length atIndex:(NSUInteger)index;
 - (void)setVertexBuffer:(id<MTLBuffer>)buffer offset:(NSUInteger)offset atIndex:(NSUInteger)index;
 - (void)setVertexBufferOffset:(NSUInteger)offset atIndex:(NSUInteger)index;
+- (void)setVertexBuffer:(id<MTLBuffer>)buffer offset:(NSUInteger)offset attributeStride:(NSUInteger)stride
+               atIndex:(NSUInteger)index;
+- (void)setVertexBufferOffset:(NSUInteger)offset attributeStride:(NSUInteger)stride atIndex:(NSUInteger)index;
+- (void)setVertexBytes:(const void *)bytes length:(NSUInteger)length attributeStride:(NSUInteger)stride
+              atIndex:(NSUInteger)index;
+- (void)setVertexBuffers:(const id<MTLBuffer> __unsafe_unretained[])buffers
+                 offsets:(const NSUInteger[])offsets attributeStrides:(const NSUInteger[])strides
+               withRange:(NSRange)range;
 - (void)setVertexBuffers:(const id<MTLBuffer> __unsafe_unretained[])buffers offsets:(const NSUInteger[])offsets
                withRange:(NSRange)range;
 - (void)setVertexTexture:(id<MTLTexture>)texture atIndex:(NSUInteger)index;
@@ -862,6 +872,9 @@ typedef id<MTLResource> MTLAllocation_;
                                                              options:(MTLPipelineOption)options
                                                           reflection:(MTLAutoreleasedComputePipelineReflection *)reflection
                                                                error:(NSError **)error;
+- (void)newComputePipelineStateWithDescriptor:(MTLComputePipelineDescriptor *)descriptor
+                                      options:(MTLPipelineOption)options
+                            completionHandler:(MTLNewComputePipelineStateWithReflectionCompletionHandler)completionHandler;
 - (void)newComputePipelineStateWithFunction:(id<MTLFunction>)computeFunction
                           completionHandler:(MTLNewComputePipelineStateCompletionHandler)completionHandler;
 - (id<MTLFence>)newFence;

@@ -182,6 +182,8 @@ struct prim {
     int topleft[3];
     double inv_area;
     int line;
+    unsigned layer, viewport;   /* what the provoking vertex chose */
+    float zlo, zhi;             /* that viewport's depth range */
 };
 struct primlist {
     struct prim *p;
@@ -222,7 +224,20 @@ struct setup {
     int sx0, sy0, sx1, sy1;         /* scissor and target bounds, exclusive ends */
     float rbias;                    /* the depth format's smallest step */
     struct primlist L;
+    unsigned layer, viewport;       /* of the primitive being set up */
 };
+
+/* The viewport and layer a primitive's provoking vertex chose; the
+ * viewport's transform is used from here on. */
+static void pick_viewport(struct setup *S, const float *prov)
+{
+    S->layer = S->p->writes_layer ? __builtin_bit_cast(unsigned, prov[FERRY_VS_LAYER]) : 0;
+    unsigned vi = S->p->writes_viewport ? __builtin_bit_cast(unsigned, prov[FERRY_VS_VIEWPORT]) : 0;
+    if (vi >= S->st->nvp) vi = 0;
+    S->viewport = vi;
+    const double *v = vi ? S->st->vpx[vi - 1] : S->st->vp;
+    S->vx = v[0]; S->vy = v[1]; S->vw = v[2]; S->vh = v[3]; S->zn = v[4]; S->zf = v[5];
+}
 
 /* Clip-space vertex to window space: x, y, z, 1/w and the varyings ready
  * for screen-space interpolation (perspective ones divided by w). */
@@ -276,7 +291,11 @@ static void tri_setup(struct setup *S, const float *w0, const float *w1, const f
     }
     struct prim *p = prim_new(&S->L);
     p->type = PT_TRI;
+    p->zlo = (float)fmin(S->zn, S->zf);
+    p->zhi = (float)fmax(S->zn, S->zf);
     p->front = front;
+    p->layer = S->layer;
+    p->viewport = S->viewport;
     p->prim_id = prim_id;
     p->line = line;
     p->v[0] = arena_put(&S->L, w0);
@@ -339,6 +358,7 @@ static void fix_flat(const struct setup *S, float *v, const float *prov)
 
 static void emit_tri_clipped(struct setup *S, const float *a, const float *b, const float *c, unsigned prim_id)
 {
+    pick_viewport(S, a);
     int np = clip_plane_count(S);
     int all_in = 1;
     const float *in3[3] = {a, b, c};
@@ -395,6 +415,7 @@ static void emit_tri_clipped(struct setup *S, const float *a, const float *b, co
  * triangles widened across its major axis. */
 static void emit_line(struct setup *S, const float *a, const float *b, unsigned prim_id)
 {
+    pick_viewport(S, a);
     float t0 = 0, t1 = 1;
     int np = clip_plane_count(S);
     for (int k = 0; k < np; k++) {
@@ -428,6 +449,7 @@ static void emit_line(struct setup *S, const float *a, const float *b, unsigned 
 
 static void emit_point(struct setup *S, const float *a, unsigned prim_id)
 {
+    pick_viewport(S, a);
     for (int k = 0; k < clip_plane_count(S); k++)
         if (!(plane_dist(S, a, k) >= 0)) return;
     float w[MAXV];
@@ -437,7 +459,11 @@ static void emit_point(struct setup *S, const float *a, unsigned prim_id)
     if (size > 511) size = 511;
     struct prim *p = prim_new(&S->L);
     p->type = PT_POINT;
+    p->zlo = (float)fmin(S->zn, S->zf);
+    p->zhi = (float)fmax(S->zn, S->zf);
     p->front = 1;
+    p->layer = S->layer;
+    p->viewport = S->viewport;
     p->prim_id = prim_id;
     p->v[0] = arena_put(&S->L, w);
     p->pc[0] = w[0];
@@ -464,7 +490,8 @@ struct tile {
     int px[4], py[4];
     float pos[4][4];
     float pcoord[4][2];
-    unsigned front, prim_id;
+    unsigned front, prim_id, layer, viewport;
+    float zlo, zhi;                 /* the primitive's viewport's depth range */
     uint64_t visible;
 };
 static void frag_lane(void *arg, int lane)
@@ -476,6 +503,8 @@ static void frag_lane(void *arg, int lane)
     c->point_coord[1] = T->pcoord[lane][1];
     c->front_facing = T->front;
     c->primitive_id = T->prim_id;
+    c->render_target_array_index = T->layer;
+    c->viewport_array_index = T->viewport;
     c->sample_mask_in = 1;
     T->out[lane][FERRY_FS_SAMPLE_MASK] = __builtin_bit_cast(float, 0xffffffffu);
     T->S->p->fs->fs(c, T->in[lane], T->out[lane]);
@@ -587,9 +616,8 @@ static int fragment_out(struct tile *T, int lane, float z, int shaded)
         if (p->alpha_to_coverage && p->color_kind[0] >= 0 && o[3] < 0.5f) return 0;
         if (p->writes_depth) z = o[FERRY_FS_DEPTH];
     }
-    float zlo = (float)fmin(S->zn, S->zf), zhi = (float)fmax(S->zn, S->zf);
-    if (z < zlo) z = zlo;
-    if (z > zhi) z = zhi;
+    if (z < T->zlo) z = T->zlo;
+    if (z > T->zhi) z = T->zhi;
     const struct mtl_dsstate *ds = st->ds;
     const struct mtl_stencil_face *sf = ds ? (T->front ? &ds->front : &ds->back) : NULL;
     uint32_t ref = T->front ? st->stencil_ref_front : st->stencil_ref_back;
@@ -735,6 +763,10 @@ static void raster_tile(void *arg, size_t ti)
         if (bx0 > bx1 || by0 > by1) continue;
         T->front = (unsigned)pr->front;
         T->prim_id = pr->prim_id;
+        T->layer = pr->layer;
+        T->viewport = pr->viewport;
+        T->zlo = pr->zlo;
+        T->zhi = pr->zhi;
         int sx = bx0 & ~1, sy = by0 & ~1;
         if (sx < qx0) sx = qx0;
         if (sy < qy0) sy = qy0;
@@ -786,9 +818,8 @@ static void raster_tile(void *arg, size_t ti)
                     for (int l = 0; l < 4; l++) {
                         if (!(cover & (1 << l))) continue;
                         float dv[4], z = T->pos[l][2];
-                        float zlo = (float)fmin(S->zn, S->zf), zhi = (float)fmax(S->zn, S->zf);
-                        if (z < zlo) z = zlo;
-                        if (z > zhi) z = zhi;
+                        if (z < T->zlo) z = T->zlo;
+                        if (z > T->zhi) z = T->zhi;
                         mtl_texel_load(S->rt->depth.tex->f, att_texel(&S->rt->depth, T->px[l], T->py[l]), dv);
                         if (!cmp(st->ds->depth_func, z, dv[0])) cover &= ~(1 << l);
                     }
@@ -906,7 +937,16 @@ void mtl_execute_draw(const struct mtl_target *rt, const struct mtl_draw_state *
     (void)strip;
     float *vout = malloc(sizeof(float) * (size_t)nshade * (size_t)S.vsize);
     if (!vout || !vids) { free(vout); free(vids); free(slot); return; }
-    struct vshade V = {st, {&p->vd, st->vb.buffers, d->base_instance}, vids, nshade, 0, vout, S.vsize};
+    /* buffer strides set when binding (Metal 3's attributeStride:) over the pipeline's */
+    struct mtl_vdesc vd_dyn;
+    const struct mtl_vdesc *vd = &p->vd;
+    if (st->vstride_set) {
+        vd_dyn = p->vd;
+        for (int b = 0; b < 31; b++)
+            if (st->vstride_set & (1u << b)) vd_dyn.layout[b].stride = st->vstride[b];
+        vd = &vd_dyn;
+    }
+    struct vshade V = {st, {vd, st->vb.buffers, d->base_instance}, vids, nshade, 0, vout, S.vsize};
     size_t nchunks = (nshade + VCHUNK - 1) / VCHUNK;
     int fill_lines = st->fill == 1;
     for (unsigned inst = 0; inst < d->instances; inst++) {

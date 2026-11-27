@@ -532,6 +532,7 @@ static void resolve(FerryMTLCommandBuffer *cb, MTLRenderPassAttachmentDescriptor
     st->vp[3] = h;
     st->vp[4] = 0;
     st->vp[5] = 1;
+    st->nvp = 1;
     st->scissor[0] = 0;
     st->scissor[1] = 0;
     st->scissor[2] = (int)w;
@@ -607,6 +608,37 @@ static void keep_buf(id<MTLBuffer> *slot, id<MTLBuffer> b)
     bind_buffer(_cb, &_st.vb, b, o, i);
 }
 - (void)setVertexBufferOffset:(NSUInteger)o atIndex:(NSUInteger)i { bind_offset(&_st.vb, _vbufs, o, i); }
+static void set_vstride(struct mtl_draw_state *st, NSUInteger stride, NSUInteger i)
+{
+    if (i >= 31) return;
+    if (stride == MTLAttributeStrideStatic) {
+        st->vstride_set &= ~(1u << i);
+    } else {
+        st->vstride[i] = (unsigned)stride;
+        st->vstride_set |= 1u << i;
+    }
+}
+- (void)setVertexBuffer:(id<MTLBuffer>)b offset:(NSUInteger)o attributeStride:(NSUInteger)s atIndex:(NSUInteger)i
+{
+    [self setVertexBuffer:b offset:o atIndex:i];
+    set_vstride(&_st, s, i);
+}
+- (void)setVertexBufferOffset:(NSUInteger)o attributeStride:(NSUInteger)s atIndex:(NSUInteger)i
+{
+    [self setVertexBufferOffset:o atIndex:i];
+    set_vstride(&_st, s, i);
+}
+- (void)setVertexBytes:(const void *)bytes length:(NSUInteger)n attributeStride:(NSUInteger)s atIndex:(NSUInteger)i
+{
+    [self setVertexBytes:bytes length:n atIndex:i];
+    set_vstride(&_st, s, i);
+}
+- (void)setVertexBuffers:(const id<MTLBuffer> __unsafe_unretained[])b offsets:(const NSUInteger[])o
+         attributeStrides:(const NSUInteger[])s withRange:(NSRange)r
+{
+    for (NSUInteger k = 0; k < r.length; k++)
+        [self setVertexBuffer:b[k] offset:o[k] attributeStride:s[k] atIndex:r.location + k];
+}
 - (void)setVertexBuffers:(const id<MTLBuffer> __unsafe_unretained[])b offsets:(const NSUInteger[])o withRange:(NSRange)r
 {
     for (NSUInteger k = 0; k < r.length; k++) [self setVertexBuffer:b[k] offset:o[k] atIndex:r.location + k];
@@ -666,10 +698,23 @@ static void keep_buf(id<MTLBuffer> *slot, id<MTLBuffer> b)
     _st.vp[3] = v.height;
     _st.vp[4] = v.znear;
     _st.vp[5] = v.zfar;
+    _st.nvp = 1;
 }
 - (void)setViewports:(const MTLViewport[])v count:(NSUInteger)n
 {
-    if (n) [self setViewport:v[0]];
+    if (!n) return;
+    [self setViewport:v[0]];
+    if (n > 16) n = 16;
+    for (NSUInteger i = 1; i < n; i++) {
+        double *d = _st.vpx[i - 1];
+        d[0] = v[i].originX;
+        d[1] = v[i].originY;
+        d[2] = v[i].width;
+        d[3] = v[i].height;
+        d[4] = v[i].znear;
+        d[5] = v[i].zfar;
+    }
+    _st.nvp = (unsigned)n;
 }
 - (void)setFrontFacingWinding:(MTLWinding)w { _st.winding = (unsigned)w; }
 - (void)setCullMode:(MTLCullMode)c { _st.cull = (unsigned)c; }

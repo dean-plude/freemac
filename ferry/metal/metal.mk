@@ -24,6 +24,7 @@ frameworks/Metal.framework/Metal: $(METAL_FW_OBJ) $(FOUNDATION) $(GRAPHICS)
 install-metal:
 	install -Dm755 metal/ferry-mslc $(DESTDIR)$(PREFIX)/lib/ferry/metal/ferry-mslc
 	install -d $(DESTDIR)$(PREFIX)/lib/ferry/metal/msl
-	install -m644 metal/msl/* $(DESTDIR)$(PREFIX)/lib/ferry/metal/msl/
+	install -m644 $(filter-out metal/msl/simd,$(wildcard metal/msl/*)) $(DESTDIR)$(PREFIX)/lib/ferry/metal/msl/
+	install -Dm644 metal/msl/simd/simd.h $(DESTDIR)$(PREFIX)/lib/ferry/metal/msl/simd/simd.h
 
 .PHONY: install-metal

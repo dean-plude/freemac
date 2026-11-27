@@ -459,6 +459,38 @@ void *ferry_sound_symbol(const char *name)
     return addr;
 }
 
+/* ---- music synthesis (freemac 1.NEXT) ---------------------------------------------
+ * Ferry's Core Audio plays MIDI (its DLS and MIDI synth units, which VLC's
+ * MIDI decoder uses) with this system's FluidSynth, libfluidsynth
+ * (LGPL-2.1-or-later), and a General MIDI SoundFont that this system has,
+ * such as FluidR3_GM (MIT). The library is opened the first time a program
+ * makes a synth unit, so Ferry runs on a system without it (the unit then
+ * fails to initialize). Only FluidSynth's own calls (fluid_, new_fluid_,
+ * delete_fluid_) are served. FERRY_FLUIDSYNTH_LIBRARY names another library
+ * to open in its place (the tests use it to stand for a system without it,
+ * or for one unpacked beside the tests). */
+static void *synth_handle;
+static void open_synth(void)
+{
+    const char *other = getenv("FERRY_FLUIDSYNTH_LIBRARY");
+    if (other && *other) {
+        synth_handle = dlopen(other, RTLD_NOW | RTLD_LOCAL);
+        return;
+    }
+    synth_handle = dlopen("libfluidsynth.so.3", RTLD_NOW | RTLD_LOCAL);
+    if (!synth_handle)
+        synth_handle = dlopen("libfluidsynth.so.2", RTLD_NOW | RTLD_LOCAL);
+}
+
+void *ferry_synth_symbol(const char *name)
+{
+    static pthread_once_t once = PTHREAD_ONCE_INIT;
+    if (!name || (strncmp(name, "fluid_", 6) && strncmp(name, "new_fluid_", 10) && strncmp(name, "delete_fluid_", 13)))
+        return NULL;
+    pthread_once(&once, open_synth);
+    return synth_handle ? dlsym(synth_handle, name) : NULL;
+}
+
 /* ---- OpenGL (freemac 1.235) -------------------------------------------------------
  * Ferry's OpenGL framework (opengl/) makes its contexts with this system's
  * EGL (libEGL.so.1: Mesa, or another vendor's through GLVND) and passes

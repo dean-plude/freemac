@@ -38,16 +38,24 @@ helps when looking for a bug.
 A program gets a Metal device when it links Metal.framework and not
 OpenGL.framework: a program that links both (such as OBS Studio, VLC or a
 Qt app) gets no device, so it keeps drawing with OpenGL, which is faster
-here. `FERRY_METAL=1` turns Metal on for any program, and `FERRY_METAL=0`
-turns it off.
+here. In a program that links neither, such as Python, the library asking for
+the device decides the same way: Blender's `bpy` module links Metal and not
+OpenGL, so it gets one, and its Workbench and EEVEE engines render with it,
+EEVEE's shadows included.
+`FERRY_METAL=1` turns Metal on for any program, and `FERRY_METAL=0` turns it
+off.
 
 ## What's missing
 
 - Ray tracing, mesh shaders, tile shaders and indirect command buffers.
 - Barycentric coordinates in fragment functions, and BC (DXT) compressed
   textures being sampled (they can be copied).
-- Argument buffers are only partly done: an argument encoder lays out
-  buffers, textures and samplers, but a shader can't read them yet.
+- Argument buffers inside argument buffers, and resource heaps. An argument
+  buffer itself works: a buffer argument whose struct has `[[id(n)]]`
+  members gets its encoder from the function, laid out as the shader reads it
+  (Blender keeps its samplers in one).
+- Texture atomics work on 32-bit int and uint textures (1D, 2D, their
+  arrays and 3D), at mip level 0.
 
 Ferry notes each Metal call a program makes that isn't done yet, once, on
 its standard error.
