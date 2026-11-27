@@ -662,6 +662,8 @@ run_one quartzcore_layer_contents_parts "$here/quartzcore/layer_contents_parts.m
     -framework QuartzCore -framework Foundation -framework CoreGraphics
 run_one quartzcore_layer_blend_modes "$here/quartzcore/layer_blend_modes.m" "$here/quartzcore/layer_blend_modes.out" -fobjc-arc \
     -framework QuartzCore -framework Foundation -framework CoreGraphics
+run_one quartzcore_layer_host "$here/quartzcore/layer_host.m" "$here/quartzcore/layer_host.out" -fobjc-arc \
+    -framework QuartzCore -framework Foundation -framework CoreGraphics
 run_one quartzcore_animations "$here/quartzcore/animations.m" "$here/quartzcore/animations.out" -fobjc-arc -fblocks \
     -framework QuartzCore -framework Foundation -framework CoreGraphics
 # AppKit (M4). First with no display, where windows are drawn off screen,

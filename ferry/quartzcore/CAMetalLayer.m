@@ -98,6 +98,17 @@
     return d;
 }
 
+/* A presented drawable's picture, from the presenting thread: taken at
+ * once in a context's tree (CAContext.m), whose program may not run its
+ * main run loop; otherwise left to the main thread. */
+- (BOOL)_ferryTakeMetalImage:(NSArray *)a
+{
+    if (!FerryCALayerInContext(self))
+        return NO;
+    [self _ferryShowMetalImage:a];
+    return YES;
+}
+
 /* A presented drawable's picture: @[image, drawable id], on the main thread. */
 - (void)_ferryShowMetalImage:(NSArray *)a
 {

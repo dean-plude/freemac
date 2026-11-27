@@ -1,0 +1,10 @@
+context id given: yes, listed: yes
+ids differ: yes
+layer kept: yes
+host id kept: yes
+shown: inside r--, its blue part --b, below it rgb, right of it rgb
+after a change: -g-
+grown: -g-
+after invalidate: rgb, valid no
+unknown id shows nothing: rgb
+exit=0
