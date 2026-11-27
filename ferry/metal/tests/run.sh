@@ -30,4 +30,13 @@ frag 0.2 0.3 0.5 5
 add 11 22 33 44
 WANT
 diff -u "$tmp/want.txt" "$tmp/out.txt"
+# Blender-style shader code builds, with a function-constant buffer index
+"$here/../ferry-mslc" build "$here/blender-style.metal" -o "$tmp/blender.dylib" --fcname base_index=2
+"$here/../ferry-mslc" reflect "$here/blender-style.metal" --fcname base_index=2 > "$tmp/blender.json"
+python3 -c "
+import json, sys
+f = {x['name']: x for x in json.load(open(sys.argv[1]))['functions']}
+assert [b['index'] for b in f['vs_main']['buffers']] == [3], f['vs_main']['buffers']
+assert [b['index'] for b in f['fs_main']['buffers']] == [2], f['fs_main']['buffers']
+" "$tmp/blender.json"
 echo "ferry-mslc: all tests passed"

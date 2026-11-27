@@ -2,7 +2,8 @@
  * Metal: the device, a shader library compiled from source,
  * a render pipeline drawing a triangle into a cleared texture (read back
  * texel by texel), indexed drawing with a depth test and blending, a texture
- * sampled in a fragment function, a compute kernel adding two buffers,
+ * sampled in a fragment function, fragments discarded, an argument buffer
+ * holding a texture and a sampler, a compute kernel adding two buffers,
  * blits, and a command buffer's handlers. Written from Apple's public Metal
  * documentation; built with ARC, as most Metal programs are. */
 #import <Foundation/Foundation.h>
@@ -26,9 +27,12 @@ static NSString *const source = @
     "  O o; o.position = float4(in.pos, depth, 1); o.col = in.col; o.uv = in.pos * 0.5 + 0.5; return o;\n"
     "}\n"
     "fragment float4 fs_col(O in [[stage_in]]) { return in.col; }\n"
+    "fragment float4 fs_cut(O in [[stage_in]]) { if (in.uv.x < 0.5) discard_fragment(); return in.col; }\n"
     "fragment float4 fs_tex(O in [[stage_in]], texture2d<float> t [[texture(0)]], sampler s [[sampler(0)]]) {\n"
     "  return t.sample(s, in.uv);\n"
     "}\n"
+    "struct Args { texture2d<float> t [[id(0)]]; sampler s [[id(1)]]; };\n"
+    "fragment float4 fs_args(O in [[stage_in]], constant Args &a [[buffer(0)]]) { return a.t.sample(a.s, in.uv); }\n"
     "kernel void add(device float *a [[buffer(0)]], device const float *b [[buffer(1)]],\n"
     "                uint gid [[thread_position_in_grid]]) { a[gid] += b[gid]; }\n";
 
@@ -68,7 +72,7 @@ int main(void)
             return 1;
         }
         NSArray *names = [lib.functionNames sortedArrayUsingSelector:@selector(compare:)];
-        check("its functions", [names isEqual:(@[ @"add", @"fs_col", @"fs_tex", @"vs_tri" ])]);
+        check("its functions", [names isEqual:(@[ @"add", @"fs_args", @"fs_col", @"fs_cut", @"fs_tex", @"vs_tri" ])]);
         id<MTLFunction> vs = [lib newFunctionWithName:@"vs_tri"];
         check("a vertex function", vs && vs.functionType == MTLFunctionTypeVertex);
         check("a missing function is nil", [lib newFunctionWithName:@"nope"] == nil);
@@ -224,6 +228,53 @@ int main(void)
         check("sampled top left", near(p, 255, 0, 0, 255));
         texel(target, 28, 4, p);
         check("sampled top right", near(p, 255, 255, 255, 255));
+
+        /* green over the right half only: the left half's fragments are discarded */
+        pd.fragmentFunction = [lib newFunctionWithName:@"fs_cut"];
+        id<MTLRenderPipelineState> cutPipe = [dev newRenderPipelineStateWithDescriptor:pd error:&err];
+        check("a discarding pipeline", cutPipe != nil);
+        for (int i = 0; i < 3; i++) full[i].col[1] = 1, full[i].col[3] = 1;
+        cb = [q commandBuffer];
+        rp.colorAttachments[0].loadAction = MTLLoadActionLoad;
+        enc = [cb renderCommandEncoderWithDescriptor:rp];
+        [enc setRenderPipelineState:cutPipe];
+        [enc setVertexBytes:&z length:sizeof z atIndex:2];
+        [enc setVertexBytes:full length:sizeof full atIndex:0];
+        [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+        [enc endEncoding];
+        [cb commit];
+        [cb waitUntilCompleted];
+        texel(target, 4, 4, p);
+        check("discarded on the left", near(p, 255, 0, 0, 255));
+        texel(target, 28, 4, p);
+        check("drawn on the right", near(p, 0, 255, 0, 255));
+
+        /* the texture and sampler again, through an argument buffer the
+         * function's encoder fills */
+        id<MTLFunction> fa_fn = [lib newFunctionWithName:@"fs_args"];
+        id<MTLArgumentEncoder> ae = [fa_fn newArgumentEncoderWithBufferIndex:0];
+        check("an argument encoder from a function", ae != nil && ae.encodedLength >= 8);
+        id<MTLBuffer> ab = [dev newBufferWithLength:ae.encodedLength options:0];
+        [ae setArgumentBuffer:ab offset:0];
+        [ae setTexture:small atIndex:0];
+        [ae setSamplerState:sampler atIndex:1];
+        pd.fragmentFunction = fa_fn;
+        id<MTLRenderPipelineState> argPipe = [dev newRenderPipelineStateWithDescriptor:pd error:&err];
+        cb = [q commandBuffer];
+        enc = [cb renderCommandEncoderWithDescriptor:rp];
+        [enc setRenderPipelineState:argPipe];
+        [enc setVertexBytes:&z length:sizeof z atIndex:2];
+        [enc setVertexBytes:full length:sizeof full atIndex:0];
+        [enc setFragmentBuffer:ab offset:0 atIndex:0];
+        [enc useResource:small usage:MTLResourceUsageRead stages:MTLRenderStageFragment];
+        [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+        [enc endEncoding];
+        [cb commit];
+        [cb waitUntilCompleted];
+        texel(target, 28, 28, p);
+        unsigned char p2[4];
+        texel(target, 4, 4, p2);
+        check("sampled through the argument buffer", near(p, 0, 255, 0, 255) && near(p2, 255, 0, 0, 255));
 
         /* a compute kernel */
         id<MTLComputePipelineState> cp = [dev newComputePipelineStateWithFunction:[lib newFunctionWithName:@"add"]

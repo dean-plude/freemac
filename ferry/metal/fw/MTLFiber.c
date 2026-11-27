@@ -65,6 +65,9 @@ struct worker {
     void *tg_ptr[64];
     size_t tg_size[64];
     struct group *gbuf;
+    /* the last group's discards, for the writes that follow it */
+    unsigned char last_discarded[MAX_LANES];
+    int last_n;
 };
 static __thread struct worker *me;
 
@@ -171,13 +174,20 @@ void mtl_run_lanes(int kind, int n, mtl_lane_fn fn, void *arg)
         }
     }
     w->g = outer;
+    if (!outer) {
+        memcpy(w->last_discarded, g->discarded, (size_t)n);
+        w->last_n = n;
+    }
     if (outer) free(g);
 }
 
 int mtl_lane_discarded(int lane)
 {
     struct worker *w = worker();
-    if (!w->g) { int d = w->discard_outside; w->discard_outside = 0; return d; }
+    if (!w->g) {
+        if (w->discard_outside) { w->discard_outside = 0; return 1; }
+        return lane >= 0 && lane < w->last_n ? w->last_discarded[lane] : 0;
+    }
     return lane >= 0 && lane < w->g->n ? w->g->discarded[lane] : 0;
 }
 

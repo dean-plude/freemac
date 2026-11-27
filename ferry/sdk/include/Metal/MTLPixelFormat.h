@@ -1,3 +1,5 @@
+/* Ferry submodule: CAMetalLayer.h takes only this from Metal, so importing
+ * QuartzCore or AppKit doesn't bring in all of Metal's names. */
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Metal: the pixel formats, from Apple's public Metal documentation. Metal/Metal.h
  * includes it; QuartzCore's CAMetalLayer.h includes only this, as on a Mac. */

@@ -316,6 +316,108 @@ class Source:
                 j = match_close(toks, k + 1)
                 name = text_of(toks[k + 2:j])
                 self.edit(t.start, toks[j].end, "__FERRY_FC_DEFINED_%s" % name)
+        self.wrap_conditionals()
+        self.generic_array_params()
+
+    def generic_array_params(self):
+        """A parameter "float4 offset[3]" becomes "float4 __generic *offset".
+
+        C++ for OpenCL makes an array parameter a pointer to private memory,
+        so a member array (reached through the object, which is generic)
+        can't be passed to it; Metal takes either."""
+        toks = self.toks
+        n = len(toks)
+        spaces = {"__private", "__global", "__local", "__constant", "__generic", "thread",
+                  "device", "constant", "threadgroup", "threadgroup_imageblock", "ray_data", "object_data"}
+        not_funcs = {"if", "while", "for", "switch", "return", "sizeof", "alignof", "decltype",
+                     "static_assert", "catch", "alignas", "defined"}
+        for k in range(1, n):
+            t = toks[k]
+            if t.text != "(" or not t.user or toks[k - 1].kind != "id" or toks[k - 1].text in not_funcs:
+                continue
+            j = match_close(toks, k)
+            group = toks[k + 1:j]
+            if not group or any(g.text == "[[" or not g.user for g in group):
+                continue
+            for part in split_commas(group):
+                if not part or part[-1].text != "]":
+                    continue
+                d = Decl(part, [])
+                if not d.name or not d.dims or not d.type_toks:
+                    continue
+                tt = [x.text for x in d.type_toks]
+                if any(x in spaces for x in tt) or tt.count("<") != tt.count(">"):
+                    continue
+                if not all(x.kind in ("id", "num") or x.text in ("::", "<", ">", ",") for x in d.type_toks):
+                    continue
+                if tt[0] in ("return", "case", "else", "new", "delete", "throw", "goto"):
+                    continue
+                if d.type_toks[0].kind != "id":
+                    continue
+                ty = text_of(d.type_toks)
+                rest = "".join("[%s]" % x for x in d.dims[1:])
+                if rest:
+                    rep = "%s __generic (*%s)%s" % (ty, d.name, rest)
+                else:
+                    rep = "%s __generic *%s" % (ty, d.name)
+                self.edit(part[0].start, part[-1].end, rep)
+
+    def wrap_conditionals(self):
+        """c ? a : b, with each of a and b passed through __ferry_value().
+
+        In clang's C++ for OpenCL a local vector is a "__private vec" while a
+        function's result is a plain "vec", and ?: won't take one of each
+        (Metal's own compiler does). Passing both through a function that
+        returns its argument by value gives the two sides the same type."""
+        toks = self.toks
+        n = len(toks)
+        opens, closes = ("(", "[", "{", "[["), (")", "]", "}", "]]")
+
+        def end_of(k, stop_colon):
+            # the index after the last token of an operand starting at k
+            depth, pending = 0, 0
+            j = k
+            while j < n:
+                x = toks[j].text
+                if x in opens:
+                    depth += 1
+                elif x in closes:
+                    if depth == 0:
+                        return j
+                    depth -= 1
+                elif depth == 0:
+                    if x == "?":
+                        pending += 1
+                    elif x == ":":
+                        if pending:
+                            pending -= 1
+                        else:
+                            return j
+                    elif x in (";", ",") and not pending:
+                        return j
+                j += 1
+            return None
+
+        in_attr = 0
+        for k, t in enumerate(toks):
+            if t.text == "[[":
+                in_attr += 1
+            elif t.text == "]]":
+                in_attr -= 1
+            if t.text != "?" or not t.user or in_attr:
+                continue
+            colon = end_of(k + 1, True)
+            if colon is None or colon == k + 1 or toks[colon].text != ":":
+                continue
+            stop = end_of(colon + 1, False)
+            if stop is None or stop == colon + 1:
+                continue
+            if not all(x.user for x in toks[k:stop]):
+                continue
+            self.edit(toks[k + 1].start, toks[k + 1].start, "__ferry_value(")
+            self.edit(toks[colon - 1].end, toks[colon - 1].end, ")")
+            self.edit(toks[colon + 1].start, toks[colon + 1].start, "__ferry_value(")
+            self.edit(toks[stop - 1].end, toks[stop - 1].end, ")")
 
     def statement(self, st, brace_stack):
         if not st:
@@ -356,9 +458,17 @@ class Source:
         for p in prev[idx + 1:]:
             if p.kind == "id" and p.text not in ("alignas",):
                 name = p.text
+        j = match_close(toks, k)
+        if not name and "typedef" in ptext[:idx]:
+            # typedef struct { ... } Name;
+            for t in toks[j + 1:j + 4]:
+                if t.kind == "id":
+                    name = t.text
+                    break
+                if t.text == ";":
+                    break
         if not name:
             return
-        j = match_close(toks, k)
         body = toks[k + 1:j]
         fields = []
         cur = []
@@ -451,7 +561,8 @@ class Source:
 
 
 def apply_edits(text, edits):
-    edits = sorted(edits, key=lambda e: (e[0], -e[1]))
+    # at one place an insertion goes before a replacement that starts there
+    edits = sorted(edits, key=lambda e: (e[0], e[1] != e[0], -e[1]))
     out, pos = [], 0
     for s, e, r in edits:
         if s < pos:
@@ -509,10 +620,36 @@ def strip_type(t):
 
 
 class Gen:
-    def __init__(self, src):
+    def __init__(self, src, fcvals=None):
         self.src = src
         self.out = []
         self.reflect = []
+        self.fcvals = fcvals or {}   # function constants' values, by name
+
+    def index(self, expr):
+        """A binding index: a number, or an expression of numbers and function
+        constants (Blender writes [[buffer(MTL_uniform_buffer_base_index+1)]]).
+        None when a function constant in it has no value yet."""
+        try:
+            return int(expr, 0)
+        except ValueError:
+            pass
+        def value(m):
+            v = self.fcvals.get(m.group(0))
+            if v is None:
+                raise KeyError(m.group(0))
+            return "(%s)" % v
+        try:
+            e = re.sub(r"\b[A-Za-z_]\w*\b", value, expr)
+        except KeyError:
+            return None
+        e = re.sub(r"(?<![/])/(?![/])", "//", e)
+        if not re.match(r"^[\s\d()+\-*/%<>&|^~xXa-fA-F]*$", e):
+            return None
+        try:
+            return int(eval(e, {"__builtins__": {}}, {}))
+        except Exception:
+            return None
 
     def emit(self, s):
         self.out.append(s)
@@ -525,7 +662,46 @@ class Gen:
 
     def gen_all(self):
         for e in self.src.entries:
+            self.later = []
             getattr(self, "gen_" + e["stage"])(e)
+            self.out.extend(self.later)
+
+    def arg_layout(self, e, i, p):
+        """An argument buffer: a buffer argument whose struct has [[id(n)]]
+        members gets a function listing where each member is, with the
+        offsets and sizes the compiler gives, for the argument encoder that
+        newArgumentEncoderWithBufferIndex: makes. Returns its name."""
+        _, fields = self.struct_of(text_of(p.type_toks))
+        if not fields or not any(f.attr("id") is not None for f in fields):
+            return None
+        sym = "__ferry_args_%s_%d" % (e["name"], i)
+        self.later.append('extern "C" int %s(struct ferry_arg *a, int max, int *size)\n{' % sym)
+        self.later.append("    typedef __ferry::plain<%s> __S;" % text_of(p.type_toks))
+        self.later.append("    int k = 0;")
+        for f in fields:
+            fid = f.attr("id")
+            if fid is None:
+                continue
+            ty = text_of(f.type_toks)
+            m = re.match(r"^\s*(?:metal\s*::\s*)?array\s*<(.*),[^,]*>\s*$", ty)
+            elem = m.group(1) if m else ty
+            is_array = bool(m) or bool(f.dims)
+            if re.search(r"\bsampler\b", elem):
+                kind = "FERRY_A_SAMPLER"
+            elif re.search(r"\b(texture|depth)\w*\b", elem):
+                kind = "FERRY_A_TEXTURE"
+            elif "*" in elem:
+                kind = "FERRY_A_BUFFER"
+            else:
+                kind = "FERRY_A_DATA"
+            whole = "sizeof(__ferry::declval<__S>().%s)" % f.name
+            one = "sizeof(__ferry::declval<__S>().%s[0])" % f.name if is_array else whole
+            self.later.append("    if (k < max) a[k] = (ferry_arg){(int)(%s), (int)__builtin_offsetof(__S, %s), "
+                              "(int)(%s / %s), (int)(%s), %s};" % (fid, f.name, whole, one, one, kind))
+            self.later.append("    k++;")
+        self.later.append("    *size = (int)sizeof(__S);")
+        self.later.append("    return k;\n}")
+        return sym
 
     def bind_params(self, e, inputs_var=None):
         """Locals for each parameter; returns (call args, reflection)."""
@@ -538,19 +714,23 @@ class Gen:
             if p.attr("buffer") is not None:
                 idx = p.attr("buffer")
                 self.emit("    __T%d %s = __ferry_entry::buffer<__T%d>::get(c->buffers[%s]);" % (i, loc, i, idx))
-                refl["buffers"].append({"index": int(idx, 0), "name": p.name})
+                b = {"index": self.index(idx), "name": p.name}
+                args_sym = self.arg_layout(e, i, p)
+                if args_sym:
+                    b["arguments"] = args_sym
+                refl["buffers"].append(b)
             elif p.attr("texture") is not None:
                 idx = p.attr("texture")
                 self.emit("    __T%d %s = __ferry_entry::texture<__ferry::plain<__T%d>>::get(c, %s);" % (i, loc, i, idx))
-                refl["textures"].append({"index": int(idx, 0), "name": p.name})
+                refl["textures"].append({"index": self.index(idx), "name": p.name})
             elif p.attr("sampler") is not None:
                 idx = p.attr("sampler")
                 self.emit("    __T%d %s = __ferry_entry::samplers<__ferry::plain<__T%d>>::get(c, %s);" % (i, loc, i, idx))
-                refl["samplers"].append({"index": int(idx, 0), "name": p.name})
+                refl["samplers"].append({"index": self.index(idx), "name": p.name})
             elif p.attr("threadgroup") is not None:
                 idx = p.attr("threadgroup")
                 self.emit("    __T%d %s = (__T%d)c->tgmem[%s];" % (i, loc, i, idx))
-                refl["threadgroup"].append({"index": int(idx, 0), "name": p.name})
+                refl["threadgroup"].append({"index": self.index(idx), "name": p.name})
             elif p.attr("stage_in") is not None:
                 sname, fields = self.struct_of(text_of(p.type_toks))
                 if fields is None:
@@ -770,8 +950,10 @@ def fc_literal(ty, expr):
 
 
 def preprocess(src_path, defines, msl_dir, clang):
-    cmd = [clang, "-E"] + CLANG_FLAGS + ["-I", msl_dir, "-D__METAL_VERSION__=240", "-D__METAL_MACOS__=1",
-                                         "-D__FERRY_METAL__=1"]
+    # <metal_stdlib> comes first even where the source doesn't include it, as
+    # with Apple's compiler (Blender's shaders start "using namespace metal;")
+    cmd = [clang, "-E"] + CLANG_FLAGS + ["-I", msl_dir, "-include", "metal_stdlib", "-D__METAL_VERSION__=240",
+                                         "-D__METAL_MACOS__=1", "-D__FERRY_METAL__=1"]
     for d in defines:
         cmd += ["-D", d]
     cmd.append(src_path)
@@ -832,7 +1014,14 @@ def main(argv):
         sys.exit("ferry-mslc: clang isn't installed; Metal shaders need it (package clang)")
     text = preprocess(src_path, defines, MSL_DIR, clang)
     src = Source(text, os.path.abspath(src_path) if os.path.isabs(src_path) else src_path)
-    gen = Gen(src)
+    fcvals = {}
+    for f in src.fconsts:
+        val = fcnames.get(f["name"])
+        if val is None and f["index"] is not None:
+            val = fcs.get(str(f["index"]))
+        if val is not None:
+            fcvals[f["name"]] = val
+    gen = Gen(src, fcvals)
     gen.gen_all()
     # function constants: their values in place of their declarations
     fcdefs = []

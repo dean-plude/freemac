@@ -445,6 +445,10 @@ template<class T, unsigned long N> struct array {
     T __a[N ? N : 1];
     T &operator[](unsigned long i) { return __a[i]; }
     const T &operator[](unsigned long i) const { return __a[i]; }
+    /* an array in device or constant memory gives elements there, so
+     * &args.samplers[i] is a constant sampler * (Blender's argument buffers) */
+    __global T &operator[](unsigned long i) __global { return __a[i]; }
+    const __global T &operator[](unsigned long i) const __global { return __a[i]; }
     constexpr unsigned long size() const { return N; }
 };
 template<class T> struct numeric_limits;
@@ -481,6 +485,33 @@ template<class T> struct is_vector { static constexpr bool value = false; };
 template<class T, int N> struct is_vector<vec<T, N>> { static constexpr bool value = true; };
 template<class T> struct vec_elements { static constexpr int value = 1; };
 template<class T, int N> struct vec_elements<vec<T, N>> { static constexpr int value = N; };
+template<bool B, class T, class F> struct conditional { typedef T type; };
+template<class T, class F> struct conditional<false, T, F> { typedef F type; };
+template<bool B, class T, class F> using conditional_t = typename conditional<B, T, F>::type;
+
+template<class T, T V> struct integral_constant { static constexpr T value = V; typedef T value_type; constexpr operator T() const { return V; } };
+typedef integral_constant<bool, true> true_type;
+typedef integral_constant<bool, false> false_type;
+template<class T> struct remove_cv { typedef typename __ferry::remove_cv<T>::type type; };
+template<class T> struct remove_reference { typedef typename __ferry::remove_reference<T>::type type; };
+template<class T> struct is_integral { static constexpr bool value = __ferry::is_scalar<T>::value && !__ferry::is_floating<T>::value; };
+template<class T> struct is_arithmetic { static constexpr bool value = __ferry::is_scalar<T>::value; };
+template<class T> struct make_scalar { typedef T type; };
+template<class T, int N> struct make_scalar<vec<T, N>> { typedef T type; };
+template<class T> using make_scalar_t = typename make_scalar<T>::type;
+template<class T, bool S = __ferry::is_scalar<T>::value> struct __ferry_is_signed { static constexpr bool value = false; };
+template<class T> struct __ferry_is_signed<T, true> { static constexpr bool value = __ferry::plain<T>(-1) < __ferry::plain<T>(0); };
+template<class T> struct is_signed { static constexpr bool value = __ferry_is_signed<T>::value; };
+template<class T> struct is_unsigned { static constexpr bool value = __ferry::is_scalar<T>::value && !__ferry_is_signed<T>::value; };
+template<class A, class B> constexpr bool is_same_v = __ferry::is_same<A, B>::value;
+template<class T> constexpr bool is_integral_v = is_integral<T>::value;
+template<class T> constexpr bool is_floating_point_v = is_floating_point<T>::value;
+template<class T> constexpr bool is_arithmetic_v = is_arithmetic<T>::value;
+template<class T> constexpr bool is_scalar_v = is_scalar<T>::value;
+template<class T> constexpr bool is_vector_v = is_vector<T>::value;
+template<class T> constexpr bool is_signed_v = is_signed<T>::value;
+template<class T> constexpr bool is_unsigned_v = is_unsigned<T>::value;
+template<class T> constexpr int vec_elements_v = vec_elements<T>::value;
 } // namespace metal
 
 #endif

@@ -833,6 +833,136 @@ SEEKERS(4)
 static void *const seekoff_fns[NSEEK] = {seekoff_0, seekoff_1, seekoff_2, seekoff_3, seekoff_4};
 static void *const seekpos_fns[NSEEK] = {seekpos_0, seekpos_1, NULL, seekpos_3, seekpos_4};
 
+/* A Mac library can hold its own copies of stream buffers' seekoff and
+ * seekpos (libc++'s templates made in the library, or its own stream
+ * buffers), and its virtual tables point at them. This system's libc++
+ * calls those through the tables its own way (pubseekoff from seekg, for
+ * one), so those slots get calls that tell the two ways apart too and
+ * then call the library's copy the Mac's way (freemac Blender work:
+ * OpenColorIO reads its files so). */
+enum { NMACSEEK = 96 };
+/* slot k's calls are numbered (k / 8 + 1) * 10 + k % 8, 10 to 127 */
+#define SLOT_NUMBER(k) (((k) / 8 + 1) * 10 + (k) % 8)
+static struct mac_fpos (*mac_seekoff_fn[128])(void *, long long, int, unsigned);
+static struct mac_fpos (*mac_seekpos_fn[128])(void *, struct mac_fpos, unsigned);
+static int nmac_seekoff, nmac_seekpos;
+static pthread_mutex_t mac_seek_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static struct host_fpos mac_seekoff_any(int i, long a, long b, long c, long d, long e)
+{
+    if (!is_direction(d)) { /* this system's way: (buffer, off, way, which) */
+        struct mac_fpos r = mac_seekoff_fn[i]((void *)a, b, (int)c, (unsigned)d);
+        return to_host(&r);
+    }
+    *(struct mac_fpos *)a = mac_seekoff_fn[i]((void *)b, c, (int)d, (unsigned)e);
+    return (struct host_fpos){(uint64_t)a, 0};
+}
+static struct host_fpos mac_seekpos_any(int i, long a, long b, long c, long d, const struct mac_fpos *pos)
+{
+    if (!b || !is_mode(c)) { /* this system's way: (buffer, state, off, which) */
+        struct mac_fpos p;
+        to_mac(&p, (struct host_fpos){(uint64_t)b, c});
+        struct mac_fpos r = mac_seekpos_fn[i]((void *)a, p, (unsigned)d);
+        return to_host(&r);
+    }
+    *(struct mac_fpos *)a = mac_seekpos_fn[i]((void *)b, *pos, (unsigned)c);
+    return (struct host_fpos){(uint64_t)a, 0};
+}
+#define MAC_SEEKERS(i)                                                                                         \
+    static struct host_fpos mac_seekoff_##i(long a, long b, long c, long d, long e)                            \
+    {                                                                                                          \
+        return mac_seekoff_any(i, a, b, c, d, e);                                                              \
+    }                                                                                                          \
+    static struct host_fpos mac_seekpos_##i(long a, long b, long c, long d, long e, long f, struct mac_fpos pos) \
+    {                                                                                                          \
+        (void)e, (void)f;                                                                                      \
+        return mac_seekpos_any(i, a, b, c, d, &pos);                                                           \
+    }
+#define MAC_SEEKERS8(i) MAC_SEEKERS(i##0) MAC_SEEKERS(i##1) MAC_SEEKERS(i##2) MAC_SEEKERS(i##3) \
+                        MAC_SEEKERS(i##4) MAC_SEEKERS(i##5) MAC_SEEKERS(i##6) MAC_SEEKERS(i##7)
+MAC_SEEKERS8(1) MAC_SEEKERS8(2) MAC_SEEKERS8(3) MAC_SEEKERS8(4) MAC_SEEKERS8(5) MAC_SEEKERS8(6)
+MAC_SEEKERS8(7) MAC_SEEKERS8(8) MAC_SEEKERS8(9) MAC_SEEKERS8(10) MAC_SEEKERS8(11) MAC_SEEKERS8(12)
+#define MAC_SLOTS8(f, i) f##i##0, f##i##1, f##i##2, f##i##3, f##i##4, f##i##5, f##i##6, f##i##7
+static void *const mac_seekoff_slots[NMACSEEK] = {
+    MAC_SLOTS8(mac_seekoff_, 1), MAC_SLOTS8(mac_seekoff_, 2),  MAC_SLOTS8(mac_seekoff_, 3),
+    MAC_SLOTS8(mac_seekoff_, 4), MAC_SLOTS8(mac_seekoff_, 5),  MAC_SLOTS8(mac_seekoff_, 6),
+    MAC_SLOTS8(mac_seekoff_, 7), MAC_SLOTS8(mac_seekoff_, 8),  MAC_SLOTS8(mac_seekoff_, 9),
+    MAC_SLOTS8(mac_seekoff_, 10), MAC_SLOTS8(mac_seekoff_, 11), MAC_SLOTS8(mac_seekoff_, 12),
+};
+static void *const mac_seekpos_slots[NMACSEEK] = {
+    MAC_SLOTS8(mac_seekpos_, 1), MAC_SLOTS8(mac_seekpos_, 2),  MAC_SLOTS8(mac_seekpos_, 3),
+    MAC_SLOTS8(mac_seekpos_, 4), MAC_SLOTS8(mac_seekpos_, 5),  MAC_SLOTS8(mac_seekpos_, 6),
+    MAC_SLOTS8(mac_seekpos_, 7), MAC_SLOTS8(mac_seekpos_, 8),  MAC_SLOTS8(mac_seekpos_, 9),
+    MAC_SLOTS8(mac_seekpos_, 10), MAC_SLOTS8(mac_seekpos_, 11), MAC_SLOTS8(mac_seekpos_, 12),
+};
+
+static int ends_with(const char *s, const char *tail)
+{
+    size_t n = strlen(s), m = strlen(tail);
+    return n >= m && !memcmp(s + n - m, tail, m);
+}
+
+struct seek_scan {
+    uintptr_t pairs[2 * NMACSEEK][2];
+    int n;
+};
+
+static void find_mac_seek(const char *name, void *addr, void *ctx)
+{
+    struct seek_scan *scan = ctx;
+    int off = ends_with(name, "7seekoffExNS_8ios_base7seekdirEj");
+    if (!off && !ends_with(name, "7seekposENS_4fposI11__mbstate_tEEj"))
+        return;
+    if (strncmp(name, "__ZN", 4) || scan->n >= 2 * NMACSEEK)
+        return;
+    for (int i = 0; i < scan->n; i++)
+        if (scan->pairs[i][0] == (uintptr_t)addr)
+            return;
+    void *slot;
+    if (off) {
+        for (int i = 0; i < nmac_seekoff; i++)
+            if ((void *)mac_seekoff_fn[SLOT_NUMBER(i)] == addr) {
+                slot = mac_seekoff_slots[i];
+                goto found;
+            }
+        if (nmac_seekoff == NMACSEEK) {
+            fprintf(stderr, "ferry: too many C++ stream buffers to convert; %s is left as it is\n", name);
+            return;
+        }
+        *(void **)&mac_seekoff_fn[SLOT_NUMBER(nmac_seekoff)] = addr;
+        slot = mac_seekoff_slots[nmac_seekoff++];
+    } else {
+        for (int i = 0; i < nmac_seekpos; i++)
+            if ((void *)mac_seekpos_fn[SLOT_NUMBER(i)] == addr) {
+                slot = mac_seekpos_slots[i];
+                goto found;
+            }
+        if (nmac_seekpos == NMACSEEK) {
+            fprintf(stderr, "ferry: too many C++ stream buffers to convert; %s is left as it is\n", name);
+            return;
+        }
+        *(void **)&mac_seekpos_fn[SLOT_NUMBER(nmac_seekpos)] = addr;
+        slot = mac_seekpos_slots[nmac_seekpos++];
+    }
+found:
+    scan->pairs[scan->n][0] = (uintptr_t)addr;
+    scan->pairs[scan->n][1] = (uintptr_t)slot;
+    scan->n++;
+}
+
+void ferry_cxx_wrap_image_seeks(struct image *im)
+{
+    static struct seek_scan scan;
+    pthread_mutex_lock(&mac_seek_lock);
+    scan.n = 0;
+    ferry_image_each_symbol(im, find_mac_seek, &scan);
+    int replaced = scan.n ? ferry_image_replace_pointers(im, scan.pairs, scan.n) : 0;
+    pthread_mutex_unlock(&mac_seek_lock);
+    if (ferry_verbose && scan.n)
+        fprintf(stderr, "ferry: %d stream buffer calls of %s take positions both ways (%d table slots)\n", scan.n,
+                ferry_image_path(im), replaced);
+}
+
 /* The library's own virtual tables (and its pointers to these calls) are in
  * its read-only-after-start data: point them at the calls above. */
 static int relro_of(struct dl_phdr_info *info, size_t size, void *data)

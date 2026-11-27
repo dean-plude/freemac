@@ -1487,6 +1487,7 @@ enum { NSModalResponseStop = -1000, NSModalResponseAbort = -1001, NSModalRespons
 @end
 APPKIT_EXTERN NSApplication *NSApp;
 int NSApplicationMain(int argc, const char *argv[]);
+BOOL NSApplicationLoad(void);
 APPKIT_EXTERN NSNotificationName const NSApplicationWillFinishLaunchingNotification;
 APPKIT_EXTERN NSNotificationName const NSApplicationDidFinishLaunchingNotification;
 APPKIT_EXTERN NSNotificationName const NSApplicationWillTerminateNotification;

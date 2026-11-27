@@ -20,6 +20,8 @@ SRC += src/libc_vlc.c
 SRC += src/libc_apps.c
 # Mach ports and exception ports that fail as when exhausted, confstr and more, for Audacity (freemac 1.263)
 SRC += src/libc_audacity.c
+# NXArchInfo, Mach clocks, regex, syslog and more, for Blender
+SRC += src/libc_blender.c
 # cameras, for AVFoundation's capture (freemac 1.257)
 SRC += src/camera.c
 OBJ = $(SRC:.c=.o) src/objc/msgsend.o src/objc/unwind.o
