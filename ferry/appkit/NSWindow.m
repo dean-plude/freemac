@@ -1807,6 +1807,10 @@ static int button_index(NSEventType t)
         if (![self isKeyWindow] && [self canBecomeKeyWindow])
             [self makeKeyAndOrderFront:nil];
         NSView *v = [self _viewAt:[e locationInWindow]];
+        if (getenv("FERRY_EVENT_TRACE"))
+            fprintf(stderr, "ferry: mouse down at %.0f,%.0f in %s: %s (key %d, can %d)\n", [e locationInWindow].x,
+                    [e locationInWindow].y, object_getClassName(self), v ? object_getClassName(v) : "no view",
+                    [self isKeyWindow], [self canBecomeKeyWindow]);
         [_mouseView[b] release];
         _mouseView[b] = [v retain];
         if (!v)

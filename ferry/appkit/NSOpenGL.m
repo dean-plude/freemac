@@ -119,6 +119,7 @@ static size_t ncontexts, contexts_size;
   @public
     NSOpenGLContext *_context; /* not retained */
     NSView *_view;             /* not retained */
+    BOOL _frameOnly;           /* the next draw is for a new frame alone (main thread) */
 }
 @end
 @implementation AGLViewWatch
@@ -358,17 +359,39 @@ static void flushed(CGLContextObj cgl, void *info)
     dispatch_async(dispatch_get_main_queue(), ^{
       __atomic_store_n(&c->_redraw, 0, __ATOMIC_RELEASE);
       NSView *view = c->_view;
-      if (view) {
+      if ([view isKindOfClass:[NSOpenGLView class]]) {
           [view setNeedsDisplay:YES];
-          if ([view isKindOfClass:[NSOpenGLView class]])
-              ((NSOpenGLView *)view)->_glOnly = YES;
+          ((NSOpenGLView *)view)->_glOnly = YES;
+      } else if (view && ![view respondsToSelector:@selector(displayLayer:)] && ![view wantsUpdateLayer]) {
+          [view setNeedsDisplay:YES];
+      } else if (view) {
+          /* a view that updates its own layer (Qt's) isn't asked to draw again for a new frame
+           * either: on a Mac the frame shows without the view. Marking it
+           * would have its layer displayed, and Qt answers that by drawing
+           * and flushing a frame again: a loop in which no frame showed
+           * (freemac 1.267). Its window is drawn again instead. */
+          AGLViewWatch *w = objc_getAssociatedObject(view, &watch_key);
+          if (w)
+              w->_frameOnly = YES;
+          [[view window] setViewsNeedDisplay:YES];
       }
       [c release];
     });
 }
 
+/* For a view (not an NSOpenGLView) whose OpenGL context flushed a new
+ * frame since it last drew: YES, so that this draw shows the frame
+ * without asking the view to draw (until AGLViewDidDraw). */
+BOOL AGLViewTakeFrameOnly(NSView *view)
+{
+    AGLViewWatch *w = objc_getAssociatedObject(view, &watch_key);
+    return w && w->_frameOnly;
+}
+
 BOOL AGLViewWillDraw(NSView *view)
 {
+    if (![view isKindOfClass:[NSOpenGLView class]] && AGLViewTakeFrameOnly(view))
+        return YES;
     if ([view isKindOfClass:[NSOpenGLView class]]) {
         NSOpenGLView *gv = (NSOpenGLView *)view;
         BOOL glOnly = gv->_glOnly;
@@ -383,6 +406,9 @@ BOOL AGLViewWillDraw(NSView *view)
 
 void AGLViewDidDraw(NSView *view, CGContextRef ctx)
 {
+    AGLViewWatch *watch = objc_getAssociatedObject(view, &watch_key);
+    if (watch)
+        watch->_frameOnly = NO;
     if (drawing_view == view) {
         drawing_view = nil;
         if ([view isKindOfClass:[NSOpenGLView class]])

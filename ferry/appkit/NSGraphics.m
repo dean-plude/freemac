@@ -151,6 +151,10 @@ NSString *const NSCalibratedRGBColorSpace = @"NSCalibratedRGBColorSpace";
 NSString *const NSDeviceRGBColorSpace = @"NSDeviceRGBColorSpace";
 NSString *const NSCalibratedWhiteColorSpace = @"NSCalibratedWhiteColorSpace";
 NSString *const NSDeviceWhiteColorSpace = @"NSDeviceWhiteColorSpace";
+NSString *const NSDeviceCMYKColorSpace = @"NSDeviceCMYKColorSpace";
+NSString *const NSNamedColorSpace = @"NSNamedColorSpace";
+NSString *const NSPatternColorSpace = @"NSPatternColorSpace";
+NSString *const NSCustomColorSpace = @"NSCustomColorSpace";
 
 @implementation NSColor {
     CGFloat _c[4];      /* sRGB, not premultiplied */
@@ -448,6 +452,18 @@ NAMED(findHighlightColor, 1, 0.9, 0, 1)
     return [NSString stringWithFormat:@"sRGB IEC61966-2.1 colorspace %g %g %g %g", _c[0], _c[1], _c[2], _c[3]];
 }
 - (NSString *)_ferryDynamicName { return _dynamic ? _name : nil; }
+/* The older name for a colour's space ("Color Spaces" in Apple's Color
+ * Programming Topics): a system colour is a named (catalog) colour, which
+ * an app turns into components with colorUsingColorSpaceName: first, as Qt
+ * does (freemac 1.267). */
+- (NSString *)colorSpaceName
+{
+    if (_dynamic)
+        return NSNamedColorSpace;
+    if ([self patternImage])
+        return NSPatternColorSpace;
+    return _gray ? NSCalibratedWhiteColorSpace : NSCalibratedRGBColorSpace;
+}
 
 - (CGFloat)redComponent { return comps(self)[0]; }
 - (CGFloat)greenComponent { return comps(self)[1]; }
@@ -546,8 +562,21 @@ NAMED(findHighlightColor, 1, 0.9, 0, 1)
 }
 - (NSColor *)highlightWithLevel:(CGFloat)level { return [self blendedColorWithFraction:level ofColor:[NSColor whiteColor]]; }
 - (NSColor *)shadowWithLevel:(CGFloat)level { return [self blendedColorWithFraction:level ofColor:[NSColor blackColor]]; }
-/* a system colour in a colour space is the colour it is now */
-- (NSColor *)colorUsingColorSpaceName:(NSString *)name { return resolved(self); }
+/* A system colour in a colour space is the colour it is now. A colour
+ * can't become a pattern unless it is one, and only a system colour is a
+ * named colour: nil, as Apple's documentation says when a colour can't be
+ * converted. Qt asks for the pattern space and uses the pattern's image
+ * when the answer isn't nil (freemac 1.267). */
+- (NSColor *)colorUsingColorSpaceName:(NSString *)name
+{
+    if ([name isEqualToString:NSPatternColorSpace])
+        return [self patternImage] ? self : nil;
+    if ([name isEqualToString:NSNamedColorSpace])
+        return _dynamic ? self : nil;
+    if ([self patternImage])
+        return nil;
+    return resolved(self);
+}
 - (NSColor *)colorUsingColorSpace:(id)space { return resolved(self); }
 /* Ferry's colours are kept as components, a system colour as two sets of
  * them, which makes it a catalog colour; one made from a pattern image is

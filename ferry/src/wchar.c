@@ -383,7 +383,31 @@ static unsigned long long mac_wcstoull_l(const wchar_t *s, wchar_t **e, int b, l
 static double mac_wcstod_l(const wchar_t *s, wchar_t **e, locale_t loc) { UNDER(loc, wcstod(s, e)); }
 static float mac_wcstof_l(const wchar_t *s, wchar_t **e, locale_t loc) { UNDER(loc, wcstof(s, e)); }
 
+/* Printing into a string under a locale (printf_l(3)): the plain call,
+ * with the locale in force on this thread while it runs (freemac 1.267). */
+static int mac_vsnprintf_l(char *buf, size_t n, locale_t loc, const char *fmt, va_list ap)
+{
+    UNDER(loc, vsnprintf(buf, n, fmt, ap));
+}
+static int mac_vsprintf_l(char *buf, locale_t loc, const char *fmt, va_list ap)
+{
+    UNDER(loc, vsprintf(buf, fmt, ap));
+}
+static int mac_vasprintf_l(char **out, locale_t loc, const char *fmt, va_list ap)
+{
+    UNDER(loc, vasprintf(out, fmt, ap));
+}
+static int mac_sprintf_l(char *buf, locale_t loc, const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    int r = mac_vsprintf_l(buf, loc, fmt, ap);
+    va_end(ap);
+    return r;
+}
+
 const struct ferry_symbol ferry_wchar_symbols[] = {
+    MAC(vsnprintf_l), MAC(vsprintf_l), MAC(vasprintf_l), MAC(sprintf_l),
     {"nl_langinfo", mac_nl_langinfo},
     {"nl_langinfo_l", mac_nl_langinfo_l},
     MAC(wcstol_l), MAC(wcstoul_l), MAC(wcstoll_l), MAC(wcstoull_l), MAC(wcstod_l), MAC(wcstof_l),

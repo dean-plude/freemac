@@ -128,6 +128,34 @@ static int nofollow_any_open(int fd, const char *path, int flags, mode_t mode)
     return (int)syscall(SYS_openat2, fd, path, &how, sizeof how);
 }
 
+/* qsort_r(3) on a Mac takes its context before the comparison, and passes
+ * it first; the C library here takes them the other way round (1.267). */
+struct mac_qsort_ctx { void *thunk; int (*cmp)(void *, const void *, const void *); };
+static int mac_qsort_cmp(const void *a, const void *b, void *arg)
+{
+    struct mac_qsort_ctx *c = arg;
+    return c->cmp(c->thunk, a, b);
+}
+static void mac_qsort_r(void *base, size_t n, size_t size, void *thunk, int (*cmp)(void *, const void *, const void *))
+{
+    struct mac_qsort_ctx c = {thunk, cmp};
+    qsort_r(base, n, size, mac_qsort_cmp, &c);
+}
+
+/* POSIX shared memory (shm_open(2)): a Mac's open flags, and the mode only
+ * when it creates (freemac 1.267; FreeCAD's Qt shares a memory segment). */
+static int mac_shm_open(const char *name, int flags, ...)
+{
+    mode_t mode = 0;
+    if (flags & 0x200) {
+        va_list ap;
+        va_start(ap, flags);
+        mode = va_arg(ap, int);
+        va_end(ap);
+    }
+    return shm_open(name, open_to_linux(flags), mode);
+}
+
 static int mac_open(const char *path, int flags, ...)
 {
     char font[PATH_MAX];
@@ -814,6 +842,24 @@ static void crash_handler(int sig, siginfo_t *si, void *ctx)
             break;
         bp = frame[0];
     }
+    /* Code built without frame pointers breaks that chain, so with
+     * FERRY_CRASH_REPORT=2 the stack's words that point into a program's
+     * code follow: likely return addresses, the callers (freemac 1.267). */
+    const char *e = getenv("FERRY_CRASH_REPORT");
+    if (e && *e == '2') {
+        fprintf(stderr, "  stack words into code:\n");
+        uintptr_t sp = (uintptr_t)uc->uc_mcontext.gregs[REG_RSP];
+        int shown = 0;
+        for (int i = 0; i < 4096 && shown < 40; i++) {
+            uintptr_t w;
+            if (crash_read(sp + 8 * (uintptr_t)i, &w, sizeof w) < 0)
+                break;
+            if (w > 4096 && ferry_image_containing((void *)w)) {
+                crash_where(w);
+                shown++;
+            }
+        }
+    }
     _exit(128 + sig);
 }
 
@@ -1416,6 +1462,9 @@ const struct ferry_symbol ferry_posix_symbols[] = {
     {"OSAtomicCompareAndSwapLong", mac_OSAtomicCompareAndSwap64},
     {"OSAtomicCompareAndSwapLongBarrier", mac_OSAtomicCompareAndSwap64},
     {"open", mac_open},
+    {"shm_open", mac_shm_open},
+    {"qsort_r", mac_qsort_r},
+    {"shm_unlink", shm_unlink},
     {"openat", mac_openat},
     {"renamex_np", mac_renamex_np},
     {"renameat", mac_renameat},

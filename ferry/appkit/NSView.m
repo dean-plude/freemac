@@ -16,6 +16,21 @@ NSNotificationName const NSViewBoundsDidChangeNotification = @"NSViewBoundsDidCh
 - (void)_noteViewNeedsDisplay;
 @end
 
+/* the view whose drawRect: runs, and the rectangle it draws */
+static NSView *drawing_view;
+static NSRect drawing_rect;
+
+static void draw_rect(NSView *view, NSRect dirty)
+{
+    NSView *was = drawing_view;
+    NSRect wasRect = drawing_rect;
+    drawing_view = view;
+    drawing_rect = dirty;
+    [view drawRect:dirty];
+    drawing_view = was;
+    drawing_rect = wasRect;
+}
+
 @implementation NSView {
     NSRect _frame, _bounds;
     NSView *_superview;             /* not retained */
@@ -827,6 +842,22 @@ static NSSize abs_size(NSSize s) { return NSMakeSize(fabs(s.width), fabs(s.heigh
 }
 
 - (void)drawRect:(NSRect)dirtyRect {}
+/* The rectangles drawRect: is drawing, for a view that draws only those
+ * (NSView's getRectsBeingDrawn:count: and needsToDrawRect:, as Apple's
+ * documentation describes them): Ferry draws one rectangle at a time, so
+ * there is one (freemac 1.267). */
+- (void)getRectsBeingDrawn:(const NSRect **)rects count:(NSInteger *)count
+{
+    BOOL mine = drawing_view == self;
+    if (rects)
+        *rects = mine ? &drawing_rect : NULL;
+    if (count)
+        *count = mine ? 1 : 0;
+}
+- (BOOL)needsToDrawRect:(NSRect)rect
+{
+    return NSIntersectsRect(rect, drawing_view == self ? drawing_rect : [self visibleRect]);
+}
 
 /* Adds the window rectangles this view and those under it need drawn to
  * rects (merging ones that touch, all into one past max). NO when the whole
@@ -899,7 +930,7 @@ static void add_dirty(NSRect r, NSRect *rects, int *n, int max)
     BOOL gl = AGLViewCount > 0, skip = gl && AGLViewWillDraw(self);
     @autoreleasepool {
         if (!skip)
-            [self drawRect:dirty];
+            draw_rect(self, dirty);
     }
     if (gl)
         AGLViewDidDraw(self, ctx);
@@ -917,7 +948,7 @@ static void add_dirty(NSRect r, NSRect *rects, int *n, int max)
 {
     BOOL updates = !_hostsLayer && [self wantsUpdateLayer];
     layers_drawing++;
-    if (updates && update)
+    if (updates && update && !(AGLViewCount > 0 && AGLViewTakeFrameOnly(self)))
         [self updateLayer];
     NSRect b = _bounds;
     FerryCALayerRender(_layer, ctx, YES, [self isFlipped], ^(CGContextRef c) {
@@ -930,10 +961,16 @@ static void add_dirty(NSRect r, NSRect *rects, int *n, int max)
           BOOL gl = AGLViewCount > 0, skip = gl && AGLViewWillDraw(self);
           @autoreleasepool {
               if (!skip)
-                  [self drawRect:dirty];
+                  draw_rect(self, dirty);
           }
           if (gl)
               AGLViewDidDraw(self, c);
+      } else if (AGLViewCount > 0 && !_hostsLayer) {
+          /* a view that updates its layer itself still shows what an
+           * OpenGL context draws into it: Qt 5 composes a window that
+           * holds a 3D view with OpenGL into the window's own layer-backed
+           * view (freemac 1.267) */
+          AGLViewDidDraw(self, c);
       }
       for (NSView *v in [[_subviews copy] autorelease])
           [v _drawInContext:c dirty:dirty screen:screen];

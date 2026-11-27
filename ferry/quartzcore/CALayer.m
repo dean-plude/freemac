@@ -428,8 +428,10 @@ static BOOL add_dynamic_accessor(Class cls, SEL sel)
 
 - (void)dealloc
 {
-    if (!_presentation)
+    if (!_presentation) {
         [self removeAllAnimations];
+        surface_use(_values[@"contents"], NO);
+    }
     for (CALayer *s in _sublayers)
         s->_superlayer = nil;
     [_sublayers release];
@@ -461,6 +463,18 @@ static BOOL add_dynamic_accessor(Class cls, SEL sel)
     return YES;
 }
 
+/* An IOSurface shown as a layer's contents is in use, as it is on a Mac once
+ * Core Animation has it (IOSurfaceIsInUse): Qt's backing store paints its
+ * next frame into another surface while one is in use, and otherwise skips
+ * handing the layer a surface it already shows, so without this its
+ * redraws never reached the screen (freemac 1.267). */
+static void surface_use(id contents, BOOL use)
+{
+    SEL sel = use ? @selector(incrementUseCount) : @selector(decrementUseCount);
+    if (contents && [contents respondsToSelector:@selector(incrementUseCount)] && [contents respondsToSelector:sel])
+        ((void (*)(id, SEL))objc_msgSend)(contents, sel);
+}
+
 - (void)_ferrySetValue:(id)value forKey:(NSString *)key
 {
     if (!key)
@@ -476,6 +490,10 @@ static BOOL add_dynamic_accessor(Class cls, SEL sel)
         _values[key] = value;
     else
         [_values removeObjectForKey:key];
+    if (!_presentation && old != value && [key isEqualToString:@"contents"]) {
+        surface_use(value, YES);
+        surface_use(old, NO);
+    }
     if (!_presentation) {
         if ([key isEqualToString:@"bounds"]) {
             CGSize was = [old isKindOfClass:[NSValue class]] ? [old rectValue].size : CGSizeZero;

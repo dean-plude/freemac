@@ -124,6 +124,7 @@ void AGlobalMonitorsDeliver(NSEvent *event);
  * drawn over it. */
 extern int AGLViewCount;
 BOOL AGLViewWillDraw(NSView *view);
+BOOL AGLViewTakeFrameOnly(NSView *view);
 void AGLViewDidDraw(NSView *view, CGContextRef ctx);
 void AWindowsDisplayIfNeeded(void);
 void AWindowsNeedUpdate(void);
