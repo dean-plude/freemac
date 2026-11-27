@@ -2258,6 +2258,11 @@ FOUNDATION_EXPORT NSString *const NSFileTypeCharacterSpecial, *const NSFileTypeB
 - (void)skipDescendants;
 @end
 
+typedef NS_OPTIONS(NSUInteger, NSVolumeEnumerationOptions) {
+    NSVolumeEnumerationSkipHiddenVolumes = 1UL << 1,
+    NSVolumeEnumerationProduceFileReferenceURLs = 1UL << 2,
+};
+
 @interface NSFileManager (FerryFileAccess)
 - (NSDirectoryEnumerator<NSString *> *)enumeratorAtPath:(NSString *)path;
 - (NSDirectoryEnumerator<NSURL *> *)enumeratorAtURL:(NSURL *)url includingPropertiesForKeys:(NSArray *)keys
@@ -2276,6 +2281,9 @@ FOUNDATION_EXPORT NSString *const NSFileTypeCharacterSpecial, *const NSFileTypeB
 @property (readonly, copy) id<NSObject, NSCopying, NSCoding> ubiquityIdentityToken;
 - (NSURL *)URLForUbiquityContainerIdentifier:(NSString *)containerIdentifier;
 - (BOOL)isUbiquitousItemAtURL:(NSURL *)url;
+/* The mounted volumes: the system disk, then the others (freemac Godot work) */
+- (NSArray<NSURL *> *)mountedVolumeURLsIncludingResourceValuesForKeys:(NSArray *)propertyKeys
+                                                              options:(NSVolumeEnumerationOptions)options;
 @end
 FOUNDATION_EXPORT NSString *const NSUbiquityIdentityDidChangeNotification;
 

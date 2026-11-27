@@ -263,6 +263,36 @@ NSString *const NSUbiquityIdentityDidChangeNotification = @"NSUbiquityIdentityDi
 - (id<NSObject, NSCopying, NSCoding>)ubiquityIdentityToken { return nil; }
 - (NSURL *)URLForUbiquityContainerIdentifier:(NSString *)containerIdentifier { return nil; }
 - (BOOL)isUbiquitousItemAtURL:(NSURL *)url { return NO; }
+
+/* The mounted volumes, the system disk first, as a Finder sidebar or a
+ * program's own volume list shows them (freemac Godot work). Skipping the
+ * hidden ones leaves the system disk and what is mounted where disks and
+ * shares show up (/media, /run/media, /mnt), as a Mac leaves out its own
+ * system volumes. The resource values are read when asked for. */
+- (NSArray<NSURL *> *)mountedVolumeURLsIncludingResourceValuesForKeys:(NSArray *)propertyKeys
+                                                              options:(NSVolumeEnumerationOptions)options
+{
+    int n = getfsstat(NULL, 0, MNT_NOWAIT);
+    if (n <= 0)
+        return [NSArray arrayWithObject:[NSURL fileURLWithPath:@"/" isDirectory:YES]];
+    struct statfs *all = calloc((size_t)n + 8, sizeof *all);
+    if (!all)
+        return nil;
+    n = getfsstat(all, (int)(((size_t)n + 8) * sizeof *all), MNT_NOWAIT);
+    NSMutableArray *out = [NSMutableArray arrayWithObject:[NSURL fileURLWithPath:@"/" isDirectory:YES]];
+    for (int i = 0; i < n; i++) {
+        NSString *point = [NSString stringWithUTF8String:all[i].f_mntonname];
+        if (![point length] || [point isEqualToString:@"/"])
+            continue;
+        if ((options & NSVolumeEnumerationSkipHiddenVolumes) &&
+            ((all[i].f_flags & MNT_DONTBROWSE) ||
+             !([point hasPrefix:@"/media/"] || [point hasPrefix:@"/run/media/"] || [point hasPrefix:@"/mnt/"])))
+            continue;
+        [out addObject:[NSURL fileURLWithPath:point isDirectory:YES]];
+    }
+    free(all);
+    return out;
+}
 - (NSDirectoryEnumerator *)enumeratorAtPath:(NSString *)path
 {
     return [[[NSDirectoryEnumerator alloc] _initWithPath:path URLs:NO options:0 errorHandler:nil] autorelease];
