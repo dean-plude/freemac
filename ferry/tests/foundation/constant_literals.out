@@ -1,0 +1,16 @@
+class: NSConstantIntegerNumber, is a number: yes
+@3: 3, type i, says 3
+big: 1111970369, type I, double 1111970369
+minus: -7, type q
+@3 equals [NSNumber numberWithInt:3]: yes, and back: yes
+compare -7 with 3: -1, hash matches: yes
+still there after release: 3
+as a dictionary key: three
+array: 2 items, first 3, last -7, contains @-7: yes
+array says 3,-7
+mutable copy: 3 items
+out of range: NSRangeException
+empty array: 0 items, is an array: yes
+true storage is kCFBooleanTrue: yes, false: yes
+@YES is it: yes, boolValue 1
+exit=0

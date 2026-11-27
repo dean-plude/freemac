@@ -18,6 +18,8 @@ SRC += src/objc/swift.c src/swiftsupport.c
 SRC += src/libc_vlc.c
 # posix_spawn, glob, fnmatch, termios and mach_wait_until, for OBS, VLC and FFmpeg (freemac 1.233)
 SRC += src/libc_apps.c
+# Mach ports and exception ports that fail as when exhausted, confstr and more, for Audacity (freemac 1.263)
+SRC += src/libc_audacity.c
 # cameras, for AVFoundation's capture (freemac 1.257)
 SRC += src/camera.c
 OBJ = $(SRC:.c=.o) src/objc/msgsend.o src/objc/unwind.o
@@ -103,8 +105,8 @@ EVENTKIT_HEADERS = sdk/include/EventKit/EventKit.h $(FOUNDATION_HEADERS)
 # Core Audio (freemac 1.232; the HAL, audio units, audio queues and
 # converters 1.234) in one Mac library, which plays and records through
 # this system's sound server (libpulse, opened when a program first touches
-# the hardware, src/host.c) or a null device. AudioToolbox and AudioUnit
-# are served from it.
+# the hardware, src/host.c) or a null device. AudioToolbox, AudioUnit and
+# CoreMIDI (with no devices, 1.263) are served from it.
 COREAUDIO_SRC = $(wildcard coreaudio/*.m)
 COREAUDIO_OBJ = $(COREAUDIO_SRC:coreaudio/%.m=coreaudio/build/%.o)
 COREAUDIO = frameworks/CoreAudio.framework/CoreAudio
@@ -431,11 +433,12 @@ coreaudio/build/%.o: coreaudio/%.m $(COREAUDIO_HEADERS) sdk/ferry-cc
 	sdk/ferry-cc $(OBJCFLAGS) -fblocks -c -o $@ $<
 
 $(COREAUDIO): $(COREAUDIO_OBJ) $(FOUNDATION)
-	@mkdir -p frameworks/CoreAudio.framework frameworks/AudioToolbox.framework frameworks/AudioUnit.framework
+	@mkdir -p frameworks/CoreAudio.framework frameworks/AudioToolbox.framework frameworks/AudioUnit.framework frameworks/CoreMIDI.framework
 	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/CoreAudio.framework/Versions/A/CoreAudio \
 	    -o $@ $(COREAUDIO_OBJ) -framework Foundation
 	sdk/gen-alias-tbd.sh AudioToolbox $@ > frameworks/AudioToolbox.framework/AudioToolbox.tbd
 	sdk/gen-alias-tbd.sh AudioUnit $@ > frameworks/AudioUnit.framework/AudioUnit.tbd
+	sdk/gen-alias-tbd.sh CoreMIDI $@ > frameworks/CoreMIDI.framework/CoreMIDI.tbd
 
 screencapturekit/build/%.o: screencapturekit/%.m $(SCK_HEADERS) sdk/ferry-cc
 	@mkdir -p screencapturekit/build
@@ -478,7 +481,7 @@ install: install-metal ferry $(TBD) $(TBD_ALIASES) $(TWIN_TBD) $(SDK_LIBXML2) $(
 	for f in $(MEDIA_FW); do install -Dm755 frameworks/$$f.framework/$$f $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/$$f.framework/$$f; done
 	install -Dm755 $(EVENTKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/EventKit.framework/EventKit
 	install -Dm755 $(COREAUDIO) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/CoreAudio.framework/CoreAudio
-	for f in AudioToolbox AudioUnit; do \
+	for f in AudioToolbox AudioUnit CoreMIDI; do \
 	    install -Dm644 frameworks/$$f.framework/$$f.tbd $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/$$f.framework/$$f.tbd; \
 	done
 	install -Dm755 $(IOSURFACE) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/IOSurface.framework/IOSurface

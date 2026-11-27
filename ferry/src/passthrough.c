@@ -40,7 +40,7 @@ const char *const ferry_passthrough[] = {
     "getenv", "setenv", "unsetenv", "putenv", "exit", "_exit", "_Exit", "abort", "atexit",
     "system", "getpid", "getppid", "getuid", "geteuid", "getgid", "getegid", "setuid",
     "setgid", "seteuid", "setegid", "getpgrp", "setpgid", "setsid", "getsid", "getlogin",
-    "fork", "execv", "execvp", "execve", "execl", "execlp", "alarm", "pause", "sleep",
+    "fork", "alarm", "pause", "sleep",
     "usleep", "nanosleep", "getgroups", "umask", "nice",
     /* freemac 1.232, Ferry 0.56.0: priorities, and the group database, whose record
      * is laid out the same on both */

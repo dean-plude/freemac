@@ -837,6 +837,15 @@ static BOOL places_own_windows(void)
         gtk_widget_queue_draw(_area);
 }
 
+/* A view asked to be drawn: only the part it marked is (see display). */
+- (void)_noteViewNeedsDisplay
+{
+    if (_hostedSheet)
+        [_sheetParent _noteNeedsDisplay];   /* drawn in its window */
+    if (_area)
+        gtk_widget_queue_draw(_area);
+}
+
 - (void)_ensureBacking
 {
     CGFloat scale = _area ? gtk_widget_get_scale_factor(_area) : 1;
@@ -879,7 +888,11 @@ static BOOL places_own_windows(void)
 }
 - (void)_drawWindowContentInContext:(CGContextRef)ctx screen:(BOOL)screen
 {
-    NSRect all = NSMakeRect(0, 0, _frame.size.width, _frame.size.height);
+    [self _drawWindowContentInContext:ctx screen:screen rect:NSMakeRect(0, 0, _frame.size.width, _frame.size.height)];
+}
+/* Only what lies in rect (window coordinates), clipped to it. */
+- (void)_drawWindowContentInContext:(CGContextRef)ctx screen:(BOOL)screen rect:(NSRect)all
+{
     CGContextSaveGState(ctx);
     CGContextSetBlendMode(ctx, kCGBlendModeCopy);
     CGFloat c[4];
@@ -918,8 +931,52 @@ static BOOL places_own_windows(void)
     }
     ALayoutWindowIfNeeded(_contentView);
     [self _ensureBacking];
+    /* Only the rectangles views marked are drawn again, over what the
+     * backing already holds; the whole window when the window itself was
+     * marked (a resize, a new backing), a sheet or OpenGL is in it, or a
+     * view with a layer changed. */
+    enum { MAXDIRTY = 8 };
+    NSRect rects[MAXDIRTY];
+    int n = 0;
+    BOOL full = _needsDisplay || _sheet || AGLViewCount > 0;
+    NSView *roots[] = {_contentView, _toolbarView, _sheetHost, _overlay};
+    for (int i = 0; i < 4 && !full; i++)
+        full = roots[i] && ![roots[i] _collectDirty:rects count:&n max:MAXDIRTY];
     _needsDisplay = NO;
-    [self _drawWindowInContext:_ctx screen:YES];
+    if (full) {
+        [self _drawWindowInContext:_ctx screen:YES];
+    } else {
+        NSRect all = NSMakeRect(0, 0, _frame.size.width, _frame.size.height);
+        NSAppearance *appearance = ABeginDrawingAppearance(self);
+        for (int i = 0; i < n; i++) {
+            NSRect r = NSIntersectionRect(rects[i], all);
+            if (NSIsEmptyRect(r))
+                continue;
+            CGContextSaveGState(_ctx);
+            CGContextClipToRect(_ctx, r);
+            [self _drawWindowContentInContext:_ctx screen:YES rect:r];
+            CGContextRestoreGState(_ctx);
+        }
+        AEndDrawingAppearance(appearance);
+    }
+    CGContextFlush(_ctx);
+    if (_area)
+        gtk_widget_queue_draw(_area);
+}
+
+/* -[NSView lockFocus] draws straight into the window's backing, outside
+ * drawRect: (wxWidgets' client DCs, a playhead over a waveform). */
+- (CGContextRef)_focusContext
+{
+    if (_hostedSheet)
+        return NULL;
+    [self _ensureBacking];
+    return _ctx;
+}
+- (void)_focusDrawn
+{
+    if (!_ctx)
+        return;
     CGContextFlush(_ctx);
     if (_area)
         gtk_widget_queue_draw(_area);
@@ -1118,6 +1175,20 @@ static void on_realize(GtkWidget *w, void *data) { AMainMenuBarAttach(gtk_widget
             c->_hiddenWithParent = NO;
             [c orderFront:nil];
         }
+    /* While a window runs modal it stays above the app's other windows, as
+     * on a Mac: a document window opened under Audacity's welcome dialog
+     * would otherwise hide the dialog that takes every click. */
+    NSWindow *modal = [NSApp modalWindow];
+    if (modal && modal != self && modal->_visible && modal->_gtk && modal->_alpha > 0 &&
+        ![self _isChildOf:modal])
+        gtk_window_present(modal->_gtk);
+}
+- (BOOL)_isChildOf:(NSWindow *)w
+{
+    for (NSWindow *p = _parent; p; p = p->_parent)
+        if (p == w)
+            return YES;
+    return _sheetParent == w;
 }
 - (void)orderFrontRegardless { [self orderFront:nil]; }
 - (void)orderBack:(id)sender { [self orderFront:sender]; }

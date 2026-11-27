@@ -6,6 +6,7 @@
 #import "FInternal.h"
 #include <pwd.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <sys/time.h>
 
@@ -1367,12 +1368,26 @@ NSString *FConfigHome(void)
     return [FHome() stringByAppendingPathComponent:@".config"];
 }
 
+/* A Mac user's Library, Application Support and Caches always exist, and
+ * apps make their own folder in them without making the parent (OBS); so
+ * here their counterparts are made when missing (freemac 1.263). */
 static NSString *xdg_dir(const char *var, NSString *fallback)
 {
     const char *x = getenv(var);
-    if (x && x[0] == '/')
-        return [NSString stringWithUTF8String:x];
-    return [FHome() stringByAppendingPathComponent:fallback];
+    NSString *d = x && x[0] == '/' ? [NSString stringWithUTF8String:x] : [FHome() stringByAppendingPathComponent:fallback];
+    const char *p = [d fileSystemRepresentation];
+    if (access(p, F_OK) != 0) {
+        char buf[4096];
+        snprintf(buf, sizeof buf, "%s", p);
+        for (char *c = buf + 1; *c; c++)
+            if (*c == '/') {
+                *c = 0;
+                mkdir(buf, 0700);
+                *c = '/';
+            }
+        mkdir(buf, 0700);
+    }
+    return d;
 }
 
 NSString *NSHomeDirectory(void) { return FHome(); }

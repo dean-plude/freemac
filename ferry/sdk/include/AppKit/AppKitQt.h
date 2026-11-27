@@ -235,6 +235,7 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidEnterFullScreenNotification;
 APPKIT_EXTERN NSNotificationName const NSWindowWillExitFullScreenNotification;
 APPKIT_EXTERN NSNotificationName const NSWindowDidExitFullScreenNotification;
 APPKIT_EXTERN NSNotificationName const NSWindowDidChangeScreenProfileNotification;
+APPKIT_EXTERN NSNotificationName const NSWindowDidChangeScreenNotification;
 
 /* ---- Services menu ---------------------------------------------------------------- */
 

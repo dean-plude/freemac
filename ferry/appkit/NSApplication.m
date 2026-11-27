@@ -141,6 +141,8 @@ void NSBeep(void)
  * coordinates: the first screen's bottom left is the origin and y runs up.
  * Without Wayfire (or under another compositor), one screen from GTK, as
  * before. Wayfire's answer is kept for half a second. */
+void GContextSyncAll(void);   /* CoreGraphics */
+
 @implementation NSScreen {
     NSRect _frame, _visible;
     NSString *_name;
@@ -748,6 +750,9 @@ static BOOL matches(NSMenuItem *item, NSEvent *event)
 }
 - (NSMenu *)windowsMenu { return _windowsMenu; }
 - (void)setWindowsMenu:(NSMenu *)m { _windowsMenu = m; }
+/* The application menu, which older programs (wxWidgets among them) name
+ * this way: on freemac it is the main menu's first item, so nothing to keep. */
+- (void)setAppleMenu:(NSMenu *)m { (void)m; }
 - (NSMenu *)servicesMenu { return _servicesMenu; }
 - (void)setServicesMenu:(NSMenu *)m { _servicesMenu = m; }
 /* The Services menu's providers and types: kept, but nothing offers services here. */
@@ -1252,8 +1257,11 @@ static void listen_for_open_requests(void)
 
 - (void)run
 {
-    [self finishLaunching];
+    /* Running from before the launch is finished, so that a stop: the
+     * delegate sends from applicationDidFinishLaunching: (wxWidgets does, to
+     * return to its own event loop) ends this run, as on a Mac. */
     _running = YES;
+    [self finishLaunching];
     while (_running) {
         @autoreleasepool {
             /* As on a Mac, an exception the app's code raises while handling
@@ -1400,6 +1408,7 @@ static BOOL wanted(NSEvent *e, NSEventMask mask) { return (mask & NSEventMaskFro
         /* each turn has a pool of its own: the loop can turn many times (timers, redraws) before an event */
         @autoreleasepool {
             AWindowsDisplayIfNeeded();
+            GContextSyncAll();   /* bitmap contexts' drawing out to their memory (CGContext.m) */
             NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
             if (now >= limit) {
                 done = YES;

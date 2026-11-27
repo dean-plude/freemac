@@ -119,11 +119,15 @@ static void open_cxx(int soft)
     if (!path || !*path)
         path = "libc++.so.1";
     /* Some other library already in the program's global scope (GNU
-     * libstdc++, through a library opened with RTLD_GLOBAL) would take
-     * libc++abi's place for the names both have: say so if it happens. */
+     * libstdc++, which this system's OpenGL brings in through LLVM) would
+     * take libc++abi's place for the names both have: libc++ would throw
+     * its own errors (std::filesystem's, OBS) as libstdc++'s exceptions,
+     * which no Mac catch clause matches. So libc++ and what it needs look
+     * among themselves first (RTLD_DEEPBIND), wherever they're loaded
+     * (freemac 1.263). */
     if (dlsym(RTLD_DEFAULT, "__cxa_throw") && ferry_verbose)
-        fprintf(stderr, "ferry: another C++ runtime is already loaded; C++ exceptions may not work\n");
-    cxx_handle = dlopen(path, RTLD_NOW | RTLD_LOCAL);
+        fprintf(stderr, "ferry: another C++ runtime is already loaded; libc++ is kept apart from it\n");
+    cxx_handle = dlopen(path, RTLD_NOW | RTLD_LOCAL | RTLD_DEEPBIND);
     if (!cxx_handle && soft)
         return;
     if (!cxx_handle) {

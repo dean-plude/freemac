@@ -32,6 +32,23 @@
 
 static FNumber *yes_number, *no_number;
 
+/* A number that newer clang writes into the program itself for a literal
+ * such as @3, as an object of the class NSConstantIntegerNumber: the class,
+ * then the @encode letters of the literal's type, then its value. Qt and
+ * OBS's plugins in OBS's own download hold these (freemac 1.263). */
+@interface NSConstantIntegerNumber : NSNumber
+@end
+
+/* The fields sit right after the class pointer, where the program put
+ * them; Ferry's own objects keep more there, so they are read by hand. */
+struct constant_number {
+    Class isa;
+    const char *encoding;
+    long long value;
+};
+#define LITERAL(n) ((const struct constant_number *)(const void *)(n))
+static id ferry_plain_number(id n);
+
 F_EXPORT CFBooleanRef ferry_true __asm__("_kCFBooleanTrue");
 F_EXPORT CFBooleanRef ferry_false __asm__("_kCFBooleanFalse");
 CFBooleanRef ferry_true, ferry_false;
@@ -433,6 +450,7 @@ static NSString *format_double(double d, BOOL single)
 }
 - (NSComparisonResult)compare:(NSNumber *)other
 {
+    other = ferry_plain_number(other);
     if ([other isKindOfClass:[NSDecimalNumber class]])   /* exactly, in base 10 */
         return (NSComparisonResult) - [other compare:self];
     if (![other isKindOfClass:[FNumber class]])
@@ -455,6 +473,7 @@ static NSString *format_double(double d, BOOL single)
 {
     if (other == self)
         return YES;
+    other = ferry_plain_number(other);
     if ([other isKindOfClass:[NSDecimalNumber class]])
         return [other isEqual:self];
     if (![other isKindOfClass:[FNumber class]])
@@ -474,12 +493,105 @@ static NSString *format_double(double d, BOOL single)
 - (id)copyWithZone:(NSZone *)zone { return [self retain]; }
 @end
 
+/* ---- NSConstantIntegerNumber: a literal number kept in the program ---- */
+
+@implementation NSConstantIntegerNumber
+/* the type letter, when the program's pointer to it reads as one */
+static char literal_type(NSConstantIntegerNumber *n)
+{
+    const char *e = LITERAL(n)->encoding;
+    if ((uintptr_t)e > 0x1000 && e[0] && !e[1] && strchr("cCsSiIlLqQB", e[0]))
+        return e[0];
+    return 'q';
+}
+static BOOL literal_unsigned(char t) { return strchr("CSILQ", t) != NULL; }
+- (id)retain { return self; }
+- (oneway void)release {}
+- (id)autorelease { return self; }
+- (NSUInteger)retainCount { return NSUIntegerMax; }
+- (void)dealloc { /* kept in the program, never freed */ if (0) [super dealloc]; }
+- (id)copyWithZone:(NSZone *)zone { return self; }
+- (const char *)objCType
+{
+    switch (literal_type(self)) {
+    case 'c': return "c";
+    case 'C': return "C";
+    case 's': return "s";
+    case 'S': return "S";
+    case 'i': return "i";
+    case 'I': return "I";
+    case 'l': return "l";
+    case 'L': return "L";
+    case 'Q': return "Q";
+    case 'B': return "c";
+    default: return "q";
+    }
+}
+- (long long)longLongValue { return LITERAL(self)->value; }
+- (unsigned long long)unsignedLongLongValue { return (unsigned long long)LITERAL(self)->value; }
+- (double)doubleValue
+{
+    return literal_unsigned(literal_type(self)) ? (double)(unsigned long long)LITERAL(self)->value : (double)LITERAL(self)->value;
+}
+- (BOOL)boolValue { return LITERAL(self)->value != 0; }
+- (void *)pointerValue { return (void *)(uintptr_t)LITERAL(self)->value; }
+- (void)getValue:(void *)value
+{
+    switch (literal_type(self)) {
+    case 'c': case 'C': case 'B': *(char *)value = (char)LITERAL(self)->value; break;
+    case 's': case 'S': *(short *)value = (short)LITERAL(self)->value; break;
+    case 'i': case 'I': *(int *)value = (int)LITERAL(self)->value; break;
+    default: *(long long *)value = LITERAL(self)->value; break;
+    }
+}
+- (NSNumber *)_ferryNumber
+{
+    char t = literal_type(self);
+    if (t == 'B')
+        return LITERAL(self)->value ? yes_number : no_number;
+    if (literal_unsigned(t))
+        return [NSNumber numberWithUnsignedLongLong:(unsigned long long)LITERAL(self)->value];
+    return [NSNumber numberWithLongLong:LITERAL(self)->value];
+}
+- (NSComparisonResult)compare:(NSNumber *)other { return [[self _ferryNumber] compare:other]; }
+- (BOOL)isEqual:(id)other { return other == self || [[self _ferryNumber] isEqual:other]; }
+- (NSUInteger)hash { return [[self _ferryNumber] hash]; }
+- (NSString *)description { return [[self _ferryNumber] description]; }
+- (NSString *)stringValue { return [[self _ferryNumber] stringValue]; }
+@end
+
+static id ferry_plain_number(id n)
+{
+    static Class constant;
+    if (!constant)
+        constant = [NSConstantIntegerNumber class];
+    return n && object_getClass(n) == constant ? [(NSConstantIntegerNumber *)n _ferryNumber] : n;
+}
+
+/* Newer clang refers to the two booleans' own storage, __kCFBooleanTrue and
+ * __kCFBooleanFalse, where older code read the kCFBooleanTrue pointer
+ * (Qt's Cocoa plugin in OBS, freemac 1.263): the booleans live there. */
+F_EXPORT _Alignas(16) unsigned char ferry_true_storage[48] __asm__("___kCFBooleanTrue");
+F_EXPORT _Alignas(16) unsigned char ferry_false_storage[48] __asm__("___kCFBooleanFalse");
+_Alignas(16) unsigned char ferry_true_storage[48], ferry_false_storage[48];
+
+static FNumber *static_boolean(unsigned char *storage, long long v)
+{
+    Class c = [FNumber class];
+    if (class_getInstanceSize(c) > 48)
+        return make('B');
+    memset(storage, 0, 48);
+    *(Class *)storage = c;
+    FNumber *n = (FNumber *)(void *)storage;
+    n->_type = 'B';
+    n->_v.i = v;
+    return n;
+}
+
 __attribute__((constructor)) static void numbers_init(void)
 {
-    yes_number = make('B');
-    yes_number->_v.i = 1;
-    no_number = make('B');
-    no_number->_v.i = 0;
+    yes_number = static_boolean(ferry_true_storage, 1);
+    no_number = static_boolean(ferry_false_storage, 0);
     ferry_true = (CFBooleanRef)yes_number;
     ferry_false = (CFBooleanRef)no_number;
 }

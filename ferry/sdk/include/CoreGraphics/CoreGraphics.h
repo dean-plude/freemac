@@ -204,6 +204,10 @@ CGImageRef CGImageCreateWithPNGDataProvider(CGDataProviderRef source, const CGFl
 CGImageRef CGImageCreateWithJPEGDataProvider(CGDataProviderRef source, const CGFloat *decode, bool shouldInterpolate,
                                              CGColorRenderingIntent intent);
 CGImageRef CGImageCreateWithImageInRect(CGImageRef image, CGRect rect);
+CGImageRef CGImageMaskCreate(size_t width, size_t height, size_t bitsPerComponent, size_t bitsPerPixel,
+                             size_t bytesPerRow, CGDataProviderRef provider, const CGFloat *decode,
+                             bool shouldInterpolate);
+CGImageRef CGImageCreateWithMask(CGImageRef image, CGImageRef mask);
 CGImageRef CGImageCreateCopy(CGImageRef image);
 CGImageRef CGImageCreateCopyWithColorSpace(CGImageRef image, CGColorSpaceRef space);
 CGImageRef CGImageRetain(CGImageRef image);

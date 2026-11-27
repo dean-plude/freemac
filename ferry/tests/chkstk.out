@@ -1,0 +1,6 @@
+probe 16 bytes: rax kept yes, rcx kept yes
+probe 4096 bytes: rax kept yes, rcx kept yes
+probe 70000 bytes: rax kept yes, rcx kept yes
+probe 1048576 bytes: rax kept yes, rcx kept yes
+a frame of 300000 bytes: 2
+exit=0

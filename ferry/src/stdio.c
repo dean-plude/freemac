@@ -17,6 +17,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <wchar.h>
 
 #include "ferry.h"
 
@@ -197,6 +198,82 @@ static int mac_fprintf(struct mac_FILE *f, const char *fmt, ...)
     return rc;
 }
 
+/* Wide output (freemac 1.263, for Audacity): written as the multibyte
+ * text of the current locale, so a stream the program also writes bytes to
+ * keeps working (this system's FILE would refuse wide output on a stream
+ * already used for bytes). */
+static int put_wide(struct mac_FILE *f, const wchar_t *w)
+{
+    size_t n = wcstombs(NULL, w, 0);
+    if (n == (size_t)-1) {
+        errno = EILSEQ;
+        return -1;
+    }
+    char *mb = malloc(n + 1);
+    if (!mb) {
+        errno = ENOMEM;
+        return -1;
+    }
+    wcstombs(mb, w, n + 1);
+    int rc = fputs(mb, real(f));
+    sync_flags(f);
+    free(mb);
+    return rc < 0 ? -1 : (int)wcslen(w);
+}
+
+static int mac_vfwprintf(struct mac_FILE *f, const wchar_t *fmt, va_list ap)
+{
+    size_t cap = 256;
+    for (;;) {
+        wchar_t *buf = malloc(cap * sizeof *buf);
+        if (!buf) {
+            errno = ENOMEM;
+            return -1;
+        }
+        va_list aq;
+        va_copy(aq, ap);
+        int n = vswprintf(buf, cap, fmt, aq);
+        va_end(aq);
+        if (n >= 0) {
+            int rc = put_wide(f, buf);
+            free(buf);
+            return rc < 0 ? -1 : n;
+        }
+        free(buf);
+        if (cap >= (1u << 24))
+            return -1;
+        cap *= 4;
+    }
+}
+
+static int mac_fwprintf(struct mac_FILE *f, const wchar_t *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    int rc = mac_vfwprintf(f, fmt, ap);
+    va_end(ap);
+    return rc;
+}
+
+static int mac_wprintf(const wchar_t *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    int rc = mac_vfwprintf(mac_stdoutp, fmt, ap);
+    va_end(ap);
+    return rc;
+}
+
+static int mac_vwprintf(const wchar_t *fmt, va_list ap) { return mac_vfwprintf(mac_stdoutp, fmt, ap); }
+
+static int mac_fputws(const wchar_t *w, struct mac_FILE *f) { return put_wide(f, w) < 0 ? -1 : 0; }
+
+static wint_t mac_fputwc(wchar_t c, struct mac_FILE *f)
+{
+    wchar_t w[2] = {c, 0};
+    return put_wide(f, w) < 0 ? WEOF : (wint_t)c;
+}
+
 static int mac_fputc(int c, struct mac_FILE *f) { int rc = fputc(c, real(f)); sync_flags(f); return rc; }
 static int mac_fputs(const char *s, struct mac_FILE *f) { int rc = fputs(s, real(f)); sync_flags(f); return rc; }
 
@@ -312,6 +389,13 @@ const struct ferry_symbol ferry_stdio_symbols[] = {
     {"putc", mac_fputc},
     {"putc_unlocked", mac_fputc},
     {"fputs", mac_fputs},
+    {"fwprintf", mac_fwprintf},
+    {"vfwprintf", mac_vfwprintf},
+    {"wprintf", mac_wprintf},
+    {"vwprintf", mac_vwprintf},
+    {"fputws", mac_fputws},
+    {"fputwc", mac_fputwc},
+    {"putwc", mac_fputwc},
     {"fwrite", mac_fwrite},
     {"__swbuf", mac_swbuf},
     {"fflush", mac_fflush},

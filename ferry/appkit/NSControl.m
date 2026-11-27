@@ -999,6 +999,56 @@ static BOOL keeps_state(NSButtonType t)
 
 /* ---- NSTextField --------------------------------------------------------------------- */
 
+/* A text field made in code has no cell, as Ferry's controls keep their
+ * state themselves. One that a program asks for (wxWidgets' labels set
+ * their text, wrapping and alignment through [field cell]) is made then,
+ * holding the field's settings, and passes what is set on it back to the
+ * field (freemac 1.263). */
+@interface FerryFieldCell : NSTextFieldCell {
+@public
+    BOOL _quiet; /* being filled from the field */
+}
+@end
+
+@interface NSTextField (FerryFieldCell)
+- (void)_cellSetWraps:(BOOL)wraps;
+@end
+
+#define FIELD ((NSTextField *)(_quiet ? nil : [self controlView]))
+@implementation FerryFieldCell
+- (void)setObjectValue:(id)v { [super setObjectValue:v]; [FIELD setObjectValue:v]; }
+- (void)setStringValue:(NSString *)v { [super setStringValue:v]; [FIELD setStringValue:v]; }
+- (void)setAttributedStringValue:(NSAttributedString *)v
+{
+    [super setAttributedStringValue:v];
+    NSTextField *f = FIELD;
+    if (!f)
+        return;
+    [f setAttributedStringValue:v];
+    /* a paragraph style over the whole text sets the field's alignment and line breaks */
+    NSParagraphStyle *style = [v length] ? [v attribute:NSParagraphStyleAttributeName atIndex:0 effectiveRange:NULL] : nil;
+    if (style) {
+        [f setAlignment:[style alignment]];
+        [f setLineBreakMode:[style lineBreakMode]];
+    }
+}
+- (void)setFont:(NSFont *)v { [super setFont:v]; [FIELD setFont:v]; }
+- (void)setAlignment:(NSTextAlignment)v { [super setAlignment:v]; [FIELD setAlignment:v]; }
+- (void)setLineBreakMode:(NSLineBreakMode)v { [super setLineBreakMode:v]; [FIELD setLineBreakMode:v]; }
+- (void)setWraps:(BOOL)v { [super setWraps:v]; [FIELD _cellSetWraps:v]; }
+- (void)setEditable:(BOOL)v { [super setEditable:v]; [FIELD setEditable:v]; }
+- (void)setSelectable:(BOOL)v { [super setSelectable:v]; [FIELD setSelectable:v]; }
+- (void)setBezeled:(BOOL)v { [super setBezeled:v]; [FIELD setBezeled:v]; }
+- (void)setBordered:(BOOL)v { [super setBordered:v]; [FIELD setBordered:v]; }
+- (void)setEnabled:(BOOL)v { [super setEnabled:v]; [FIELD setEnabled:v]; }
+- (void)setDrawsBackground:(BOOL)v { [super setDrawsBackground:v]; [FIELD setDrawsBackground:v]; }
+- (void)setBackgroundColor:(NSColor *)v { [super setBackgroundColor:v]; [FIELD setBackgroundColor:v]; }
+- (void)setTextColor:(NSColor *)v { [super setTextColor:v]; [FIELD setTextColor:v]; }
+- (void)setPlaceholderString:(NSString *)v { [super setPlaceholderString:v]; [FIELD setPlaceholderString:v]; }
+- (void)setUsesSingleLineMode:(BOOL)v { [super setUsesSingleLineMode:v]; [FIELD setUsesSingleLineMode:v]; }
+@end
+#undef FIELD
+
 @implementation NSTextField {
     NSString *_placeholder;
     NSAttributedString *_placeholderAttributed;
@@ -1169,6 +1219,50 @@ static BOOL keeps_state(NSButtonType t)
 - (BOOL)usesSingleLineMode { return _singleLine; }
 - (void)setUsesSingleLineMode:(BOOL)f { _singleLine = f; }
 
+- (NSCell *)cell
+{
+    NSCell *c = [super cell];
+    if (c || [[self class] cellClass] != [NSTextFieldCell class])
+        return c;
+    FerryFieldCell *f = [[FerryFieldCell alloc] init];
+    f->_quiet = YES;
+    [f setObjectValue:[self objectValue]];
+    [f setFont:[self font]];
+    [f setAlignment:[self alignment]];
+    [f setLineBreakMode:[self lineBreakMode]];
+    [f setWraps:_lineBreak == NSLineBreakByWordWrapping && _maxLines != 1];
+    [f setEditable:_editable];
+    [f setSelectable:_selectable];
+    [f setBezeled:_bezeled];
+    [f setBordered:_bordered];
+    [f setEnabled:[self isEnabled]];
+    [f setDrawsBackground:_drawsBackground];
+    [f setTextColor:[self textColor]];
+    if (_background)
+        [f setBackgroundColor:_background];
+    [f setPlaceholderString:_placeholder];
+    [f setUsesSingleLineMode:_singleLine];
+    [f setFormatter:[self formatter]];
+    f->_quiet = NO;
+    [self setCell:f];
+    [f release];
+    return f;
+}
+
+/* a cell told to wrap makes a label wrap its words, with no limit of lines */
+- (void)_cellSetWraps:(BOOL)wraps
+{
+    if (wraps) {
+        _lineBreak = NSLineBreakByWordWrapping;
+        if (!_editable)
+            _maxLines = 0;
+    } else if (_lineBreak == NSLineBreakByWordWrapping) {
+        _lineBreak = NSLineBreakByClipping;
+        _maxLines = 1;
+    }
+    [self setNeedsDisplay:YES];
+}
+
 - (NSString *)stringValue { return _editing ? [[_text copy] autorelease] : [super stringValue]; }
 - (void)setObjectValue:(id)value
 {
@@ -1258,6 +1352,10 @@ static BOOL keeps_state(NSButtonType t)
     if (_lineBreak == NSLineBreakByWordWrapping && _maxLines != 1) {
         CGFloat w = _preferredWidth > 0 ? _preferredWidth : ([self frame].size.width > 0 ? [self frame].size.width - 4 : 1e6);
         t = [s boundingRectWithSize:NSMakeSize(w, 0) options:NSStringDrawingUsesLineFragmentOrigin].size;
+    } else if (!_editable && !_singleLine && [[s string] rangeOfString:@"\n"].location != NSNotFound) {
+        // A label with its own line breaks (wxWidgets' Wrap inserts them)
+        // measures as its widest line by all its lines, as on a Mac.
+        t = [s boundingRectWithSize:NSMakeSize(1e6, 0) options:NSStringDrawingUsesLineFragmentOrigin].size;
     } else {
         t = ALineSize(s, NULL, NULL);
     }
@@ -1838,9 +1936,15 @@ static BOOL keeps_state(NSButtonType t)
             color = [NSColor colorWithWhite:1 alpha:0.8];
     }
 
-    if (!_editing && _lineBreak == NSLineBreakByWordWrapping && _maxLines != 1) {
+    BOOL wrapping = _lineBreak == NSLineBreakByWordWrapping && _maxLines != 1;
+    /* a label whose text has line breaks shows each line, as on a Mac (1.263) */
+    BOOL lines = !_editable && !_singleLine &&
+                 [[self stringValue] rangeOfCharacterFromSet:[NSCharacterSet newlineCharacterSet]].location != NSNotFound;
+    if (!_editing && (wrapping || lines)) {
         NSMutableParagraphStyle *style = [[[NSMutableParagraphStyle alloc] init] autorelease];
         [style setAlignment:_alignment];
+        if (!wrapping)
+            [style setLineBreakMode:_lineBreak];
         NSAttributedString *s = [[[NSAttributedString alloc]
             initWithString:[self stringValue]
                 attributes:@{NSFontAttributeName : font, NSForegroundColorAttributeName : color,

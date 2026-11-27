@@ -905,4 +905,10 @@ static NSSpellChecker *shared_checker;
 
 @implementation NSGraphicsContext (FerryGraphicsPort)
 - (void *)graphicsPort { return [self CGContext]; }
+/* the deprecated name of graphicsContextWithCGContext:flipped: (freemac 1.263,
+ * wxWidgets) */
++ (NSGraphicsContext *)graphicsContextWithGraphicsPort:(void *)port flipped:(BOOL)flipped
+{
+    return [self graphicsContextWithCGContext:(CGContextRef)port flipped:flipped];
+}
 @end

@@ -151,6 +151,29 @@ void *VTCompressionSessionGetPixelBufferPool(VTSessionRef session)
 
 void VTCompressionSessionInvalidate(VTSessionRef session) { (void)session; }
 
+/* ---- the list of encoders: none in hardware, so an empty list, and a
+ * program such as OBS offers its own software encoders (freemac 1.263) */
+
+OSStatus VTCopyVideoEncoderList(CFDictionaryRef options, CFArrayRef *listOfVideoEncodersOut)
+{
+    (void)options;
+    if (listOfVideoEncodersOut)
+        *listOfVideoEncodersOut = CFArrayCreate(kCFAllocatorDefault, NULL, 0, &kCFTypeArrayCallBacks);
+    return 0;
+}
+
+OSStatus VTCopySupportedPropertyDictionaryForEncoder(int32_t width, int32_t height, FourCharCode codecType,
+                                                     CFDictionaryRef encoderSpecification, CFStringRef *encoderIDOut,
+                                                     CFDictionaryRef *supportedPropertiesOut)
+{
+    (void)width; (void)height; (void)codecType; (void)encoderSpecification;
+    if (encoderIDOut)
+        *encoderIDOut = NULL;
+    if (supportedPropertiesOut)
+        *supportedPropertiesOut = NULL;
+    return kVTCouldNotFindVideoEncoderErr;
+}
+
 /* ---- a session's properties */
 
 OSStatus VTSessionSetProperty(VTSessionRef session, CFStringRef propertyKey, CFTypeRef propertyValue)
@@ -191,7 +214,15 @@ VT_KEY(kVTCompressionPropertyKey_Quality)
 VT_KEY(kVTCompressionPropertyKey_RealTime)
 VT_KEY(kVTCompressionPropertyKey_TransferFunction)
 VT_KEY(kVTCompressionPropertyKey_YCbCrMatrix)
+VT_KEY(kVTCompressionPropertyKey_MaxH264SliceBytes)
 VT_KEY(kVTDecompressionPropertyKey_RealTime)
+VT_KEY(kVTVideoEncoderList_CodecName)
+VT_KEY(kVTVideoEncoderList_CodecType)
+VT_KEY(kVTVideoEncoderList_DisplayName)
+VT_KEY(kVTVideoEncoderList_EncoderID)
+VT_KEY(kVTVideoEncoderList_EncoderName)
+VT_KEY(kVTVideoEncoderList_IsHardwareAccelerated)
+VT_KEY(kVTVideoEncoderSpecification_EncoderID)
 VT_KEY(kVTDecompressionPropertyKey_FieldMode)
 VT_KEY(kVTDecompressionProperty_FieldMode_BothFields)
 VT_KEY(kVTDecompressionProperty_FieldMode_TopFieldOnly)
