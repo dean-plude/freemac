@@ -1198,6 +1198,7 @@ Ferry 0.89.0: Obsidian 1.8.10, from its official download, opens a working windo
 | 7 | Malloc zones another allocator made, OpenGL under its Linux library names, missing string constants filled in, clearer messages when a library won't load, a crash report with registers and a backtrace | Ferry | done |
 | 8 | Core Audio format information and encoder and decoder lists for the compressed formats | Ferry Core Audio | done |
 | 9 | Obsidian opens, makes a vault, shows its notes and graph, and edits a note | Ferry / Obsidian | done |
+| 10 | A synchronous XPC call returns only after its reply block has run | Ferry Foundation | done |
 
 ## 1.265 "Electron apps start" (done)
 

@@ -695,11 +695,20 @@ static NSString *type_string(NSMethodSignature *sig)
     NSNumber *ident = [message objectForKey:@"i"];
     pthread_mutex_lock(&_lock);
     NSArray *entry = [[[_replies objectForKey:ident] retain] autorelease];
-    [_replies removeObjectForKey:ident];
-    pthread_cond_broadcast(&_cond);
     pthread_mutex_unlock(&_lock);
     if (!entry)
         return;
+    [self _runReply:entry message:message];
+    /* only now, so a synchronous call, which waits for its reply blocks,
+     * returns after the block has run, as on a Mac (freemac 1.266) */
+    pthread_mutex_lock(&_lock);
+    [_replies removeObjectForKey:ident];
+    pthread_cond_broadcast(&_cond);
+    pthread_mutex_unlock(&_lock);
+}
+
+- (void)_runReply:(NSArray *)entry message:(NSDictionary *)message
+{
     id block = [entry objectAtIndex:0];
     const char *types = _Block_signature(block);
     NSMethodSignature *sig = [NSMethodSignature signatureWithObjCTypes:types ? types : "v8@?0"];
