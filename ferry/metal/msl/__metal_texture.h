@@ -333,7 +333,45 @@ template<class T, int C> struct __texbase {
     uint get_num_samples() const { return __ferry_tex_size(__t, 5, 0); }
     void fence() const {}
     bool is_null() const { return __t == 0; }
+    /* Texture atomics on 32-bit int and uint texels: x, y, z as a read passes
+     * them. Op numbers are Metal.framework's (__ferry_tex_atomic). */
+    struct __aop {
+        T v;
+        __aop(T x) : v(x) {}
+        __aop(const vec<T, 4> &x) : v(x.c[0]) {}
+    };
+    texel __atom(int x, int y, int z, int op, T v, T cmp = T(0)) const
+    {
+        if (op == 4 || op == 5) op += __texel_kind<T>::is_int == 1 ? 4 : 0;
+        return texel(T(__ferry_tex_atomic(__t, x, y, z, op, (unsigned int)v, (unsigned int)cmp)));
+    }
+    template<class E> bool __acas(int x, int y, int z, E *expected, T desired) const
+    {
+        T e;
+        if constexpr (sizeof(E) == sizeof(texel)) e = expected->c[0]; else e = T(*expected);
+        T old = __atom(x, y, z, 7, desired, e).c[0];
+        if (old == e) return true;
+        if constexpr (sizeof(E) == sizeof(texel)) *expected = texel(old); else *expected = old;
+        return false;
+    }
 };
+
+/* The atomic members of a texture shape, given how its coordinates map to x, y, z. */
+#define __FERRY_TATOM(X, Y, Z, ...) \
+    typedef typename __texbase<T, __ferry_tc>::__aop __aop; \
+    texel atomic_fetch_add(__VA_ARGS__, __aop v, memory_order = memory_order_relaxed) const { return this->__atom(X, Y, Z, 0, v.v); } \
+    texel atomic_fetch_sub(__VA_ARGS__, __aop v, memory_order = memory_order_relaxed) const { return this->__atom(X, Y, Z, 0, T(0) - v.v); } \
+    texel atomic_fetch_and(__VA_ARGS__, __aop v, memory_order = memory_order_relaxed) const { return this->__atom(X, Y, Z, 1, v.v); } \
+    texel atomic_fetch_or(__VA_ARGS__, __aop v, memory_order = memory_order_relaxed) const { return this->__atom(X, Y, Z, 2, v.v); } \
+    texel atomic_fetch_xor(__VA_ARGS__, __aop v, memory_order = memory_order_relaxed) const { return this->__atom(X, Y, Z, 3, v.v); } \
+    texel atomic_fetch_min(__VA_ARGS__, __aop v, memory_order = memory_order_relaxed) const { return this->__atom(X, Y, Z, 4, v.v); } \
+    texel atomic_fetch_max(__VA_ARGS__, __aop v, memory_order = memory_order_relaxed) const { return this->__atom(X, Y, Z, 5, v.v); } \
+    texel atomic_exchange(__VA_ARGS__, __aop v, memory_order = memory_order_relaxed) const { return this->__atom(X, Y, Z, 6, v.v); } \
+    texel atomic_load(__VA_ARGS__, memory_order = memory_order_relaxed) const { return this->__atom(X, Y, Z, 2, T(0)); } \
+    void atomic_store(__aop v, __VA_ARGS__, memory_order = memory_order_relaxed) const { this->__atom(X, Y, Z, 6, v.v); } \
+    template<class E> bool atomic_compare_exchange_weak(__VA_ARGS__, E *expected, __aop desired, \
+        memory_order = memory_order_relaxed, memory_order = memory_order_relaxed) const \
+    { return this->__acas(X, Y, Z, expected, desired.v); }
 
 /* Integer coordinates in any of the widths MSL allows. */
 template<class V> struct __icoord { static constexpr bool value = false; };
@@ -346,12 +384,16 @@ template<int N> struct __icoord<vec<short, N>> { static constexpr bool value = t
 
 template<class T, access A = access::sample> struct texture1d : __texbase<T, 1> {
     typedef vec<T, 4> texel;
+    static constexpr int __ferry_tc = 1;
+    __FERRY_TATOM(int(p), 0, 0, uint p)
     texel sample(sampler s, float c) const { return __texbase<T, 1>::sample(s, vec<float, 1>(c), level(0)); }
     __FERRY_IS texel read(P p, uint lod = 0) const { return this->__read(int(p), 0, 0, int(lod), 0); }
     __FERRY_IS void write(texel v, P p, uint lod = 0) const { this->__write(v, int(p), 0, 0, int(lod)); }
 };
 template<class T, access A = access::sample> struct texture1d_array : __texbase<T, 1> {
     typedef vec<T, 4> texel;
+    static constexpr int __ferry_tc = 1;
+    __FERRY_TATOM(int(p), int(layer), 0, uint p, uint layer)
     texel sample(sampler s, float c, uint layer) const
     { return __texbase<T, 1>::sample(s, vec<float, 1>(c), layer, level(0)); }
     __FERRY_IS texel read(P p, uint layer, uint lod = 0) const { return this->__read(int(p), int(layer), 0, int(lod), 0); }
@@ -359,11 +401,15 @@ template<class T, access A = access::sample> struct texture1d_array : __texbase<
 };
 template<class T, access A = access::sample> struct texture2d : __texbase<T, 2> {
     typedef vec<T, 4> texel;
+    static constexpr int __ferry_tc = 2;
+    __FERRY_TATOM(int(p.x), int(p.y), 0, uint2 p)
     __FERRY_IC(2) texel read(P p, uint lod = 0) const { return this->__read(int(p.x), int(p.y), 0, int(lod), 0); }
     __FERRY_IC(2) void write(texel v, P p, uint lod = 0) const { this->__write(v, int(p.x), int(p.y), 0, int(lod)); }
 };
 template<class T, access A = access::sample> struct texture2d_array : __texbase<T, 2> {
     typedef vec<T, 4> texel;
+    static constexpr int __ferry_tc = 2;
+    __FERRY_TATOM(int(p.x), int(p.y), int(layer), uint2 p, uint layer)
     __FERRY_IC(2) texel read(P p, uint layer, uint lod = 0) const
     { return this->__read(int(p.x), int(p.y), int(layer), int(lod), 0); }
     __FERRY_IC(2) void write(texel v, P p, uint layer, uint lod = 0) const
@@ -371,6 +417,8 @@ template<class T, access A = access::sample> struct texture2d_array : __texbase<
 };
 template<class T, access A = access::sample> struct texture3d : __texbase<T, 3> {
     typedef vec<T, 4> texel;
+    static constexpr int __ferry_tc = 3;
+    __FERRY_TATOM(int(p.x), int(p.y), int(p.z), uint3 p)
     __FERRY_IC(3) texel read(P p, uint lod = 0) const { return this->__read(int(p.x), int(p.y), int(p.z), int(lod), 0); }
     __FERRY_IC(3) void write(texel v, P p, uint lod = 0) const { this->__write(v, int(p.x), int(p.y), int(p.z), int(lod)); }
 };

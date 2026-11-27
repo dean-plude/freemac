@@ -149,6 +149,24 @@ template<class T, int N> vec<T, N> refract(const vec<T, N> &i, const vec<T, N> &
 }
 template<class T, int N> vec<T, N> faceforward(const vec<T, N> &n, const vec<T, N> &i, const vec<T, N> &nref)
 { return dot(nref, i) < T(0) ? n : -n; }
+/* a packed vector works in them as the vector it holds */
+#define __FERRY_PK1(f) \
+    template<class T, int N> auto f(const packed_vec<T, N> &a) { return f(vec<T, N>(a)); }
+#define __FERRY_PK2(f) \
+    template<class T, int N> auto f(const packed_vec<T, N> &a, const packed_vec<T, N> &b) \
+    { return f(vec<T, N>(a), vec<T, N>(b)); } \
+    template<class T, int N> auto f(const packed_vec<T, N> &a, const vec<T, N> &b) { return f(vec<T, N>(a), b); } \
+    template<class T, int N> auto f(const vec<T, N> &a, const packed_vec<T, N> &b) { return f(a, vec<T, N>(b)); }
+__FERRY_PK1(length) __FERRY_PK1(length_squared) __FERRY_PK1(normalize)
+__FERRY_PK2(dot) __FERRY_PK2(cross) __FERRY_PK2(distance) __FERRY_PK2(distance_squared) __FERRY_PK2(reflect)
+#undef __FERRY_PK1
+#undef __FERRY_PK2
+template<class T, int N> vec<T, N> refract(const packed_vec<T, N> &i, const packed_vec<T, N> &n, T eta)
+{ return refract(vec<T, N>(i), vec<T, N>(n), eta); }
+template<class T, int N> vec<T, N> refract(const packed_vec<T, N> &i, const vec<T, N> &n, T eta)
+{ return refract(vec<T, N>(i), n, eta); }
+template<class T, int N> vec<T, N> refract(const vec<T, N> &i, const packed_vec<T, N> &n, T eta)
+{ return refract(i, vec<T, N>(n), eta); }
 inline float length(float x) { return __builtin_fabsf(x); }
 inline float normalize(float x) { return x < 0.0f ? -1.0f : 1.0f; }
 inline float dot(float a, float b) { return a * b; }

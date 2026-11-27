@@ -14,7 +14,7 @@ template<class T, int N> struct __vstore;
 #define __FERRY_SWG(name, n, ...) \
     vec<T, n> __g_##name() const { return vec<T, n>(__VA_ARGS__); }
 #define __FERRY_SWS(name, n, ...) \
-    void __s_##name(vec<T, n> __v) { __VA_ARGS__ }
+    vec<T, n> __s_##name(vec<T, n> __v) { __VA_ARGS__ return __v; }   /* (a.xy = b.xy = c chains) */
 
 template<class T> struct __vstore<T, 1> {
     union { T c[1]; struct { T x; }; struct { T r; }; };
@@ -48,6 +48,9 @@ template<class T, int N> struct alignas(sizeof(T) * (N == 3 ? 4 : N)) vec : __vs
     explicit vec(U s) { for (int i = 0; i < N; i++) this->c[i] = T(s); }
     template<class U, __ferry::enable_if_t<!__ferry::is_same<U, T>::value, int> = 0>
     explicit vec(const vec<U, N> &o) { for (int i = 0; i < N; i++) this->c[i] = T(o.c[i]); }
+    /* float3(packed_int3): a packed vector of another type, converted */
+    template<class U, __ferry::enable_if_t<!__ferry::is_same<U, T>::value, int> = 0>
+    explicit vec(const __vstore<U, N> &o) { for (int i = 0; i < N; i++) this->c[i] = T(o.c[i]); }
     template<class A, class B, class... R,
              __ferry::enable_if_t<(__comps<A>::n + __comps<B>::n + (0 + ... + __comps<R>::n)) == N, int> = 0>
     vec(const A &a, const B &b, const R &...r)
