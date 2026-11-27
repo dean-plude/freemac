@@ -25,6 +25,7 @@ SRC += src/libc_blender.c
 SRC += src/mach.c
 SRC += src/notify.c
 SRC += src/libc_electron.c
+SRC += src/pcsc.c
 # cameras, for AVFoundation's capture (freemac 1.257)
 SRC += src/camera.c
 # AAC and other sound codecs through this system's FFmpeg, for Core Audio (freemac 1.264)
@@ -36,6 +37,8 @@ TBD_ALIASES = sdk/lib/libm.tbd sdk/lib/libdl.tbd sdk/lib/libpthread.tbd sdk/lib/
 # Link stubs for the Mac libraries served by this system's copy (src/host.c).
 TWIN_TBD = sdk/lib/libz.tbd sdk/lib/libbz2.tbd sdk/lib/liblzma.tbd sdk/lib/libxml2.tbd sdk/lib/libsqlite3.tbd \
            sdk/lib/libicucore.tbd sdk/lib/libc++.tbd sdk/lib/libc++abi.tbd sdk/lib/libcurl.tbd
+# PC/SC smart cards over pcsc-lite (src/pcsc.c): its link stub, for KeePassXC's calls
+PCSC_TBD = frameworks/PCSC.framework/PCSC.tbd
 SDK_LIBXML2 = sdk/usr/include/libxml2
 SDK_CURL = sdk/usr/include/curl
 
@@ -79,7 +82,7 @@ QUARTZCORE_HEADERS = quartzcore/QInternal.h $(wildcard sdk/include/QuartzCore/*.
 SECURITY_SRC = $(wildcard security/*.m)
 SECURITY_OBJ = $(SECURITY_SRC:security/%.m=security/build/%.o)
 SECURITY = frameworks/Security.framework/Security
-SECURITY_HEADERS = security/SInternal.h $(wildcard sdk/include/Security/*.h) $(wildcard sdk/include/CommonCrypto/*.h) \
+SECURITY_HEADERS = security/SInternal.h $(wildcard sdk/include/Security/*.h) $(wildcard sdk/include/LocalAuthentication/*.h) $(wildcard sdk/include/CommonCrypto/*.h) \
                    $(FOUNDATION_HEADERS)
 
 # AppKit (M4): windows through this system's GTK, drawn with the library
@@ -177,7 +180,7 @@ QUARTZCORE_HEADERS += $(GPU_HEADERS)
 SDK_GL = sdk/usr/include/GL
 GPU = $(SDK_GL) $(IOSURFACE) $(OPENGL) $(COREVIDEO)
 
-all: ferry $(TBD) $(TBD_ALIASES) $(TWIN_TBD) $(SDK_LIBXML2) $(SDK_CURL) $(FOUNDATION) $(GRAPHICS) $(GPU) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT) $(EVENTKIT) $(COREAUDIO) $(SCK)
+all: ferry $(TBD) $(TBD_ALIASES) $(TWIN_TBD) $(PCSC_TBD) $(SDK_LIBXML2) $(SDK_CURL) $(FOUNDATION) $(GRAPHICS) $(GPU) $(QUARTZCORE) $(SECURITY) $(APPKIT) $(INSTALLER) $(COREDATA) $(WEBKIT) $(JSC) $(CLOUDKIT) $(EVENTKIT) $(COREAUDIO) $(SCK)
 
 include media/media.mk
 
@@ -245,6 +248,13 @@ sdk/lib/libicucore.tbd: sdk/gen-twin-tbd.sh
 sdk/lib/libcurl.tbd: sdk/gen-twin-tbd.sh
 	@mkdir -p sdk/lib
 	sdk/gen-twin-tbd.sh /usr/lib/libcurl.4.dylib libcurl.so.4 > $@
+$(PCSC_TBD): src/pcsc.c
+	@mkdir -p frameworks/PCSC.framework
+	{ printf -- "--- !tapi-tbd\ntbd-version:     4\ntargets:         [ x86_64-macos ]\n"; \
+	  printf "install-name:    '/System/Library/Frameworks/PCSC.framework/Versions/A/PCSC'\n"; \
+	  printf "exports:\n  - targets:     [ x86_64-macos ]\n    symbols:     [ "; \
+	  sed -n 's/^    {"\([A-Za-z0-9_]*\)", .*/\1/p' src/pcsc.c | sed "s/.*/'_&'/" | paste -sd, -; \
+	  printf " ]\n...\n"; } > $@
 $(SDK_CURL): sdk/gen-curl-headers.sh
 	sdk/gen-curl-headers.sh $@
 
@@ -352,6 +362,8 @@ $(SECURITY): $(SECURITY_OBJ) $(FOUNDATION)
 	@mkdir -p frameworks/Security.framework
 	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/Security.framework/Versions/A/Security \
 	    -o $@ $(SECURITY_OBJ) -framework Foundation
+	@mkdir -p frameworks/LocalAuthentication.framework
+	sdk/gen-alias-tbd.sh LocalAuthentication $@ > frameworks/LocalAuthentication.framework/LocalAuthentication.tbd
 
 appkit/build/%.o: appkit/%.m $(APPKIT_HEADERS) sdk/ferry-cc
 	@mkdir -p appkit/build
@@ -479,7 +491,7 @@ install: install-metal ferry $(TBD) $(TBD_ALIASES) $(TWIN_TBD) $(SDK_LIBXML2) $(
 	install -Dm755 $(QUARTZCORE) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/QuartzCore.framework/QuartzCore
 	install -Dm755 $(SECURITY) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/Security.framework/Security
 	install -Dm755 $(APPKIT) $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/AppKit.framework/AppKit
-	for f in CoreText ApplicationServices ImageIO Cocoa SystemConfiguration Carbon CoreServices CFNetwork ServiceManagement IOKit ForceFeedback AVFoundation UserNotifications ScriptingBridge Quartz QuickLook UniformTypeIdentifiers CoreImage MediaPlayer CoreMedia CoreMediaIO AddressBook VideoToolbox PIP; do \
+	for f in CoreText ApplicationServices ImageIO Cocoa SystemConfiguration Carbon CoreServices CFNetwork ServiceManagement IOKit ForceFeedback AVFoundation UserNotifications ScriptingBridge Quartz QuickLook UniformTypeIdentifiers CoreImage MediaPlayer CoreMedia CoreMediaIO AddressBook VideoToolbox PIP LocalAuthentication; do \
 	    install -Dm644 frameworks/$$f.framework/$$f.tbd $(DESTDIR)$(PREFIX)/lib/ferry/frameworks/$$f.framework/$$f.tbd; \
 	done
 	install -Dm644 binfmt/ferry.conf $(DESTDIR)$(PREFIX)/lib/binfmt.d/ferry.conf

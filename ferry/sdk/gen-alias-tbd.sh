@@ -5,7 +5,8 @@
 # SystemConfiguration, CoreServices, CFNetwork, ServiceManagement, IOKit, ForceFeedback and
 # UniformTypeIdentifiers in Foundation's,
 # Cocoa, Quartz, QuickLook, ScriptingBridge, CoreImage, MediaPlayer, CoreMedia, CoreMediaIO,
-# VideoToolbox, PIP (a private framework) and AddressBook in AppKit's, AudioToolbox and AudioUnit in CoreAudio's): the calls the
+# VideoToolbox, PIP (a private framework) and AddressBook in AppKit's, AudioToolbox and AudioUnit in CoreAudio's,
+# LocalAuthentication in Security's): the calls the
 # files export for that framework, under
 # the framework's own Mac install name. A program linked against it records
 # the framework as a Mac-built one would, and Ferry's loader serves that name
@@ -43,6 +44,8 @@ case $framework in
     CoreMediaIO) pattern='^_CMIO' ;;
     VideoToolbox) pattern='^_(VT|kVT)' ;;
     PIP) pattern='^_OBJC_(METACLASS|CLASS)_\$_PIPViewController$'; kind=PrivateFrameworks ;;
+    # Security's file serves Local Authentication: LAContext, with no Touch ID here
+    LocalAuthentication) pattern='^_(OBJC_(METACLASS|CLASS)_\$_LAContext$|LAErrorDomain$)' ;;
     AddressBook) pattern='^_(OBJC_(METACLASS|CLASS)_\$_AB|kAB)' ;;
     UserNotifications) pattern='^_(OBJC_(METACLASS|CLASS)_\$_UN|UN)' ;;
     QuickLook) pattern='^_(QL|kQL)' ;;

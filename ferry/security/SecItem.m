@@ -114,6 +114,10 @@ K(kSecUseDataProtectionKeychain, "kSecUseDataProtectionKeychain")
 K(kSecUseKeychain, "kSecUseKeychain")
 K(kSecUseAuthenticationUI, "kSecUseAuthenticationUI")
 K(kSecUseOperationPrompt, "kSecUseOperationPrompt")
+/* kSecUseAuthenticationUI's values: Ferry's keychain never shows a prompt, so they change nothing */
+K(kSecUseAuthenticationUIAllow, "kSecUseAuthenticationUIAllow")
+K(kSecUseAuthenticationUIFail, "kSecUseAuthenticationUIFail")
+K(kSecUseAuthenticationUISkip, "kSecUseAuthenticationUISkip")
 #undef K
 
 /* ---- the attributes ------------------------------------------------------------------- */
