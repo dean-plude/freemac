@@ -12,6 +12,9 @@
  *   CAAudioUnit.m audio components and the output units (HAL output,
  *                 default and system output, generic output)
  *   CAAudioQueue.m audio queues for output and input
+ *   CAMusicDevice.m the DLS and MIDI synth units, played with this system's
+ *                 FluidSynth, and the peak limiter (freemac 1.NEXT)
+ *   CAGraph.m     audio unit graphs (freemac 1.NEXT)
  *   CAFormat.m    linear PCM conversion, channel layouts and Audio Format
  *                 Services
  *
@@ -110,5 +113,8 @@ UInt32 ca_layout_labels(const AudioChannelLayout *layout, UInt32 size, UInt32 *l
 /* a layout of channel descriptions, which the caller frees */
 AudioChannelLayout *ca_layout_with_labels(const UInt32 *labels, UInt32 n, UInt32 *size);
 const char *ca_label_name(UInt32 label);
+
+/* ---- CAAudioUnit.m, for CAMusicDevice.m and CAGraph.m (freemac 1.NEXT) ---- */
+AudioComponentMethod ca_unit_method(AudioUnit u, SInt16 selector, void **plugin);
 
 #endif

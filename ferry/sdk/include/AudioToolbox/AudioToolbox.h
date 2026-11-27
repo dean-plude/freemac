@@ -10,6 +10,7 @@
 #include <CoreAudioTypes/CoreAudioTypes.h>
 #include <CoreAudio/CoreAudio.h>
 #include <AudioToolbox/AudioUnit.h>
+#include <AudioToolbox/AUGraph.h>
 #include <AudioToolbox/AudioQueue.h>
 #include <AudioToolbox/AudioFormat.h>
 #include <AudioToolbox/AudioConverter.h>
