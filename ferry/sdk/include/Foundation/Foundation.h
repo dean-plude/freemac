@@ -1214,6 +1214,7 @@ typedef NS_OPTIONS(NSUInteger, NSDataBase64DecodingOptions) {
 - (NSDate *)laterDate:(NSDate *)other;
 - (NSComparisonResult)compare:(NSDate *)other;
 - (BOOL)isEqualToDate:(NSDate *)other;
+- (NSString *)descriptionWithLocale:(id)locale;
 @end
 
 /* ---- NSTimeZone, NSLocale (NSTimeZone.m) ------------------------------------------- */

@@ -88,6 +88,21 @@ static NSTimeInterval now_since_reference(void)
     strftime(buf, sizeof buf, "%Y-%m-%d %H:%M:%S +0000", &tm);
     return [NSString stringWithUTF8String:buf];
 }
+/* nil gives the description; a locale (an NSLocale, or a dictionary such as
+ * the user defaults, which means the user's own) gives the date and time in
+ * the local time zone, written out in full. */
+- (NSString *)descriptionWithLocale:(id)locale
+{
+    if (!locale)
+        return [self description];
+    NSDateFormatter *f = [[NSDateFormatter alloc] init];
+    [f setLocale:[locale isKindOfClass:[NSLocale class]] ? locale : [NSLocale currentLocale]];
+    [f setDateStyle:NSDateFormatterFullStyle];
+    [f setTimeStyle:NSDateFormatterFullStyle];
+    NSString *s = [f stringFromDate:self];
+    [f release];
+    return s;
+}
 @end
 
 @implementation FDate

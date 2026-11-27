@@ -24,6 +24,7 @@ enum {
     CELL_SCROLLABLE = 0x00100000u,
     CELL_CONTINUOUS = 0x00080000u,
     CELL_WRAPS = 0x00000040u,
+    CELL_SINGLE_LINE = 0x00000200u,
 };
 
 static id coder_value(NSCoder *c, NSString *key)
@@ -141,6 +142,7 @@ static void cell_changed(NSCell *cell, NSView *view)
         _scrollable = (f & CELL_SCROLLABLE) != 0;
         _continuous = (f & CELL_CONTINUOUS) != 0;
         _wraps = (f & CELL_WRAPS) != 0;
+        _singleLine = (f & CELL_SINGLE_LINE) != 0;
     }
     if ([coder containsValueForKey:@"NSCellFlags2"]) {
         unsigned f = (unsigned)[coder decodeInt64ForKey:@"NSCellFlags2"];
@@ -153,6 +155,17 @@ static void cell_changed(NSCell *cell, NSView *view)
         _lineBreak = (NSLineBreakMode)((f >> 9) & 7);
         _controlSize = (NSControlSize)((f >> 17) & 3);
     }
+    /* A text cell that word-wraps and neither scrolls nor keeps to a single
+     * line wraps, as a multi-line label in Interface Builder: nibs from Xcode
+     * say no more than that (Sparkle's "Check for updates automatically?"
+     * message, freemac 1.NEXT). Ferry's own ferry-ibtool also sets the
+     * 0x40 bit for these. */
+    if ([self isKindOfClass:[NSTextFieldCell class]] && [coder containsValueForKey:@"NSCellFlags"] &&
+        _lineBreak == NSLineBreakByWordWrapping && !_scrollable && !_singleLine)
+        _wraps = YES;
+    /* (in a nib from Xcode the 0x40 bit can come with any line breaking) */
+    if (_wraps && _lineBreak != NSLineBreakByWordWrapping && _lineBreak != NSLineBreakByCharWrapping)
+        _wraps = NO;
     if (!_wraps && _lineBreak == NSLineBreakByWordWrapping)
         _lineBreak = _scrollable ? NSLineBreakByClipping : NSLineBreakByTruncatingTail;
     if ([coder containsValueForKey:@"NSState"])
