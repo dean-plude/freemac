@@ -42,7 +42,7 @@
 
 - (void)dealloc
 {
-    [_device release];
+    [(id)_device release];
     if (_slots)
         dispatch_release(_slots);
     if (_colorspace)

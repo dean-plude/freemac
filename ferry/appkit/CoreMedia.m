@@ -8,6 +8,9 @@ const CMTime kCMTimeIndefinite = {0, 0, kCMTimeFlags_Valid | kCMTimeFlags_Indefi
 const CMTime kCMTimePositiveInfinity = {0, 0, kCMTimeFlags_Valid | kCMTimeFlags_PositiveInfinity, 0};
 const CMTime kCMTimeNegativeInfinity = {0, 0, kCMTimeFlags_Valid | kCMTimeFlags_NegativeInfinity, 0};
 const CMTime kCMTimeZero = {0, 1, kCMTimeFlags_Valid, 0};
+const CMTimeRange kCMTimeRangeInvalid = {{0, 0, 0, 0}, {0, 0, 0, 0}};
+const CMTimeRange kCMTimeRangeZero = {{0, 1, kCMTimeFlags_Valid, 0}, {0, 1, kCMTimeFlags_Valid, 0}};
+const CMTimeMapping kCMTimeMappingInvalid = {{{0, 0, 0, 0}, {0, 0, 0, 0}}, {{0, 0, 0, 0}, {0, 0, 0, 0}}};
 
 CMTime CMTimeMake(int64_t value, int32_t timescale)
 {

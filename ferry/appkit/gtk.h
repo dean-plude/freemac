@@ -164,6 +164,12 @@ char *g_filename_from_uri(const char *uri, char **hostname, void *error);
 GtkFileChooserNative *gtk_file_chooser_native_new(const char *title, GtkWidget *parent, int action,
                                                   const char *accept_label, const char *cancel_label);
 int gtk_native_dialog_run(void *dialog);
+/* the chooser as a dialog of Ferry's own, for an Open panel that chooses
+ * files and folders: GTK's native chooser can't add a button for that.
+ * The buttons are added after, so the variadic list is only its NULL. */
+GtkWidget *gtk_file_chooser_dialog_new(const char *title, GtkWidget *parent, int action, const char *first_button, ...);
+GtkWidget *gtk_dialog_add_button(GtkWidget *dialog, const char *text, int response);
+char *gtk_file_chooser_get_current_folder(void *chooser);
 void gtk_file_chooser_set_select_multiple(void *chooser, gboolean select_multiple);
 void gtk_file_chooser_set_do_overwrite_confirmation(void *chooser, gboolean confirm);
 void gtk_file_chooser_set_create_folders(void *chooser, gboolean create_folders);

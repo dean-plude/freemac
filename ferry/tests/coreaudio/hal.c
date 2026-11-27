@@ -340,7 +340,8 @@ int main(void)
             crossings++;
     printf("resample: %d %d, %u frames (about 4800), %d zero crossings (about 88)\n", (int)err, (int)cerr,
            (unsigned)total, crossings);
-    AudioStreamBasicDescription aac = {44100, kAudioFormatMPEG4AAC, 0, 0, 1024, 0, 2, 0, 0};
-    printf("to AAC: %d\n", AudioConverterNew(&s16, &aac, &conv) == kAudioConverterErr_FormatNotSupported);
+    /* a codec Ferry has no encoder for (AAC and others are in codec.c's test) */
+    AudioStreamBasicDescription qdm = {44100, 'QDM2', 0, 0, 2048, 0, 2, 0, 0};
+    printf("to QDesign: %d\n", AudioConverterNew(&s16, &qdm, &conv) == kAudioConverterErr_FormatNotSupported);
     return 0;
 }

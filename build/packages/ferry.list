@@ -2,7 +2,10 @@
 # them: libc++ for apps written in C++, 7-Zip to open disk images (.dmg) and
 # libcurl for networking, libturbojpeg for cameras that send Motion JPEG,
 # and clang and lld, which build a Metal app's shaders when it runs
-# (freemac 1.262).
+# (freemac 1.262). FluidSynth and its General MIDI sound bank play MIDI
+# for apps that use Core Audio's synthesizers (VLC's .mid files, freemac
+# 1.264). Core Audio's AAC and other sound encoders use the system's FFmpeg
+# (libavcodec), which the desktop's gstreamer1.0-libav already brings.
 # Installed with Ferry's own package (FERRY_DEB);
 # Ferry carries on without any of them, so a missing one only turns off what
 # it does.
@@ -13,3 +16,5 @@ libcurl4t64
 libturbojpeg
 clang
 lld
+libfluidsynth3
+fluid-soundfont-gm

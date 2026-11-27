@@ -351,6 +351,17 @@ S_EXPORT SecTaskRef SecTaskCreateFromSelf(CFAllocatorRef allocator)
     return (SecTaskRef)[[STask alloc] init];
 }
 
+/* another process's task, by its audit token: Ferry describes it as it
+ * does this one (freemac 1.264, Electron) */
+S_EXPORT SecTaskRef SecTaskCreateWithAuditToken(CFAllocatorRef allocator, const void *token)
+{
+    return (SecTaskRef)[[STask alloc] init];
+}
+
+/* the code signing flags (csops' CS_ bits): none, since Ferry reads no
+ * signature, so the program reads as neither signed nor hardened */
+S_EXPORT uint32_t SecTaskGetCodeSignStatus(SecTaskRef task) { return 0; }
+
 S_EXPORT CFTypeRef SecTaskCopyValueForEntitlement(SecTaskRef task, CFStringRef entitlement, CFErrorRef *error)
 {
     if (error)

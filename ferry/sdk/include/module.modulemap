@@ -107,6 +107,7 @@ module AudioToolbox [system] {
     header "AudioToolbox/AudioToolbox.h"
     header "AudioToolbox/AUComponent.h"
     header "AudioToolbox/AUGraph.h"
+    header "AudioToolbox/AudioCodec.h"
     header "AudioToolbox/AudioComponent.h"
     header "AudioToolbox/AudioConverter.h"
     header "AudioToolbox/AudioFormat.h"
@@ -207,6 +208,7 @@ module CoreFoundation [system] {
     header "CoreFoundation/CFArray.h"
     header "CoreFoundation/CFBase.h"
     header "CoreFoundation/CFBundle.h"
+    header "CoreFoundation/CFCharacterSet.h"
     header "CoreFoundation/CFData.h"
     header "CoreFoundation/CFDate.h"
     header "CoreFoundation/CFDictionary.h"
@@ -279,6 +281,7 @@ module CoreMedia [system] {
     header "CoreMedia/CMBlockBuffer.h"
     header "CoreMedia/CMFormatDescription.h"
     header "CoreMedia/CMSampleBuffer.h"
+    header "CoreMedia/CMSimpleQueue.h"
     header "CoreMedia/CMSync.h"
     header "CoreMedia/CMTime.h"
     export *

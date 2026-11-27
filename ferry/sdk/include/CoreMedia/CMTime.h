@@ -36,6 +36,9 @@ extern const CMTime kCMTimeIndefinite;
 extern const CMTime kCMTimePositiveInfinity;
 extern const CMTime kCMTimeNegativeInfinity;
 extern const CMTime kCMTimeZero;
+extern const CMTimeRange kCMTimeRangeInvalid; /* freemac 1.264 */
+extern const CMTimeRange kCMTimeRangeZero;
+extern const CMTimeMapping kCMTimeMappingInvalid;
 CMTime CMTimeMake(int64_t value, int32_t timescale);
 CMTime CMTimeMakeWithSeconds(double seconds, int32_t preferredTimescale);
 double CMTimeGetSeconds(CMTime time);

@@ -14,5 +14,6 @@
 #include <AudioToolbox/AudioQueue.h>
 #include <AudioToolbox/AudioFormat.h>
 #include <AudioToolbox/AudioConverter.h>
+#include <AudioToolbox/AudioCodec.h>
 #include <AudioToolbox/AudioServices.h>
 #endif

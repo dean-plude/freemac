@@ -509,6 +509,40 @@ void CVOpenGLTextureCacheFlush(CVOpenGLTextureCacheRef textureCache, CVOptionFla
 CVOpenGLTextureCacheRef CVOpenGLTextureCacheRetain(CVOpenGLTextureCacheRef textureCache);
 void CVOpenGLTextureCacheRelease(CVOpenGLTextureCacheRef textureCache);
 
+/* ---- Metal textures (CVMetalTextureCache.h, freemac 1.264) ---------------------------
+ * A texture made from a pixel buffer, or one plane of it, on the program's
+ * Metal device. Ferry copies the pixels when the texture is made. */
+typedef CVImageBufferRef CVMetalTextureRef;
+typedef struct CF_BRIDGED_TYPE(id) __CVMetalTextureCache *CVMetalTextureCacheRef;
+CFTypeID CVMetalTextureCacheGetTypeID(void);
+CFTypeID CVMetalTextureGetTypeID(void);
+#ifdef __OBJC__
+@protocol MTLDevice, MTLTexture;
+CVReturn CVMetalTextureCacheCreate(CFAllocatorRef allocator, CFDictionaryRef cacheAttributes, id<MTLDevice> device,
+                                   CFDictionaryRef textureAttributes, CVMetalTextureCacheRef *cacheOut);
+id<MTLTexture> CVMetalTextureGetTexture(CVMetalTextureRef image);
+#else
+CVReturn CVMetalTextureCacheCreate(CFAllocatorRef allocator, CFDictionaryRef cacheAttributes, void *device,
+                                   CFDictionaryRef textureAttributes, CVMetalTextureCacheRef *cacheOut);
+void *CVMetalTextureGetTexture(CVMetalTextureRef image);
+#endif
+CVReturn CVMetalTextureCacheCreateTextureFromImage(CFAllocatorRef allocator, CVMetalTextureCacheRef textureCache,
+                                                   CVImageBufferRef sourceImage, CFDictionaryRef textureAttributes,
+                                                   unsigned long pixelFormat, size_t width, size_t height,
+                                                   size_t planeIndex, CVMetalTextureRef *textureOut);
+void CVMetalTextureCacheFlush(CVMetalTextureCacheRef textureCache, CVOptionFlags options);
+Boolean CVMetalTextureIsFlipped(CVMetalTextureRef image);
+void CVMetalTextureGetCleanTexCoords(CVMetalTextureRef image, float lowerLeft[2], float lowerRight[2],
+                                     float upperRight[2], float upperLeft[2]);
+
+/* ---- colour code points (ITU-T H.273): a name for a number and back ---------------- */
+CFStringRef CVColorPrimariesGetStringForIntegerCodePoint(int colorPrimariesCodePoint);
+CFStringRef CVTransferFunctionGetStringForIntegerCodePoint(int transferFunctionCodePoint);
+CFStringRef CVYCbCrMatrixGetStringForIntegerCodePoint(int yCbCrMatrixCodePoint);
+int CVColorPrimariesGetIntegerCodePointForString(CFStringRef colorPrimariesString);
+int CVTransferFunctionGetIntegerCodePointForString(CFStringRef transferFunctionString);
+int CVYCbCrMatrixGetIntegerCodePointForString(CFStringRef yCbCrMatrixString);
+
 __FERRY_END
 
 #endif

@@ -559,4 +559,16 @@ INFO_PROPERTY(NSURL *, fileURL, setFileURL, NSProgressFileURLKey)
 INFO_PROPERTY(NSNumber *, fileTotalCount, setFileTotalCount, NSProgressFileTotalCountKey)
 INFO_PROPERTY(NSNumber *, fileCompletedCount, setFileCompletedCount, NSProgressFileCompletedCountKey)
 #undef INFO_PROPERTY
+
+/* Publishing a progress shows it to other programs (the Finder draws a
+ * bar on the file it names). Nothing on freemac subscribes yet, so these
+ * keep it to this program. */
+- (void)publish {}
+- (void)unpublish {}
++ (id)addSubscriberForFileURL:(NSURL *)url withPublishingHandler:(id)handler
+{
+    return [[[NSObject alloc] init] autorelease];
+}
++ (void)removeSubscriber:(id)subscriber {}
+- (BOOL)isOld { return NO; }
 @end

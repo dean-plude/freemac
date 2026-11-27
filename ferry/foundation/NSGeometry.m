@@ -34,6 +34,73 @@ NSRect NSIntegralRect(NSRect r)
     return NSMakeRect(x, y, ceil(NSMaxX(r)) - x, ceil(NSMaxY(r)) - y);
 }
 
+/* One edge to a whole number: an inward edge moves toward the middle, an
+ * outward one away from it; the lower edge's inward is up, the upper's down. */
+static CGFloat align_edge(CGFloat v, BOOL lower, NSAlignmentOptions in, NSAlignmentOptions out,
+                          NSAlignmentOptions nearest, NSAlignmentOptions o)
+{
+    if (o & in)
+        return lower ? ceil(v) : floor(v);
+    if (o & out)
+        return lower ? floor(v) : ceil(v);
+    if (o & nearest)
+        return round(v);
+    return v;
+}
+
+static CGFloat align_length(CGFloat v, NSAlignmentOptions in, NSAlignmentOptions out, NSAlignmentOptions nearest,
+                            NSAlignmentOptions o)
+{
+    if (o & in)
+        return floor(v);
+    if (o & out)
+        return ceil(v);
+    if (o & nearest)
+        return round(v);
+    return v;
+}
+
+/* Each axis takes two of its three choices (the two edges and the length);
+ * with a length and one edge, the other edge follows from them. */
+static void align_axis(CGFloat *lo, CGFloat *hi, NSAlignmentOptions o, NSAlignmentOptions minIn, NSAlignmentOptions minOut,
+                       NSAlignmentOptions minNear, NSAlignmentOptions maxIn, NSAlignmentOptions maxOut,
+                       NSAlignmentOptions maxNear, NSAlignmentOptions lenIn, NSAlignmentOptions lenOut,
+                       NSAlignmentOptions lenNear)
+{
+    BOOL hasMin = (o & (minIn | minOut | minNear)) != 0, hasMax = (o & (maxIn | maxOut | maxNear)) != 0;
+    BOOL hasLen = (o & (lenIn | lenOut | lenNear)) != 0;
+    CGFloat a = *lo, b = *hi;
+    if (hasMin && hasMax) {
+        a = align_edge(a, YES, minIn, minOut, minNear, o);
+        b = align_edge(b, NO, maxIn, maxOut, maxNear, o);
+    } else if (hasMin && hasLen) {
+        a = align_edge(a, YES, minIn, minOut, minNear, o);
+        b = a + align_length(*hi - *lo, lenIn, lenOut, lenNear, o);
+    } else if (hasMax && hasLen) {
+        b = align_edge(b, NO, maxIn, maxOut, maxNear, o);
+        a = b - align_length(*hi - *lo, lenIn, lenOut, lenNear, o);
+    } else {
+        a = align_edge(a, YES, minIn, minOut, minNear, o);
+        b = align_edge(b, NO, maxIn, maxOut, maxNear, o);
+    }
+    if (b < a)
+        b = a;
+    *lo = a;
+    *hi = b;
+}
+
+NSRect NSIntegralRectWithOptions(NSRect r, NSAlignmentOptions o)
+{
+    if (r.size.width < 0 || r.size.height < 0)
+        return NSZeroRect;
+    CGFloat x0 = NSMinX(r), x1 = NSMaxX(r), y0 = NSMinY(r), y1 = NSMaxY(r);
+    align_axis(&x0, &x1, o, NSAlignMinXInward, NSAlignMinXOutward, NSAlignMinXNearest, NSAlignMaxXInward,
+               NSAlignMaxXOutward, NSAlignMaxXNearest, NSAlignWidthInward, NSAlignWidthOutward, NSAlignWidthNearest);
+    align_axis(&y0, &y1, o, NSAlignMinYInward, NSAlignMinYOutward, NSAlignMinYNearest, NSAlignMaxYInward,
+               NSAlignMaxYOutward, NSAlignMaxYNearest, NSAlignHeightInward, NSAlignHeightOutward, NSAlignHeightNearest);
+    return NSMakeRect(x0, y0, x1 - x0, y1 - y0);
+}
+
 NSRect NSUnionRect(NSRect a, NSRect b)
 {
     if (NSIsEmptyRect(a))

@@ -388,6 +388,7 @@ __FERRY_END
  * UUIDs, URLs, bundle keys and byte order (Ferry 0.43.0) */
 #include <CoreFoundation/CFMore.h>
 #include <CoreFoundation/CFSet.h>
+#include <CoreFoundation/CFCharacterSet.h>
 /* locales, which are NSLocales (foundation/CFLocale.m) */
 #include <CoreFoundation/CFLocale.h>
 #include <CoreFoundation/CFDate.h>

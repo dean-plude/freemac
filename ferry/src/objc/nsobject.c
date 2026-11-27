@@ -59,6 +59,15 @@ id class_createInstance(Class cls, size_t extra)
     return obj;
 }
 
+/* the extra bytes class_createInstance gave an object, after its ivars */
+void *object_getIndexedIvars(id obj)
+{
+    if (!obj)
+        return NULL;
+    Class cls = object_getClass(obj);
+    return cls ? (char *)obj + class_rt(cls)->instance_size : NULL;
+}
+
 id objc_constructInstance(Class cls, void *bytes)
 {
     if (!cls || !bytes)

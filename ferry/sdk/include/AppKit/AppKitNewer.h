@@ -202,4 +202,30 @@ typedef NS_ENUM(NSInteger, NSTintProminence) {
 - (void)setTitleWithMnemonic:(NSString *)stringWithAmpersand;
 @end
 
+/* macOS 11: the line under a window's title bar (freemac 1.264, HandBrake's
+ * queue window). Ferry's title bars keep their own line, so it's kept. */
+@interface NSWindow (FerryTitlebarSeparator)
+@property NSTitlebarSeparatorStyle titlebarSeparatorStyle;
+@end
+
+/* ---- NSComboButton (macOS 13; freemac 1.264, HandBrake's toolbar) -------------------
+ * A button with a menu: a click on its main part sends the action, and a
+ * click on the arrow at its right end (or, in the unified style, a press
+ * held on the button) opens the menu. */
+typedef NS_ENUM(NSInteger, NSComboButtonStyle) {
+    NSComboButtonStyleSplit = 0,
+    NSComboButtonStyleUnified = 1,
+};
+@interface NSComboButton : NSControl
++ (instancetype)comboButtonWithTitle:(NSString *)title menu:(NSMenu *)menu target:(id)target action:(SEL)action;
++ (instancetype)comboButtonWithImage:(NSImage *)image menu:(NSMenu *)menu target:(id)target action:(SEL)action;
++ (instancetype)comboButtonWithTitle:(NSString *)title image:(NSImage *)image menu:(NSMenu *)menu
+                              target:(id)target action:(SEL)action;
+@property (copy) NSString *title;
+@property (strong) NSImage *image;
+@property NSImageScaling imageScaling;
+@property (strong) NSMenu *menu;
+@property NSComboButtonStyle style;
+@end
+
 #endif

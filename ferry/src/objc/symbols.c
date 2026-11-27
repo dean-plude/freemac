@@ -47,6 +47,9 @@ extern char _objc_empty_cache_storage[];
     X(objc_copyClassList, objc_copyClassList) \
     X(objc_allocateClassPair, objc_allocateClassPair) \
     X(objc_registerClassPair, objc_registerClassPair) \
+    X(objc_initializeClassPair, objc_initializeClassPair) \
+    X(objc_copyClassNamesForImage, objc_copyClassNamesForImage) \
+    X(object_getIndexedIvars, object_getIndexedIvars) \
     X(objc_disposeClassPair, objc_disposeClassPair) \
     X(objc_duplicateClass, objc_duplicateClass) \
     X(objc_getProtocol, objc_getProtocol) \

@@ -96,6 +96,15 @@ void *ferry_synth_symbol(const char *name);         /* FluidSynth, for Core Audi
 void *ferry_gl_symbol(const char *name);            /* EGL and OpenGL, for Ferry's OpenGL (opengl/) */
 void *ferry_capture_symbol(const char *name);       /* Xlib and its extensions, for screen capture (1.238) */
 void *ferry_camera_symbol(const char *name);        /* cameras, for AVFoundation's capture (camera.c, 1.257) */
+/* sound codecs through this system's FFmpeg, for Core Audio (codec.c, 1.264) */
+struct ferry_acodec;
+int ferry_acodec_available(int encode, uint32_t id);
+struct ferry_acodec *ferry_acodec_open(int encode, uint32_t id, int rate, int channels, int bit_rate,
+                                       const uint8_t *cookie, int cookie_len);
+int ferry_acodec_info(struct ferry_acodec *h, int *frame_size, int *padding, uint8_t *config, int *config_len);
+int ferry_acodec_send(struct ferry_acodec *h, const void *data, int count);
+int ferry_acodec_receive(struct ferry_acodec *h, void *out, int cap, int *channels);
+void ferry_acodec_close(struct ferry_acodec *h);
 
 /* servercerts.c: the certificates an https server presents, for Security */
 int ferry_server_certificates(const char *host, int port, int timeout_ms,

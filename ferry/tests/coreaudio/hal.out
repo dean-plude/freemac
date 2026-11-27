@@ -40,5 +40,5 @@ bitmap L R LFE: tag 0, 3 descriptions: 1 2 4
 channels in stereo: 2
 convert: 0 0, 16 bytes: 0.250 -1.000 0.500 0.250
 resample: 0 0, 4800 frames (about 4800), 88 zero crossings (about 88)
-to AAC: 1
+to QDesign: 1
 exit=0
