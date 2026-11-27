@@ -1661,7 +1661,11 @@ static void on_realize(GtkWidget *w, void *data) { AMainMenuBarAttach(gtk_widget
         [(NSView *)old setNeedsDisplay:YES];
     if (!responder)
         return YES;
-    if (![responder acceptsFirstResponder] || ![responder becomeFirstResponder])
+    /* As on a Mac, the responder is only asked to become first responder:
+     * acceptsFirstResponder is for clicks and the key-view loop, and a view
+     * that keeps NSView's NO can still be made first responder by its app
+     * (GPUI's view, in Zed, which takes all its typing) (freemac 1.268). */
+    if (![responder becomeFirstResponder])
         return NO;
     _first = responder;
     if ([responder isKindOfClass:[NSView class]])

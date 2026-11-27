@@ -1,0 +1,5 @@
+libraries: yes
+discarded half (BGRA): 255 255 255 255, blended half: 255 128 128 255
+dfdx across the quad: red 255
+doubled: yes, sums of 64: 2016 6112 10208 14304
+exit=0

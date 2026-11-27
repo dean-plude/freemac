@@ -336,25 +336,29 @@ static NSUInteger data_type_size(MTLDataType t)
 @end
 
 /* ---- compiling ----------------------------------------------------------------------------- */
-static NSString *find_mslc(void)
+/* One of Ferry's shader tools (ferry-mslc, ferry-airc): $FERRY_MSLC or
+ * $FERRY_AIRC, next to the frameworks, or installed. */
+static NSString *find_metal_tool(NSString *tool, const char *env);
+static NSString *find_mslc(void) { return find_metal_tool(@"ferry-mslc", "FERRY_MSLC"); }
+static NSString *find_metal_tool(NSString *tool, const char *env)
 {
     NSMutableArray *c = [NSMutableArray array];
-    const char *e = getenv("FERRY_MSLC");
+    const char *e = getenv(env);
     if (e && *e) [c addObject:@(e)];
     const char *fw = getenv("FERRY_FRAMEWORKS");
     if (fw && *fw) {
-        [c addObject:[NSString stringWithFormat:@"%s/../metal/ferry-mslc", fw]];
-        [c addObject:[NSString stringWithFormat:@"%s/../../metal/ferry-mslc", fw]];
+        [c addObject:[NSString stringWithFormat:@"%s/../metal/%@", fw, tool]];
+        [c addObject:[NSString stringWithFormat:@"%s/../../metal/%@", fw, tool]];
     }
     /* next to this framework: frameworks/Metal.framework/Metal -> ../metal */
     Dl_info di;
-    if (dladdr((const void *)find_mslc, &di) && di.dli_fname) {
+    if (dladdr((const void *)find_metal_tool, &di) && di.dli_fname) {
         NSString *me = [@(di.dli_fname) stringByDeletingLastPathComponent];
-        [c addObject:[me stringByAppendingPathComponent:@"../../metal/ferry-mslc"]];
-        [c addObject:[me stringByAppendingPathComponent:@"../../../metal/ferry-mslc"]];
+        [c addObject:[me stringByAppendingPathComponent:[@"../../metal" stringByAppendingPathComponent:tool]]];
+        [c addObject:[me stringByAppendingPathComponent:[@"../../../metal" stringByAppendingPathComponent:tool]]];
     }
-    [c addObject:@"/usr/lib/ferry/metal/ferry-mslc"];
-    [c addObject:@"/usr/local/lib/ferry/metal/ferry-mslc"];
+    [c addObject:[@"/usr/lib/ferry/metal" stringByAppendingPathComponent:tool]];
+    [c addObject:[@"/usr/local/lib/ferry/metal" stringByAppendingPathComponent:tool]];
     for (NSString *p in c)
         if (access([p fileSystemRepresentation], X_OK) == 0) return [p stringByStandardizingPath];
     return nil;
@@ -502,6 +506,13 @@ static FerryMTLLibrary *load_library(NSString *path, NSError **error)
     lib->_path = [path copy];
     lib->_reflection = [refl retain];
     lib->_specialized = [[NSMutableDictionary alloc] init];
+    /* Code that never asks for a quad's other pixels (derivatives, quad
+     * functions) or waits at a threadgroup barrier imports neither call, and
+     * its lanes can run one after another without fibers, which is much
+     * quicker for every pixel (freemac 1.268). */
+    NSData *code = [NSData dataWithContentsOfFile:path options:NSDataReadingMappedIfSafe error:NULL];
+    lib->_waits = !code || memmem([code bytes], [code length], "__ferry_quad_exchange", 21) ||
+                  memmem([code bytes], [code length], "__ferry_barrier", 15);
     return lib;
 }
 
@@ -520,6 +531,79 @@ id<MTLLibrary> FerryMTLNewLibraryWithSource(NSString *source, MTLCompileOptions 
         lib->_options = [options copy];
     }
     return lib;
+}
+
+/* A precompiled library (a .metallib an app ships or makes): its shaders
+ * are LLVM bitcode for the GPU, which ferry-airc rebuilds for this
+ * processor into the same kind of library ferry-mslc makes (freemac 1.268).
+ * The result is kept in the cache, by the library's bytes. */
+id<MTLLibrary> FerryMTLNewLibraryWithMetallib(NSData *bytes, NSString *what, NSError **error)
+{
+    if (error) *error = nil;
+    NSString *airc = find_metal_tool(@"ferry-airc", "FERRY_AIRC");
+    if (!airc) {
+        mtl_log("Ferry's tool for precompiled Metal libraries (ferry-airc) isn't installed");
+        if (error)
+            *error = FerryMTLError(MTLLibraryErrorDomain, MTLLibraryErrorUnsupported,
+                                   @"precompiled Metal libraries need ferry-airc, which isn't installed");
+        return nil;
+    }
+    if ([bytes length] < 4 || memcmp([bytes bytes], "MTLB", 4)) {
+        mtl_log("%s isn't a Metal library", [what UTF8String]);
+        if (error)
+            *error = FerryMTLError(MTLLibraryErrorDomain, MTLLibraryErrorFileNotFound, @"%@ isn't a Metal library",
+                                   what);
+        return nil;
+    }
+    uint64_t h = 0xcbf29ce484222325ull;
+    fnv(&h, "ferry-air-1", 12);
+    struct stat st;
+    if (stat([airc fileSystemRepresentation], &st) == 0) {
+        fnv(&h, &st.st_mtime, sizeof st.st_mtime);
+        fnv(&h, &st.st_size, sizeof st.st_size);
+    }
+    fnv(&h, [bytes bytes], [bytes length]);
+    NSString *dir = cache_dir();
+    NSString *lib = [dir stringByAppendingPathComponent:[NSString stringWithFormat:@"%016llx.air.dylib", (unsigned long long)h]];
+    NSString *json = [lib stringByAppendingString:@".json"];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    if (!([fm fileExistsAtPath:lib] && [fm fileExistsAtPath:json])) {
+        NSString *tag = [NSString stringWithFormat:@"%016llx.%d.%p", (unsigned long long)h, getpid(), (void *)&h];
+        NSString *in = [dir stringByAppendingPathComponent:[tag stringByAppendingString:@".metallib"]];
+        NSString *tmpLib = [dir stringByAppendingPathComponent:[tag stringByAppendingString:@".dylib"]];
+        NSString *logPath = [dir stringByAppendingPathComponent:[tag stringByAppendingString:@".log"]];
+        [bytes writeToFile:in atomically:NO];
+        if (mtl_verbose) mtl_log("rebuilding %s's precompiled shaders for this processor", [what UTF8String]);
+        const char *av[] = {[airc fileSystemRepresentation], "build", [in fileSystemRepresentation], "-o",
+                            [tmpLib fileSystemRepresentation], NULL};
+        posix_spawn_file_actions_t fa;
+        posix_spawn_file_actions_init(&fa);
+        posix_spawn_file_actions_addopen(&fa, 1, "/dev/null", O_WRONLY, 0);
+        posix_spawn_file_actions_addopen(&fa, 2, [logPath fileSystemRepresentation], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        pid_t pid;
+        int rc = posix_spawn(&pid, av[0], &fa, NULL, (char *const *)av, environ);
+        posix_spawn_file_actions_destroy(&fa);
+        int status = -1;
+        if (rc == 0)
+            while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {}
+        NSString *log = read_text(logPath, 16384);
+        [fm removeItemAtPath:logPath error:NULL];
+        [fm removeItemAtPath:in error:NULL];
+        if (rc != 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+            [fm removeItemAtPath:tmpLib error:NULL];
+            [fm removeItemAtPath:[tmpLib stringByAppendingString:@".json"] error:NULL];
+            if (rc != 0) log = [NSString stringWithFormat:@"couldn't run %@: %s", airc, strerror(rc)];
+            mtl_log("%s: its precompiled shaders couldn't be rebuilt for this processor:\n%s", [what UTF8String],
+                    [log UTF8String]);
+            if (error)
+                *error = FerryMTLError(MTLLibraryErrorDomain, MTLLibraryErrorUnsupported,
+                                       @"precompiled Metal library couldn't be run: %@", log);
+            return nil;
+        }
+        rename([[tmpLib stringByAppendingString:@".json"] fileSystemRepresentation], [json fileSystemRepresentation]);
+        rename([tmpLib fileSystemRepresentation], [lib fileSystemRepresentation]);
+    }
+    return load_library(lib, error);
 }
 
 /* ---- libraries and functions ------------------------------------------------------------- */
@@ -549,6 +633,9 @@ static FerryMTLFunction *make_function(FerryMTLLibrary *lib, NSDictionary *info)
     NSNumber *mt = nonnull(info[@"max_threads"]);
     f->_fn.max_threads = [mt isKindOfClass:[NSNumber class]] ? [mt unsignedIntValue] : 1024;
     if (!f->_fn.max_threads || f->_fn.max_threads > 1024) f->_fn.max_threads = 1024;
+    /* ferry-airc says per function; otherwise the library's code decides */
+    NSNumber *w = nonnull(info[@"waits"]);
+    f->_fn.waits = [w isKindOfClass:[NSNumber class]] ? [w boolValue] : lib->_waits;
     return f;
 }
 

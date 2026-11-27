@@ -268,6 +268,7 @@ static void *trigger_later(void *arg)
 static void user_events(void)
 {
     struct kevent ev;
+    int a0;
     CHECK(change(42, EVFILT_USER, EV_ADD | EV_CLEAR, NOTE_FFCOPY | 0x3, 0, NULL) == 0);
     printf("user event, not triggered: %d\n", poll_one(&ev, 0));
     CHECK(change(42, EVFILT_USER, 0, NOTE_TRIGGER | NOTE_FFAND | 0x1, 0, NULL) == 0);
@@ -280,6 +281,12 @@ static void user_events(void)
     n = poll_one(&ev, 5000);
     pthread_join(t, NULL);
     printf("triggered from another thread while waiting: %d event, fflags 0x%x\n", n, ev.fflags);
+    /* a trigger that adds the event again keeps the EV_CLEAR it was first
+     * added with: Rust's mio wakes its thread this way, and spun when the
+     * trigger lost it (freemac 1.268) */
+    CHECK(change(42, EVFILT_USER, EV_ADD, NOTE_TRIGGER, 0, NULL) == 0);
+    a0 = poll_one(&ev, 1000);
+    printf("triggered by adding again: %d event, EV_CLEAR kept: then %d\n", a0, poll_one(&ev, 0));
     CHECK(change(42, EVFILT_USER, EV_DELETE, 0, 0, NULL) == 0);
 
     CHECK(change(43, EVFILT_USER, EV_ADD, 0, 0, NULL) == 0);

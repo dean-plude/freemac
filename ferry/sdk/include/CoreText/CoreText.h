@@ -12,6 +12,7 @@ __FERRY_BEGIN
 typedef const struct __CTFont *CTFontRef;
 typedef const struct __CTFontDescriptor *CTFontDescriptorRef;
 typedef const struct __CTLine *CTLineRef;
+typedef const struct __CTRun *CTRunRef;
 typedef const struct __CTFramesetter *CTFramesetterRef;
 typedef const struct __CTFrame *CTFrameRef;
 typedef const struct __CTParagraphStyle *CTParagraphStyleRef;
@@ -110,6 +111,11 @@ extern const CFStringRef kCTFontCharacterSetAttribute;
 extern const CFStringRef kCTFontLanguagesAttribute;
 extern const CFStringRef kCTFontFixedAdvanceAttribute;
 extern const CFStringRef kCTFontFeatureSettingsAttribute;
+/* the keys of a feature setting: an OpenType tag ("liga") and its value */
+extern const CFStringRef kCTFontOpenTypeFeatureTag;
+extern const CFStringRef kCTFontOpenTypeFeatureValue;
+/* a font collection option: one descriptor per font */
+extern const CFStringRef kCTFontCollectionRemoveDuplicatesOption;
 /* the keys of a traits dictionary */
 extern const CFStringRef kCTFontSymbolicTrait;
 extern const CFStringRef kCTFontWeightTrait;
@@ -245,6 +251,36 @@ CGFloat CTLineGetOffsetForStringIndex(CTLineRef line, CFIndex charIndex, CGFloat
 CFIndex CTLineGetStringIndexForPosition(CTLineRef line, CGPoint position);
 void CTLineDraw(CTLineRef line, CGContextRef context);
 CFTypeID CTLineGetTypeID(void);
+/* a line's glyph runs, left to right; the line keeps them */
+CFArrayRef CTLineGetGlyphRuns(CTLineRef line);
+
+/* ---- glyph runs -------------------------------------------------------------- */
+
+typedef enum {
+    kCTRunStatusNoStatus = 0, kCTRunStatusRightToLeft = 1 << 0, kCTRunStatusNonMonotonic = 1 << 1,
+    kCTRunStatusHasNonIdentityMatrix = 1 << 2,
+} CTRunStatus;
+
+CFTypeID CTRunGetTypeID(void);
+CFIndex CTRunGetGlyphCount(CTRunRef run);
+CFDictionaryRef CTRunGetAttributes(CTRunRef run);
+CTRunStatus CTRunGetStatus(CTRunRef run);
+CFRange CTRunGetStringRange(CTRunRef run);
+CGAffineTransform CTRunGetTextMatrix(CTRunRef run);
+const CGGlyph *CTRunGetGlyphsPtr(CTRunRef run);
+const CGPoint *CTRunGetPositionsPtr(CTRunRef run);
+const CGSize *CTRunGetAdvancesPtr(CTRunRef run);
+const CFIndex *CTRunGetStringIndicesPtr(CTRunRef run);
+/* a range of glyphs (length 0: to the end) copied out */
+void CTRunGetGlyphs(CTRunRef run, CFRange range, CGGlyph buffer[]);
+void CTRunGetPositions(CTRunRef run, CFRange range, CGPoint buffer[]);
+void CTRunGetAdvances(CTRunRef run, CFRange range, CGSize buffer[]);
+void CTRunGetStringIndices(CTRunRef run, CFRange range, CFIndex buffer[]);
+void CTRunGetBaseAdvancesAndOrigins(CTRunRef run, CFRange range, CGSize advancesBuffer[], CGPoint originsBuffer[]);
+double CTRunGetTypographicBounds(CTRunRef run, CFRange range, CGFloat *ascent, CGFloat *descent, CGFloat *leading);
+CGRect CTRunGetImageBounds(CTRunRef run, CGContextRef context, CFRange range);
+/* draws the glyphs at the context's text position */
+void CTRunDraw(CTRunRef run, CGContextRef context, CFRange range);
 
 /* ---- frames ------------------------------------------------------------------ */
 

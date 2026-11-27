@@ -73,6 +73,7 @@ FerryMTLTexture *FerryMTLNewTexture(MTLTextureDescriptor *d, char *mem, NSUInteg
     NSString *_source;
     MTLCompileOptions *_options;
     NSMutableDictionary *_specialized;
+    int _waits;                 /* its code calls a quad exchange or a barrier */
 }
 @end
 

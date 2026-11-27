@@ -56,6 +56,18 @@ static kern_return_t mac_set_exception_ports(mac_port_t target, unsigned mask, m
     return port ? KERN_FAILURE : KERN_SUCCESS;
 }
 
+/* A thread's own exception port. A program that runs code it generates
+ * (wasmtime, in Zed) points each of its threads at a port of its own and
+ * stops if that can't be done. Ferry accepts it, but sends no messages
+ * there: a fault in the thread still goes to the program's signal handlers,
+ * or ends it. Task-wide ports (crash reporters) still can't be set, so those
+ * fall back to signal handlers as they're built to (freemac 1.268). */
+static kern_return_t mac_thread_set_exception_ports(mac_port_t target, unsigned mask, mac_port_t port, int behavior,
+                                                    int flavor)
+{
+    return KERN_SUCCESS;
+}
+
 static kern_return_t mac_swap_exception_ports(mac_port_t target, unsigned mask, mac_port_t port, int behavior,
                                               int flavor, unsigned *masks, unsigned *count, mac_port_t *ports,
                                               int *behaviors, int *flavors)
@@ -260,7 +272,7 @@ const struct ferry_symbol ferry_libc_audacity_symbols[] = {
     {"thread_get_exception_ports", mac_get_exception_ports},
     {"host_get_exception_ports", mac_get_exception_ports},
     {"task_set_exception_ports", mac_set_exception_ports},
-    {"thread_set_exception_ports", mac_set_exception_ports},
+    {"thread_set_exception_ports", mac_thread_set_exception_ports},
     {"host_set_exception_ports", mac_set_exception_ports},
     {"task_swap_exception_ports", mac_swap_exception_ports},
     {"thread_swap_exception_ports", mac_swap_exception_ports},

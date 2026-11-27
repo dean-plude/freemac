@@ -55,6 +55,9 @@
 
 - (BOOL)handleEvent:(NSEvent *)event
 {
+    if (getenv("FERRY_KEY_TRACE"))
+        fprintf(stderr, "ferry: input context handleEvent %s for %s\n", [[event characters] UTF8String],
+                object_getClassName(_client));
     if ([event type] != NSEventTypeKeyDown || !_client)
         return NO;
     NSString *chars = [event characters];

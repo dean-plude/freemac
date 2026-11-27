@@ -74,6 +74,9 @@ typedef void (*mtl_lane_fn)(void *arg, int lane);
  * quad exchanges and threadgroup barriers can wait for the others. kind 1
  * is a fragment quad (four lanes), kind 2 a compute threadgroup. */
 void mtl_run_lanes(int kind, int n, mtl_lane_fn fn, void *arg);
+/* Added to kind for code that never waits: its lanes run one after another
+ * on the worker's own stack, with no fibers to switch. */
+#define MTL_LANES_NO_WAIT 16
 /* For the fragment wrappers: the lane is discarded. */
 int mtl_lane_discarded(int lane);
 /* Threadgroup memory of the group being run (reset for each group). */
@@ -96,6 +99,7 @@ struct mtl_fn {
     void (*cs)(const struct ferry_call *);
     struct mtl_slots slots;
     unsigned max_threads;
+    int waits;                      /* its library calls a quad exchange or a barrier */
 };
 struct mtl_blend {
     unsigned char enabled, write_mask;

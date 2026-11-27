@@ -173,6 +173,12 @@ def parse_attr(toks):
         while k + 1 < len(part) and part[k].text == "::":
             name += "::" + part[k + 1].text
             k += 2
+        # the source is read after the preprocessor, which has already turned
+        # the threadgroup address-space macro into __local, the attribute's
+        # name included: [[threadgroup(0)]] arrives as [[__local(0)]]
+        # (freemac 1.268; Metal Shading Language Specification, 5.2.1)
+        if name == "__local":
+            name = "threadgroup"
         arg = None
         if k < len(part) and part[k].text == "(":
             arg = text_of(part[k + 1:-1]).strip()

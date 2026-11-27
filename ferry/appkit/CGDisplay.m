@@ -200,3 +200,12 @@ id<MTLDevice> CGDirectDisplayCopyCurrentMetalDevice(CGDirectDisplayID display)
  * call (Godot sets window properties through it), so there is one
  * connection, numbered 1, and nothing is sent on it. */
 int CGSMainConnectionID(void) { return 1; }
+/* A blur of what shows through a window's transparent background (Zed asks
+ * for one under its translucent themes). Ferry's windows draw no blur yet,
+ * so the request is accepted and the background stays as the app drew it
+ * (freemac 1.268). */
+int CGSSetWindowBackgroundBlurRadius(int connection, long window, int radius)
+{
+    (void)connection, (void)window, (void)radius;
+    return 0;
+}

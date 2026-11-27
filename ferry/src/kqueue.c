@@ -51,6 +51,7 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+#include <linux/kcmp.h>
 #include <linux/sockios.h>
 
 #include "ferry.h"
@@ -128,6 +129,7 @@ struct kq {
     struct kq *next;
     int fd;   /* the program's descriptor */
     int epfd; /* Ferry's own duplicate of it */
+    int dups[8], ndups; /* the program's copies of fd (dup, F_DUPFD_CLOEXEC) */
     int refs, closed;
     pthread_mutex_t lock;
     struct knote *knotes;
@@ -607,6 +609,13 @@ static int apply_change(struct kq *kq, const struct kevent64_s *c)
         }
         /* adding it again changes it, and enables it */
         uint16_t keep = c->flags & (EV_ONESHOT_ | EV_CLEAR_ | EV_DISPATCH_ | EV_UDATA_SPECIFIC_);
+        /* A user event is triggered by adding it again with NOTE_TRIGGER,
+         * usually without repeating its flags; it stays as it was added
+         * (EV_CLEAR resets it once read). Otherwise Rust's mio, whose
+         * waker is one, would find its waker ready forever and spin
+         * (freemac 1.268, Zed). */
+        if (c->filter == EVFILT_USER_)
+            keep |= kn->kev.flags & (EV_ONESHOT_ | EV_CLEAR_ | EV_DISPATCH_ | EV_UDATA_SPECIFIC_);
         int was_clear = kn->kev.flags & EV_CLEAR_;
         kn->kev.flags = keep;
         kn->kev.udata = c->udata;
@@ -819,12 +828,46 @@ static void kq_release(struct kq *kq)
     free(kq);
 }
 
+static int has_dup(const struct kq *kq, int fd)
+{
+    for (int i = 0; i < kq->ndups; i++)
+        if (kq->dups[i] == fd)
+            return 1;
+    return 0;
+}
+
+/* A copy of a kqueue's descriptor is the same kqueue, as on a Mac: Rust's
+ * tokio copies its kqueue for each handle on its event loop and waits on
+ * the copy (freemac 1.268). The copy is an epoll descriptor Ferry didn't
+ * hand out; the kernel says which open epoll it shares. */
+static struct kq *kq_by_copy(int fd)
+{
+    char link[64], what[64];
+    snprintf(link, sizeof link, "/proc/self/fd/%d", fd);
+    ssize_t n = readlink(link, what, sizeof what - 1);
+    if (n <= 0)
+        return NULL;
+    what[n] = 0;
+    if (strcmp(what, "anon_inode:[eventpoll]"))
+        return NULL;
+    pid_t self = getpid();
+    for (struct kq *kq = kqs; kq; kq = kq->next)
+        if (kq->ndups < (int)(sizeof kq->dups / sizeof *kq->dups) &&
+            syscall(SYS_kcmp, self, self, KCMP_FILE, kq->fd, fd) == 0) {
+            kq->dups[kq->ndups++] = fd;
+            return kq;
+        }
+    return NULL;
+}
+
 static struct kq *kq_get(int fd)
 {
     pthread_mutex_lock(&reg_lock);
     struct kq *kq = kqs;
-    while (kq && kq->fd != fd)
+    while (kq && kq->fd != fd && !has_dup(kq, fd))
         kq = kq->next;
+    if (!kq && fd >= 0)
+        kq = kq_by_copy(fd);
     if (kq)
         __atomic_add_fetch(&kq->refs, 1, __ATOMIC_SEQ_CST);
     pthread_mutex_unlock(&reg_lock);
@@ -1028,12 +1071,25 @@ static int mac_close(int fd)
     ferry_socket_closed(fd);
     struct kq *gone = NULL;
     pthread_mutex_lock(&reg_lock);
-    for (struct kq **p = &kqs; *p; p = &(*p)->next)
-        if ((*p)->fd == fd) {
-            gone = *p;
+    for (struct kq **p = &kqs; *p; p = &(*p)->next) {
+        struct kq *kq = *p;
+        if (kq->fd == fd && kq->ndups) {
+            /* a copy stays open: the kqueue lives on under it */
+            kq->fd = kq->dups[--kq->ndups];
+            break;
+        }
+        if (kq->fd == fd) {
+            gone = kq;
             *p = gone->next;
             break;
         }
+        if (has_dup(kq, fd)) {
+            for (int i = 0; i < kq->ndups; i++)
+                if (kq->dups[i] == fd)
+                    kq->dups[i] = kq->dups[--kq->ndups];
+            break;
+        }
+    }
     if (__atomic_load_n(&fd_knotes, __ATOMIC_SEQ_CST) > 0)
         for (struct kq *kq = kqs; kq; kq = kq->next) {
             pthread_mutex_lock(&kq->lock);

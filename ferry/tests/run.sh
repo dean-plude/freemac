@@ -861,6 +861,10 @@ run_one appkit_autosave "$here/appkit/autosave.m" "$here/appkit/autosave.out" -f
 # Pop-up buttons, segmented controls, search fields, stack views and
 # toolbars, built in code and from a nib (1.161).
 run_one appkit_controls "$here/appkit/controls.m" "$here/appkit/controls.out" -fobjc-arc -framework Cocoa
+# A view that types the way Zed's GPUI does: first responder though it
+# declines, keys through interpretKeyEvents to insertText:replacementRange:.
+run_one appkit_text_input_view "$here/appkit/text_input_view.m" "$here/appkit/text_input_view.out" -fobjc-arc \
+    -framework Cocoa
 # A nib that ferry-ibtool compiled from a xib, Ferry's own document in the
 # format Interface Builder saves (1.223). What the tool says of an element
 # it makes as a plain view goes to its log.
@@ -1950,10 +1954,12 @@ if metal_tools > /dev/null 2>&1 && \
     echo "ok   metal_mslc"; pass=$((pass + 1))
     run_one metal_draw "$here/metal/draw.m" "$here/metal/draw.out" -fobjc-arc -fblocks -framework Foundation \
         -framework Metal
+    run_one metal_lanes "$here/metal/lanes.m" "$here/metal/lanes.out" -fobjc-arc -fblocks -framework Foundation \
+        -framework Metal
     run_one metal_layer "$here/metal/layer.m" "$here/metal/layer.out" -fobjc-arc -fblocks -framework Cocoa \
         -framework Metal -framework QuartzCore
 elif ! metal_tools > /dev/null 2>&1; then
-    echo "skip metal_mslc, metal_draw, metal_layer (Metal's shaders need clang and lld)"
+    echo "skip metal_mslc, metal_draw, metal_lanes, metal_layer (Metal's shaders need clang and lld)"
 else
     echo "FAIL metal_mslc"; sed 's/^/    /' "$build/metal_mslc.log"; fail=$((fail + 1))
 fi

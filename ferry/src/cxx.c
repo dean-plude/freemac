@@ -194,9 +194,22 @@ int ferry_cxx_library(const char *install_name)
  * (freemac 1.262, IINA). They have to be the unwinder Ferry has described
  * the Mac images to, LLVM's libunwind, not this system's libgcc_s, which
  * knows nothing of those images; so the C++ runtime is opened for them. */
+/* So are the calls that tell it about code a program makes as it runs:
+ * __register_frame and __deregister_frame, which on a Mac take one FDE (the
+ * unwind description of one function), as LLVM's libunwind's do; a
+ * WebAssembly compiler (wasmtime, in Zed) registers each function it makes
+ * so its errors can unwind through them (freemac 1.268). */
+static int is_unwind_name(const char *name)
+{
+    if (!strncmp(name, "_Unwind_", 8))
+        return strcmp(name, "_Unwind_Resume") != 0;
+    return !strcmp(name, "__register_frame") || !strcmp(name, "__deregister_frame") ||
+           !strcmp(name, "__unw_add_dynamic_fde") || !strcmp(name, "__unw_remove_dynamic_fde");
+}
+
 void *ferry_unwind_lookup(const char *name)
 {
-    if (strncmp(name, "_Unwind_", 8) || !strcmp(name, "_Unwind_Resume"))
+    if (!is_unwind_name(name))
         return NULL;
     if (!cxx_tried) {
         cxx_tried = 1;

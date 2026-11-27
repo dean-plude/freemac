@@ -17,6 +17,11 @@ GPU, so it suits a program's windows and previews more than games.
   kept in `~/.cache/ferry/metal/`, so it is compiled once. When one doesn't
   compile, the error goes to the program as Metal's own, and the source is
   kept in `last-failed.metal` there.
+- **`ferry-airc`** does the same for an app's precompiled shaders: a
+  `.metallib`, built for Apple's GPUs, holds each shader as LLVM bitcode,
+  and `ferry-airc` builds that bitcode again as x86-64 code, with the
+  reflection the framework needs. It also notes which functions take
+  derivatives or wait at barriers. Its results are kept in the same cache.
 - **`fw/`** is the framework: the device, buffers, textures and samplers,
   shader libraries and functions with their reflection and function
   constants, render and compute pipelines, depth and stencil states,
@@ -27,11 +32,14 @@ GPU, so it suits a program's windows and previews more than games.
   fragment functions, then does the depth and stencil tests, blending and
   writes. Kernels run their threadgroups side by side. `fw/MTLFiber.c`
   gives each pixel of a 2x2 quad and each thread of a threadgroup a small
-  stack of its own, so derivatives and threadgroup barriers work.
+  stack of its own, so derivatives and threadgroup barriers work. A
+  function that uses neither runs its pixels and threads one after another
+  instead, which is much faster.
 
 A command buffer's work runs on its queue's own thread when it is
 committed; `FERRY_METAL_SYNC=1` runs it inside `commit` instead, which
-helps when looking for a bug.
+helps when looking for a bug. `FERRY_METAL_TIMES=1` prints how long each
+command buffer took.
 
 ## When it is on
 
@@ -62,6 +70,8 @@ its standard error.
 
 ## Tests
 
-`metal/tests/run.sh` checks the shader compiler. `tests/metal/draw.m` and
-`tests/metal/layer.m`, which `tests/run.sh` runs, draw with Metal and read
-back what was drawn.
+`metal/tests/run.sh` checks the shader compiler. `tests/metal/draw.m`,
+`tests/metal/lanes.m` and `tests/metal/layer.m`, which `tests/run.sh` runs,
+draw and compute with Metal and read back the results; `lanes.m` checks
+functions that wait (derivatives, barriers over threadgroup memory) and
+ones that don't.
