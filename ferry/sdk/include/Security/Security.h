@@ -205,6 +205,9 @@ extern const CFStringRef kSecValuePersistentRef;
 extern const CFStringRef kSecUseDataProtectionKeychain;
 extern const CFStringRef kSecUseKeychain;
 extern const CFStringRef kSecUseAuthenticationUI;
+extern const CFStringRef kSecUseAuthenticationUIAllow;
+extern const CFStringRef kSecUseAuthenticationUIFail;
+extern const CFStringRef kSecUseAuthenticationUISkip;
 extern const CFStringRef kSecUseOperationPrompt;
 
 OSStatus SecItemAdd(CFDictionaryRef attributes, CFTypeRef *result);

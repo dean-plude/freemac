@@ -130,6 +130,9 @@ run_one() {
         security_older)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_DATA_HOME= "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        security_keepassxc_calls)
+            # no smart card service: a pcsc-lite that isn't there
+            FERRY_PCSC=/nonexistent/libpcsclite.so.1 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         security_code) FERRY_VERBOSE=1 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         foundation_streams)
             # an echo server of its own, and run.sh's TLS server with its certificate
@@ -480,6 +483,11 @@ run_one foundation_mac_fonts "$here/foundation/mac_fonts.m" "$here/foundation/ma
 # runs, and the code-signing answers (said once with FERRY_VERBOSE).
 run_one security_keychain "$here/security/keychain.m" "$here/security/keychain.out" -framework Foundation \
     -framework Security
+# KeePassXC's calls (freemac 1.NEXT): Local Authentication with no Touch
+# ID, kSecUseAuthenticationUIAllow, ptrace(PT_DENY_ATTACH) and PC/SC smart
+# cards in the Mac's layout, with no smart card service.
+run_one security_keepassxc_calls "$here/security/keepassxc_calls.m" "$here/security/keepassxc_calls.out" -fblocks \
+    -framework Foundation -framework Security -framework LocalAuthentication -framework PCSC
 run_one security_code "$here/security/code.m" "$here/security/code.out" -framework Foundation -framework Security
 # The older keychain calls Sequel Pro makes (freemac 1.226, Ferry 0.50.0):
 # items from attribute lists, searches and access lists, in a home of its

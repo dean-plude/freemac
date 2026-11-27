@@ -1,0 +1,15 @@
+LAContext: made, biometry type 0
+Touch ID: no, LAErrorDomain -6
+watch: no, LAErrorDomain -11
+Touch ID or watch: no, LAErrorDomain -6
+device password: no, LAErrorDomain -5
+kept: 30, Use password
+evaluate: 1 reply, no, code -6, on another thread
+after invalidate: no, LAErrorDomain -10
+kSecUseAuthenticationUIAllow: set
+ptrace(PT_DENY_ATTACH): 0
+ptrace(PT_TRACE_ME): -1, errno set
+T0 1/8, T1 2/8, raw 4/8
+SCardEstablishContext: 0x8010001d
+SCardIsValidContext: 0x8010001d
+exit=0

@@ -968,6 +968,7 @@ static const struct { const char *name, *served_by; } framework_aliases[] = {
     {"AddressBook", "AppKit"},       /* an empty book, appkit/AddressBook.m (1.233) */
     {"PIP", "AppKit"},               /* picture in picture (a private framework), appkit/PIP.m (1.262) */
     {"VideoToolbox", "AppKit"},      /* no hardware codecs, appkit/VideoToolbox.m (1.262) */
+    {"LocalAuthentication", "Security"}, /* LAContext: no Touch ID here, security/LocalAuthentication.m */
     {NULL, NULL},
 };
 

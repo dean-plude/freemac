@@ -1420,12 +1420,26 @@ static int mac_semctl(int id, int num, int cmd, ...)
 }
 
 
+/* ptrace, from the BSD ptrace(2) manual page: Mac apps that guard secrets
+ * (KeePassXC) ask PT_DENY_ATTACH (31) at start, so that no debugger may
+ * attach later; Linux's own rules on who may trace whom stand for that, so
+ * it succeeds and changes nothing. Tracing another program isn't here. */
+static int mac_ptrace(int request, int pid, void *addr, int data)
+{
+    (void)pid; (void)addr; (void)data;
+    if (request == 31)
+        return 0;
+    errno = ENOTSUP;
+    return -1;
+}
+
 /* vfork as fork: a vfork child may only exec or _exit, and fork serves that too
  * without the parent's stack being shared through a call of Ferry's. */
 static pid_t mac_vfork(void) { return fork(); }
 
 const struct ferry_symbol ferry_posix_symbols[] = {
     {"vfork", mac_vfork},
+    {"ptrace", mac_ptrace},
     {"OSMemoryBarrier", mac_OSMemoryBarrier},
     {"OSAtomicAdd32", mac_OSAtomicAdd32},
     {"OSAtomicAdd32Barrier", mac_OSAtomicAdd32},
