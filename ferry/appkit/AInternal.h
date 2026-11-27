@@ -407,6 +407,21 @@ void ANoteRecentDocumentsMenu(NSMenu *menu);
 - (instancetype)initForReadingWithData:(NSData *)data;
 - (NSArray *)_decodeArrayKeepingNullsForKey:(NSString *)key;
 @end
+/* Loads a nib with objects handed in from outside, by the names its
+ * NSNibExternalObjectPlaceholders give (freemac 1.260). */
+@interface NSNib (FerryExternalObjects)
+- (BOOL)_instantiateWithOwner:(id)owner
+              externalObjects:(NSDictionary *)externals
+              topLevelObjects:(NSArray **)topLevelObjects;
+@end
+/* Storyboards (NSStoryboard.m): the storyboard whose scene is being
+ * loaded, if any, and where one of its nibs is. */
+CGWindowID ACGWindowNumberForView(int64_t view); /* CGServices.m */
+NSStoryboard *AStoryboardLoading(void);
+void ALoadMainStoryboard(void);
+@interface NSStoryboard (FerryPrivate)
+- (NSString *)_pathForNibNamed:(NSString *)name;
+@end
 NSRect AViewFrameFromCoder(NSCoder *coder);
 void AViewDecode(NSView *view, NSCoder *coder);
 /* The name of an image, or of a nib's stand-in for one (NSSwitch...). */

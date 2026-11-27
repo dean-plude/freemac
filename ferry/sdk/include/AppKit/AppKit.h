@@ -590,6 +590,7 @@ APPKIT_EXTERN NSString *const NSImageCompressionFactor;
  * standard template images, which Ferry draws itself. */
 @interface NSImage : NSObject <NSCopying, NSCoding>
 + (NSImage *)imageNamed:(NSImageName)name;
+- (instancetype FERRY_SWIFT_NONNULL)initWithFerryImageLiteralName:(NSString *)name; /* Swift's image literals */
 + (instancetype FERRY_SWIFT_NONNULL)imageWithSize:(NSSize)size flipped:(BOOL)flipped drawingHandler:(BOOL (^)(NSRect dstRect))handler;
 + (NSArray<NSString *> *)imageTypes;
 + (NSArray<NSString *> *)imageUnfilteredTypes;
@@ -1738,6 +1739,22 @@ typedef NSString *NSNibName;
 - (instancetype)initWithNibData:(NSData *)data bundle:(NSBundle *)bundle;
 - (instancetype)initWithContentsOfURL:(NSURL *)url;
 - (BOOL)instantiateWithOwner:(id)owner topLevelObjects:(NSArray **)topLevelObjects;
+@end
+
+typedef NSString *NSStoryboardName;
+typedef NSString *NSStoryboardSceneIdentifier;
+typedef id (^NSStoryboardControllerCreator)(NSCoder *coder);
+
+/* A storyboard: windows, views and their controllers, each scene a nib of
+ * its own inside the compiled .storyboardc folder (freemac 1.260). */
+@interface NSStoryboard : NSObject
++ (instancetype)storyboardWithName:(NSStoryboardName)name bundle:(NSBundle *)bundle;
+@property (class, readonly, retain) NSStoryboard *mainStoryboard;
+- (id)instantiateInitialController;
+- (id)instantiateInitialControllerWithCreator:(NSStoryboardControllerCreator)block;
+- (id)instantiateControllerWithIdentifier:(NSStoryboardSceneIdentifier)identifier;
+- (id)instantiateControllerWithIdentifier:(NSStoryboardSceneIdentifier)identifier
+                                  creator:(NSStoryboardControllerCreator)block;
 @end
 
 @interface NSBundle (NSNibLoading)
@@ -3634,6 +3651,25 @@ typedef NSString *NSSoundName;
 @optional
 - (void)sound:(NSSound *)sound didFinishPlaying:(BOOL)finished;
 @end
+/* Force Touch trackpad feedback (freemac 1.260): PCs have none, so it is
+ * accepted and nothing is felt. */
+typedef NS_ENUM(NSInteger, NSHapticFeedbackPattern) {
+    NSHapticFeedbackPatternGeneric = 0,
+    NSHapticFeedbackPatternAlignment = 1,
+    NSHapticFeedbackPatternLevelChange = 2,
+};
+typedef NS_ENUM(NSUInteger, NSHapticFeedbackPerformanceTime) {
+    NSHapticFeedbackPerformanceTimeDefault = 0,
+    NSHapticFeedbackPerformanceTimeNow = 1,
+    NSHapticFeedbackPerformanceTimeDrawCompleted = 2,
+};
+@protocol NSHapticFeedbackPerformer <NSObject>
+- (void)performFeedbackPattern:(NSHapticFeedbackPattern)pattern performanceTime:(NSHapticFeedbackPerformanceTime)performanceTime;
+@end
+@interface NSHapticFeedbackManager : NSObject
+@property (class, readonly, strong) id<NSHapticFeedbackPerformer> defaultPerformer;
+@end
+
 @interface NSSound : NSObject <NSCopying, NSCoding>
 + (NSSound *)soundNamed:(NSSoundName)name;
 + (NSArray<NSString *> *)soundUnfilteredTypes;

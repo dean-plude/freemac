@@ -87,6 +87,7 @@ fi
 
 o=$here/overlays
 module ObjectiveC "-lswiftCore" "$o"/ObjectiveC/*.swift
+module CoreFoundation "-lswiftCore -framework CoreFoundation" "$o"/CoreFoundation/*.swift
 module CoreGraphics "-lswiftCore -framework CoreGraphics" "$o"/CoreGraphics/*.swift
 module Dispatch "-lswiftCore -lswiftObjectiveC" "$o"/Dispatch/*.swift
 if [ -d "$o/Foundation" ] && [ -n "$(ls "$o/Foundation")" ]; then

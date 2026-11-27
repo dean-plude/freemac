@@ -295,9 +295,41 @@ static void hand_over(NSCoder *c, id old, id object)
     id obj = cls ? [cls alloc] : nil;
     hand_over(c, self, obj);
     [self release];
+    /* An object a storyboard makes with plain init (an app delegate of
+     * the app's own class): "NSInitializeWithInit" (freemac 1.260). */
+    if ([c containsValueForKey:@"NSInitializeWithInit"] && [c decodeBoolForKey:@"NSInitializeWithInit"])
+        return [obj init];
+    if (obj && ![obj respondsToSelector:@selector(initWithCoder:)])
+        return [obj init];
     return [obj initWithCoder:c];
 }
 - (void)encodeWithCoder:(NSCoder *)c {}
+@end
+
+/* An object that isn't in the nib but is handed to it by whoever loads
+ * it, by name: a storyboard hands its controller nibs the storyboard, and
+ * a view controller hands the nib of its view the controller itself
+ * (freemac 1.260). Replaced by that object when the nib is loaded. */
+@interface NSNibExternalObjectPlaceholder : NSObject <NSCoding> {
+@public
+    NSString *_identifier;
+}
+@end
+@implementation NSNibExternalObjectPlaceholder
+- (instancetype)initWithCoder:(NSCoder *)c
+{
+    if ((self = [super init])) {
+        id i = [c decodeObjectForKey:@"NSExternalObjectPlaceholderIdentifier"];
+        _identifier = [i isKindOfClass:[NSString class]] ? [i copy] : nil;
+    }
+    return self;
+}
+- (void)encodeWithCoder:(NSCoder *)c { [c encodeObject:_identifier forKey:@"NSExternalObjectPlaceholderIdentifier"]; }
+- (void)dealloc
+{
+    [_identifier release];
+    [super dealloc];
+}
 @end
 
 /* A window as Interface Builder describes it. Decoding makes the window
@@ -806,6 +838,12 @@ static id instantiate(NSCustomObject *placeholder, BOOL isRoot, id owner)
 
 - (BOOL)instantiateWithOwner:(id)owner topLevelObjects:(NSArray **)topLevelObjects
 {
+    return [self _instantiateWithOwner:owner externalObjects:nil topLevelObjects:topLevelObjects];
+}
+- (BOOL)_instantiateWithOwner:(id)owner
+              externalObjects:(NSDictionary *)externals
+              topLevelObjects:(NSArray **)topLevelObjects
+{
     if (topLevelObjects)
         *topLevelObjects = nil;
     ANibLoad load = {[NSMutableDictionary dictionary]};
@@ -845,6 +883,30 @@ static id instantiate(NSCustomObject *placeholder, BOOL isRoot, id owner)
         if (real)
             [made addObject:real];
     }
+    /* Objects handed in from outside, wherever the nib mentions them. */
+    NSMutableSet *outside = [NSMutableSet set];
+    NSMutableArray *placeholders = [NSMutableArray arrayWithArray:all];
+    for (id c in nib->_connections)
+        if ([c isKindOfClass:[NSNibConnector class]]) {
+            if (((NSNibConnector *)c)->_source)
+                [placeholders addObject:((NSNibConnector *)c)->_source];
+            if (((NSNibConnector *)c)->_destination)
+                [placeholders addObject:((NSNibConnector *)c)->_destination];
+        }
+    for (id o in placeholders) {
+        if (![o isKindOfClass:[NSNibExternalObjectPlaceholder class]])
+            continue;
+        NSValue *key = [NSValue valueWithPointer:o];
+        if ([map objectForKey:key])
+            continue;
+        NSString *name = ((NSNibExternalObjectPlaceholder *)o)->_identifier;
+        id real = name ? [externals objectForKey:name] : nil;
+        if (!real && name)
+            warn_class(@"an outside object named", name);
+        [map setObject:real ?: (id)[NSNull null] forKey:key];
+        if (real)
+            [outside addObject:[NSValue valueWithPointer:real]];
+    }
 
     /* Menu items, cells and toolbar items whose target is a stand-in, and
      * toolbars whose delegate is. */
@@ -881,6 +943,8 @@ static id instantiate(NSCustomObject *placeholder, BOOL isRoot, id owner)
                 [NSClassFromString(cn) isSubclassOfClass:[NSApplication class]])
                 continue;
         }
+        if ([o isKindOfClass:[NSNibExternalObjectPlaceholder class]])
+            continue;
         id real = resolve(o, map);
         if (real && ![top containsObject:real])
             [top addObject:real];
@@ -901,7 +965,8 @@ static id instantiate(NSCustomObject *placeholder, BOOL isRoot, id owner)
     NSMutableArray *awake = [NSMutableArray array];
     for (id o in all) {
         id real = resolve(o, map);
-        if (real && real != owner && real != NSApp && ![awake containsObject:real])
+        if (real && real != owner && real != NSApp && ![awake containsObject:real] &&
+            ![outside containsObject:[NSValue valueWithPointer:real]])
             [awake addObject:real];
     }
     for (id o in awake)

@@ -128,12 +128,12 @@ public struct URL: Hashable, Sendable, Codable, CustomStringConvertible, CustomD
 
     internal init(_ns url: NSURL) { _url = url }
 
-    public init?(string: String) {
+    public init?(string: __shared String) {
         guard !string.isEmpty, let u = NSURL(string: string) else { return nil }
         _url = u
     }
 
-    public init?(string: String, relativeTo base: URL?) {
+    public init?(string: __shared String, relativeTo base: __shared URL?) {
         guard !string.isEmpty else { return nil }
         let made: NSURL?
         if let base { made = NSURL(string: string, relativeTo: base) } else { made = NSURL(string: string) }

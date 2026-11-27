@@ -240,6 +240,7 @@ extern const unsigned ferry_static_rr_count;
 /* blocks.c */
 void ferry_blocks_init(void);
 void ferry_dispatch_init(void);
+void ferry_oslog_init(void);
 void *_Block_copy(const void *block);
 void _Block_release(const void *block);
 

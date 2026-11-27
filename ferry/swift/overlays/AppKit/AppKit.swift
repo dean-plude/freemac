@@ -198,3 +198,13 @@ extension NSRunLoop.Mode {
     /// The mode a run loop is in while a modal panel is up.
     public static var modalPanel: NSRunLoop.Mode { .init(rawValue: "NSModalPanelRunLoopMode") }
 }
+
+// MARK: - image literals (freemac 1.260)
+
+extension NSImage {
+    /// The image an #imageLiteral (or an image named in an asset catalog)
+    /// names, from the app's own resources.
+    public convenience init(imageLiteralResourceName name: String) {
+        self.init(ferryImageLiteralName: name)
+    }
+}

@@ -3333,3 +3333,22 @@ go of a notification as soon as it has been posted rather than leaving it to
 the posting thread's autorelease pool, so posting doesn't keep the object a
 notification is about alive. `NSNotification` has
 `initWithName:object:userInfo:`.
+
+## Storyboards and Swift apps built on a Mac (freemac 1.260, Ferry 0.83.0)
+
+An app whose Info.plist names `NSMainStoryboardFile` starts from its
+compiled storyboard (`Name.storyboardc`, a folder with an Info.plist and a
+nib for each scene): the main menu is loaded with the app as File's Owner,
+then the initial controller is made and shown. `NSStoryboard` makes
+controllers by their storyboard identifier, and a view controller from a
+storyboard loads its view from its own nib, with itself as the outside
+object the nib names. Swift code built on a Mac calls Dispatch, `os_log`,
+Foundation's value types (`Locale`, `TimeZone`, `URLComponents`,
+`Notification`) and CoreFoundation in the shapes Apple's overlays give
+them; Ferry's overlays now have those shapes too, written from Apple's
+documentation. Objective-C code built on a Mac logs through
+`_os_log_impl`, with its values packed as clang's open-source
+`__builtin_os_log_format` packs them. Rectangle 0.87 starts from its
+official download and shows its first window. Its pictures are in an asset
+catalog (Assets.car), which Ferry doesn't read yet, and its update checker
+(Sparkle) needs libcompression, which Ferry doesn't have yet.

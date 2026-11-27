@@ -148,6 +148,8 @@ CGError CGDisplayHideCursor(CGDirectDisplayID d) { [NSCursor hide]; return kCGEr
 CGError CGDisplayShowCursor(CGDirectDisplayID d) { [NSCursor unhide]; return kCGErrorSuccess; }
 /* Wayland lets no program move the pointer */
 CGError CGDisplayMoveCursorToPoint(CGDirectDisplayID d, CGPoint point) { return kCGErrorFailure; }
+CGError CGWarpMouseCursorPosition(CGPoint point) { return kCGErrorFailure; }
+CGError CGAssociateMouseAndMouseCursorPosition(boolean_t connected) { return kCGErrorSuccess; }
 CGImageRef CGDisplayCreateImage(CGDirectDisplayID d) { return NULL; }
 CGImageRef CGDisplayCreateImageForRect(CGDirectDisplayID d, CGRect rect) { return NULL; }
 

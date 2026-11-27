@@ -29,6 +29,20 @@ typedef NSObject *dispatch_source_t;
 typedef NSObject *dispatch_data_t;
 typedef NSObject *dispatch_io_t;
 #define DISPATCH_RETURNS_RETAINED __attribute__((ns_returns_retained))
+/* The classes of dispatch objects, by their Mac names (freemac 1.260). On
+ * a Mac, Swift sees a queue as the class OS_dispatch_queue, and an app
+ * built there calls what the Dispatch overlay adds to that class; Ferry's
+ * overlay adds the same (swift/overlays/Dispatch/Mac.swift). */
+@interface OS_dispatch_object : NSObject
+@end
+@interface OS_dispatch_queue : OS_dispatch_object
+@end
+@interface OS_dispatch_group : OS_dispatch_object
+@end
+@interface OS_dispatch_semaphore : OS_dispatch_object
+@end
+@interface OS_dispatch_source : OS_dispatch_object
+@end
 #elif defined(__OBJC__)
 /* As a Mac's os/object.h does: dispatch objects are NSObjects, so anything
  * that includes dispatch (Core Services, Carbon) declares NSObject. */

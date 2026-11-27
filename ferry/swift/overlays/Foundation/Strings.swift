@@ -61,8 +61,19 @@ extension StringProtocol {
         nsSelf.trimmingCharacters(in: set) ?? String(self)
     }
 
-    public func replacingOccurrences<T: StringProtocol, U: StringProtocol>(of target: T, with replacement: U) -> String {
-        nsSelf.replacingOccurrences(of: String(target), with: String(replacement)) ?? String(self)
+    /// With the options and range Apple's Foundation takes (freemac 1.260).
+    public func replacingOccurrences<Target: StringProtocol, Replacement: StringProtocol>(
+        of target: Target, with replacement: Replacement, options: String.CompareOptions = [],
+        range searchRange: Range<String.Index>? = nil
+    ) -> String {
+        if options.isEmpty && searchRange == nil {
+            return nsSelf.replacingOccurrences(of: String(target), with: String(replacement)) ?? String(self)
+        }
+        let r = searchRange ?? startIndex..<endIndex
+        let ns = NSRange(location: utf16.distance(from: startIndex, to: r.lowerBound),
+                         length: utf16.distance(from: r.lowerBound, to: r.upperBound))
+        return nsSelf.replacingOccurrences(of: String(target), with: String(replacement), options: options,
+                                           range: ns) ?? String(self)
     }
 
     public func caseInsensitiveCompare<T: StringProtocol>(_ other: T) -> ComparisonResult {
@@ -89,6 +100,10 @@ extension StringProtocol {
 }
 
 public typealias ComparisonResult = NSComparisonResult
+
+extension String {
+    public typealias CompareOptions = NSStringCompareOptions
+}
 
 /// Characters to trim or split at, as NSCharacterSet holds them.
 public typealias CharacterSet = NSCharacterSet

@@ -71,6 +71,7 @@ AXError AXUIElementCopyActionNames(AXUIElementRef element, CFArrayRef *names);
 AXError AXUIElementPerformAction(AXUIElementRef element, CFStringRef action);
 AXError AXUIElementGetPid(AXUIElementRef element, pid_t *pid);
 AXError AXUIElementSetMessagingTimeout(AXUIElementRef element, float timeoutInSeconds);
+AXError _AXUIElementGetWindow(AXUIElementRef element, uint32_t *windowID); /* a Mac's private call, which window managers use */
 AXError AXUIElementCopyElementAtPosition(AXUIElementRef application, float x, float y, AXUIElementRef *element);
 
 CFTypeID AXValueGetTypeID(void);

@@ -1665,4 +1665,5 @@ __attribute__((constructor)) static void objc_setup(void)
     ferry_objc_nsobject_init();
     ferry_blocks_init();
     ferry_dispatch_init();
+    ferry_oslog_init();
 }

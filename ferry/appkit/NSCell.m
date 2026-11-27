@@ -23,7 +23,7 @@ enum {
     CELL_SELECTABLE = 0x00200000u,
     CELL_SCROLLABLE = 0x00100000u,
     CELL_CONTINUOUS = 0x00080000u,
-    CELL_WRAPS = 0x00000040u,
+    CELL_WRAPS = 0x00000040u, /* written for wrapping cells; read as "truncates the last line" */
 };
 
 static id coder_value(NSCoder *c, NSString *key)
@@ -153,7 +153,17 @@ static void cell_changed(NSCell *cell, NSView *view)
         _lineBreak = (NSLineBreakMode)((f >> 9) & 7);
         _controlSize = (NSControlSize)((f >> 17) & 3);
     }
-    if (!_wraps && _lineBreak == NSLineBreakByWordWrapping)
+    /* A cell wraps when its line break mode is a wrapping one, as Apple
+     * documents wraps and lineBreakMode going together; the 0x40 bit of the
+     * first word is "truncates the last visible line" (freemac 1.260, which
+     * had taken it for wrapping until Rectangle's labels showed otherwise).
+     * A scrolling field never wraps. */
+    if ([coder containsValueForKey:@"NSCellFlags2"]) {
+        BOOL wrapping = _lineBreak == NSLineBreakByWordWrapping || _lineBreak == NSLineBreakByCharWrapping;
+        if (_scrollable && wrapping)
+            _lineBreak = NSLineBreakByClipping;
+        _wraps = wrapping && !_scrollable;
+    } else if (!_wraps && _lineBreak == NSLineBreakByWordWrapping)
         _lineBreak = _scrollable ? NSLineBreakByClipping : NSLineBreakByTruncatingTail;
     if ([coder containsValueForKey:@"NSState"])
         _state = [coder decodeIntegerForKey:@"NSState"];

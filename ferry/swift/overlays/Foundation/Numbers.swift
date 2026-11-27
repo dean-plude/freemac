@@ -284,3 +284,19 @@ extension NSNumber {
     public convenience init(value: Bool) { self.init(bool: value) }
     public convenience init(value: CGFloat) { self.init(double: Double(value)) }
 }
+
+// ---- init(truncating:), as a Mac's Foundation has it (freemac 1.260) -----------------
+
+extension Int { public init(truncating number: __shared NSNumber) { self = number.integerValue } }
+extension UInt { public init(truncating number: __shared NSNumber) { self = UInt(truncatingIfNeeded: number.unsignedLongLongValue) } }
+extension Int8 { public init(truncating number: __shared NSNumber) { self = Int8(truncatingIfNeeded: number.longLongValue) } }
+extension Int16 { public init(truncating number: __shared NSNumber) { self = Int16(truncatingIfNeeded: number.longLongValue) } }
+extension Int32 { public init(truncating number: __shared NSNumber) { self = Int32(truncatingIfNeeded: number.longLongValue) } }
+extension Int64 { public init(truncating number: __shared NSNumber) { self = Int64(number.longLongValue) } }
+extension UInt8 { public init(truncating number: __shared NSNumber) { self = UInt8(truncatingIfNeeded: number.unsignedLongLongValue) } }
+extension UInt16 { public init(truncating number: __shared NSNumber) { self = UInt16(truncatingIfNeeded: number.unsignedLongLongValue) } }
+extension UInt32 { public init(truncating number: __shared NSNumber) { self = UInt32(truncatingIfNeeded: number.unsignedLongLongValue) } }
+extension UInt64 { public init(truncating number: __shared NSNumber) { self = UInt64(number.unsignedLongLongValue) } }
+extension Double { public init(truncating number: __shared NSNumber) { self = number.doubleValue } }
+extension Float { public init(truncating number: __shared NSNumber) { self = Float(number.doubleValue) } }
+extension Bool { public init(truncating number: __shared NSNumber) { self = number.boolValue } }
