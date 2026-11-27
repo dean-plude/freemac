@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Metal: the pixel formats, from Apple's public Metal documentation. Metal/Metal.h
  * includes it; QuartzCore's CAMetalLayer.h includes only this, as on a Mac. */
+/* Ferry submodule: MTLPixelFormat (freemac 1.262), so that a header that brings in
+ * only this one (CAMetalLayer.h) doesn't bring in all of Metal.h with it. */
 #ifndef FERRY_MTLPIXELFORMAT_H
 #define FERRY_MTLPIXELFORMAT_H
 #import <Foundation/Foundation.h>

@@ -37,6 +37,16 @@ Classes:
   SwiftBridge: URLQueryItem
 - Name: NSURLComponents
   SwiftBridge: URLComponents
+- Name: NSCharacterSet
+  SwiftBridge: CharacterSet
+- Name: NSIndexSet
+  SwiftBridge: IndexSet
+- Name: NSIndexPath
+  SwiftBridge: IndexPath
+- Name: NSURLRequest
+  SwiftBridge: URLRequest
+- Name: NSAffineTransform
+  SwiftBridge: AffineTransform
 - Name: NSUserDefaults
   Methods:
   - Selector: "setObject:forKey:"
@@ -110,6 +120,14 @@ Enumerators:
   SwiftName: anchored
 - Name: NSNumericSearch
   SwiftName: numeric
+- Name: NSDiacriticInsensitiveSearch
+  SwiftName: diacriticInsensitive
+- Name: NSWidthInsensitiveSearch
+  SwiftName: widthInsensitive
+- Name: NSForcedOrderingSearch
+  SwiftName: forcedOrdering
+- Name: NSRegularExpressionSearch
+  SwiftName: regularExpression
 - Name: NSRectEdgeMinX
   SwiftName: minX
 - Name: NSRectEdgeMinY
@@ -143,6 +161,9 @@ Globals:
 # Notification.Name, strings wrapped in structs (freemac 1.230); the
 # overlay gives the modes their short member names.
 Typedefs:
+- Name: NSURLResourceKey
+  SwiftWrapper: struct
+  SwiftName: URLResourceKey
 - Name: NSNotificationName
   SwiftWrapper: struct
   SwiftName: NSNotification.Name

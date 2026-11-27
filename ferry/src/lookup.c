@@ -340,6 +340,8 @@ void *ferry_lookup(const char *name)
         if ((addr = find_own(base)))
             return addr;
     }
+    if ((addr = ferry_unwind_lookup(base)))
+        return addr;
     if ((addr = find_passthrough(base)))
         return addr;
     if ((addr = ferry_host_lookup(base)))

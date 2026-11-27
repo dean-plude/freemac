@@ -4,8 +4,8 @@
 # files serves (CoreText, ApplicationServices and ImageIO live in CoreGraphics' file,
 # SystemConfiguration, CoreServices, CFNetwork, ServiceManagement, IOKit and
 # UniformTypeIdentifiers in Foundation's,
-# Cocoa, Quartz, QuickLook, ScriptingBridge, CoreImage, MediaPlayer, CoreMedia, CoreMediaIO and
-# AddressBook in AppKit's, AudioToolbox and AudioUnit in CoreAudio's): the calls the
+# Cocoa, Quartz, QuickLook, ScriptingBridge, CoreImage, MediaPlayer, CoreMedia, CoreMediaIO,
+# VideoToolbox, PIP (a private framework) and AddressBook in AppKit's, AudioToolbox and AudioUnit in CoreAudio's): the calls the
 # files export for that framework, under
 # the framework's own Mac install name. A program linked against it records
 # the framework as a Mac-built one would, and Ferry's loader serves that name
@@ -23,6 +23,7 @@ fi
 framework=$1
 shift
 version=A
+kind=Frameworks
 case $framework in
     CoreText) pattern='^_(CT|kCT)' ;;
     ApplicationServices) pattern='^_(CG|kCG|CT|kCT|GetCurrentProcess$|GetFrontProcess$|GetNextProcess$|GetProcess|SameProcess$|SetFrontProcess|ShowHideProcess$|IsProcessVisible$|TransformProcessType$|CopyProcessName$|ProcessInformationCopyDictionary$|LaunchApplication$|KillProcess$|AX|kAX|Gestalt$|LS[A-Z]|FS[A-Z]|AE[A-Z]|UT[A-Z]|kUT|GetIconRefFromFileInfo$|AcquireIconRef$|ReleaseIconRef$|Create(ObjSpecifier|OffsetDescriptor|CompDescriptor|LogicalDescriptor|RangeDescriptor)$|UpTime$|AbsoluteTo(Nanoseconds|Duration)$|(Nanoseconds|Duration)To(Absolute|Nanoseconds|Duration)$|(Add|Sub)(Absolute|Nanoseconds|Duration)(To|From)Absolute$|AbsoluteDeltaTo)' ;;
@@ -39,6 +40,8 @@ case $framework in
     MediaPlayer) pattern='^_(OBJC_(METACLASS|CLASS)_\$_MP|MP)' ;;
     CoreMedia) pattern='^_(CM|kCM)' ;;
     CoreMediaIO) pattern='^_CMIO' ;;
+    VideoToolbox) pattern='^_(VT|kVT)' ;;
+    PIP) pattern='^_OBJC_(METACLASS|CLASS)_\$_PIPViewController$'; kind=PrivateFrameworks ;;
     AddressBook) pattern='^_(OBJC_(METACLASS|CLASS)_\$_AB|kAB)' ;;
     UserNotifications) pattern='^_(OBJC_(METACLASS|CLASS)_\$_UN|UN)' ;;
     QuickLook) pattern='^_(QL|kQL)' ;;
@@ -55,7 +58,7 @@ esac
     echo '--- !tapi-tbd'
     echo 'tbd-version:     4'
     echo 'targets:         [ x86_64-macos ]'
-    echo "install-name:    '/System/Library/Frameworks/$framework.framework/Versions/$version/$framework'"
+    echo "install-name:    '/System/Library/$kind/$framework.framework/Versions/$version/$framework'"
     echo 'current-version: 1.0.0'
     echo 'exports:'
     echo '  - targets:     [ x86_64-macos ]'

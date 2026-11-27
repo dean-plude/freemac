@@ -215,3 +215,141 @@ CFDictionaryRef IODisplayCreateInfoDictionary(io_service_t framebuffer, IOOption
     (void)options;
     return NULL;
 }
+
+/* ---- power sources (freemac 1.262, for IINA) -------------------------------------- */
+
+/* The batteries this system reports under /sys/class/power_supply, each
+ * described with the keys Apple's IOPowerSources.h documents. */
+static NSString *read_sys(NSString *dir, NSString *name)
+{
+    NSString *s = [NSString stringWithContentsOfFile:[dir stringByAppendingPathComponent:name]
+                                            encoding:NSUTF8StringEncoding error:NULL];
+    return [s stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+}
+
+static BOOL on_ac_power(void)
+{
+    NSString *base = @"/sys/class/power_supply";
+    NSArray *names = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:base error:NULL];
+    BOOL battery = NO;
+    for (NSString *n in names) {
+        NSString *dir = [base stringByAppendingPathComponent:n];
+        NSString *type = read_sys(dir, @"type");
+        if ([type isEqualToString:@"Mains"] && [read_sys(dir, @"online") isEqualToString:@"1"])
+            return YES;
+        if ([type isEqualToString:@"Battery"])
+            battery = YES;
+    }
+    return !battery;
+}
+
+CFTypeRef IOPSCopyPowerSourcesInfo(void)
+{
+    NSMutableArray *list = [NSMutableArray array];
+    NSString *base = @"/sys/class/power_supply";
+    BOOL ac = on_ac_power();
+    for (NSString *n in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:base error:NULL]) {
+        NSString *dir = [base stringByAppendingPathComponent:n];
+        if (![read_sys(dir, @"type") isEqualToString:@"Battery"])
+            continue;
+        NSString *cap = read_sys(dir, @"capacity");
+        NSString *status = read_sys(dir, @"status");
+        [list addObject:@{
+            @"Name": n,
+            @"Type": @"InternalBattery",
+            @"Transport Type": @"Internal",
+            @"Is Present": @YES,
+            @"Current Capacity": @(cap ? [cap intValue] : 100),
+            @"Max Capacity": @100,
+            @"Is Charging": @([status isEqualToString:@"Charging"]),
+            @"Power Source State": ac ? @"AC Power" : @"Battery Power",
+        }];
+    }
+    return (CFTypeRef)[[NSDictionary alloc] initWithObjectsAndKeys:list, @"Sources", @(ac), @"AC", nil];
+}
+
+CFArrayRef IOPSCopyPowerSourcesList(CFTypeRef blob)
+{
+    NSArray *list = [(NSDictionary *)blob objectForKey:@"Sources"];
+    return (CFArrayRef)[(list ? list : @[]) copy];
+}
+
+CFDictionaryRef IOPSGetPowerSourceDescription(CFTypeRef blob, CFTypeRef ps)
+{
+    (void)blob;
+    return [(id)ps isKindOfClass:[NSDictionary class]] ? (CFDictionaryRef)ps : NULL;
+}
+
+CFStringRef IOPSGetProvidingPowerSourceType(CFTypeRef blob)
+{
+    BOOL ac = blob ? [[(NSDictionary *)blob objectForKey:@"AC"] boolValue] : on_ac_power();
+    return (CFStringRef)(ac ? @"AC Power" : @"Battery Power");
+}
+
+/* ---- notification ports and user clients: freemac has no IOKit services to
+ * send notices or take calls, so none come and calls aren't supported. */
+
+typedef struct IONotificationPort *IONotificationPortRef;
+struct IONotificationPort { int unused; };
+
+IONotificationPortRef IONotificationPortCreate(mach_port_t mainPort)
+{
+    (void)mainPort;
+    return calloc(1, sizeof(struct IONotificationPort));
+}
+
+void IONotificationPortDestroy(IONotificationPortRef notify) { free(notify); }
+
+void IONotificationPortSetDispatchQueue(IONotificationPortRef notify, void *queue)
+{
+    (void)notify;
+    (void)queue;
+}
+
+void *IONotificationPortGetRunLoopSource(IONotificationPortRef notify)
+{
+    (void)notify;
+    return NULL;
+}
+
+mach_port_t IONotificationPortGetMachPort(IONotificationPortRef notify)
+{
+    (void)notify;
+    return 0;
+}
+
+kern_return_t IOServiceAddInterestNotification(IONotificationPortRef notifyPort, io_service_t service,
+                                               const char *interestType, void *callback, void *refCon,
+                                               io_object_t *notification)
+{
+    (void)notifyPort; (void)service; (void)interestType; (void)callback; (void)refCon;
+    if (notification)
+        *notification = IO_OBJECT_NULL;
+    return kIOReturnUnsupported;
+}
+
+kern_return_t IOServiceAddMatchingNotification(IONotificationPortRef notifyPort, const char *notificationType,
+                                               CFDictionaryRef matching, void *callback, void *refCon,
+                                               io_iterator_t *notification)
+{
+    (void)notifyPort; (void)notificationType; (void)callback; (void)refCon;
+    if (matching)
+        CFRelease(matching);
+    if (notification)
+        *notification = IO_OBJECT_NULL;
+    return kIOReturnSuccess;
+}
+
+kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector, const uint64_t *input,
+                                  uint32_t inputCnt, const void *inputStruct, size_t inputStructCnt,
+                                  uint64_t *output, uint32_t *outputCnt, void *outputStruct,
+                                  size_t *outputStructCnt)
+{
+    (void)connection; (void)selector; (void)input; (void)inputCnt; (void)inputStruct;
+    (void)inputStructCnt; (void)output; (void)outputStruct;
+    if (outputCnt)
+        *outputCnt = 0;
+    if (outputStructCnt)
+        *outputStructCnt = 0;
+    return kIOReturnUnsupported;
+}

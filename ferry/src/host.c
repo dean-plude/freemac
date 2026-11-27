@@ -116,6 +116,12 @@ static const struct twin {
     /* libcurl (OBS, freemac 1.232): the same calls and layouts on 64-bit Intel */
     {"/usr/lib/libcurl.4.dylib", "libcurl.so.4"},
     {"/usr/lib/libcurl.dylib", "libcurl.so.4"},
+    /* Expat (fontconfig, freemac 1.262): XML_Char is char on both */
+    {"/usr/lib/libexpat.1.dylib", "libexpat.so.1"},
+    {"/usr/lib/libexpat.dylib", "libexpat.so.1"},
+    /* libffi (p11-kit, freemac 1.262): the same types and the same x86-64
+     * calling conventions, numbered alike in libffi's own headers */
+    {"/usr/lib/libffi.dylib", "libffi.so.8"},
     /* ICU's C calls (regular expressions, collation, breaking), which
      * Linux builds name with the version, as uregex_open_74 */
     {"/usr/lib/libicucore.A.dylib", "icu"},
@@ -137,8 +143,8 @@ static void *open_icu(void)
     }
     return NULL;
 }
-static void *twin_handles[16];
-static int twin_linked[16];
+static void *twin_handles[32];
+static int twin_linked[32];
 
 static const char *const takes_a_file[] = {
     "BZ2_bzReadOpen", "BZ2_bzWriteOpen", "xmlDocDump", "xmlDocFormatDump", "xmlElemDump", "xmlBufferDump",

@@ -100,6 +100,7 @@ struct fmlist { struct fmlist *next; uint32_t count; struct fmethod m[]; };
 struct fivar {
     uint64_t *offset;               /* the program's offset variable, or own_offset */
     uint64_t own_offset;
+    uint64_t placed;                /* where realizing put it: Swift's runtime may reset it (freemac 1.262) */
     const char *name, *type;
     uint32_t align_log2, size;
 };
@@ -132,6 +133,7 @@ struct fclass_rt {
     struct fmlist *methods;         /* categories first */
     struct fivar *ivars;
     uint32_t nivars;
+    uint32_t slide;                 /* how far realizing moved the ivars */
     struct fplist *props;
     struct c_protocol **protos;
     uint32_t nprotos;

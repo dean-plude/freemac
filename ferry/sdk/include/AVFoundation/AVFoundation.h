@@ -75,6 +75,17 @@ FOUNDATION_EXPORT AVFileType const AVFileTypeAC3 _FERRY_AV_SWIFT("ac3");
 
 /* capture devices, listed (freemac 1.233, Ferry 0.57.0), and cameras read
  * with capture sessions (freemac 1.257, Ferry 0.80.0) */
+/* CMTime values in an NSValue (AVTime.h on a Mac; freemac 1.262, IINA) */
+#include <CoreMedia/CoreMedia.h>
+@interface NSValue (FerryCMTime)
++ (NSValue *)valueWithCMTime:(CMTime)time;
+@property (readonly) CMTime CMTimeValue;
++ (NSValue *)valueWithCMTimeRange:(CMTimeRange)timeRange;
+@property (readonly) CMTimeRange CMTimeRangeValue;
++ (NSValue *)valueWithCMTimeMapping:(CMTimeMapping)timeMapping;
+@property (readonly) CMTimeMapping CMTimeMappingValue;
+@end
+
 #import <AVFoundation/AVCaptureDevice.h>
 #import <AVFoundation/AVCaptureSession.h>
 

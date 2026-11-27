@@ -3363,3 +3363,35 @@ them with `packaging/build-swift.sh`, which fetches a swift.org toolchain and
 the open-source Swift project's source at the same release (6.1.3) and runs
 `swift/build-runtime.sh` and `swift/build-modules.sh`. A package built
 without them still runs everything but apps written in Swift.
+
+## IINA and what it needed (freemac 1.262, Ferry 0.85.0)
+
+IINA 1.3.5, from its official download, opens a video and plays it. What it
+uses that Ferry didn't have:
+
+- **Swift's Foundation additions.** `Data` and `DataProtocol` come from the
+  open-source swift-foundation project unchanged; `CharacterSet`,
+  `IndexSet`, `IndexPath`, `URLRequest`, `AffineTransform`, `CocoaError`,
+  `URLError`, `LocalizedError` and the string methods are Ferry's own. The
+  Mac's `DispatchQueue(label:)` and `sync` are in the Dispatch overlay.
+- **Key-value observing a Swift object.** The subclass that observing makes
+  copies the Swift class's metadata, so a Swift method called through it
+  finds its table. Swift's metadata setup can move a class's instance
+  variables after Ferry has placed them; Ferry puts them back.
+- **VideoToolbox** is served from AppKit's file. There are no hardware
+  decoders or encoders: making a session fails with the error a missing
+  codec gives, and FFmpeg decodes in software.
+- **Picture in picture.** `PIPViewController` (a private framework on a Mac)
+  moves a view into a small window that floats in the screen's lower right
+  corner, keeping the shape the app asks for; the window's close button asks
+  the app's delegate, which takes the view back.
+- **ColorSync** finds no display profiles, so a player draws in sRGB.
+  **IOKit** power sources describe this system's batteries from
+  /sys/class/power_supply.
+- **Archives.** Swift's own storage behind a bridged array, dictionary, set
+  or string is archived as `NSArray`, `NSDictionary`, `NSSet` or `NSString`,
+  as on a Mac, and an archive naming one is read as that class.
+
+Not there yet: IINA's images from its asset catalog (some buttons are
+blank), gesture recognizers don't fire, and picture in picture's window has
+no play and pause buttons.

@@ -90,6 +90,9 @@ extension NSObject: Equatable, Hashable {
 
     /// -hash, as Objective-C collections use it.
     public func hash(into hasher: inout Hasher) { hasher.combine(self.hash) }
+
+    /// The hash Swift's Set and Dictionary use, from -hash (freemac 1.262).
+    public func _rawHashValue(seed: Int) -> Int { self.hash._rawHashValue(seed: seed) }
 }
 
 extension NSObject: CVarArg {

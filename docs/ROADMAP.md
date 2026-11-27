@@ -1183,6 +1183,23 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.262 "IINA plays video" (done)
+
+Ferry 0.85.0: IINA 1.3.5, the video player written in Swift, runs from its official download and plays a video, picture and sound, in its own player window. It's the second app picked because it looked likely not to work: a large Swift app built on mpv and FFmpeg. Ferry gained what it was missing: more of the Swift additions a Mac's Foundation makes (`Data` and its protocols, `CharacterSet`, `IndexSet`, `URLRequest`, `CocoaError` and `URLError`, string methods), the Mac's shape of `DispatchQueue`, VideoToolbox (no hardware codecs, so FFmpeg decodes in software), picture in picture, ColorSync and power-source calls, window aspect ratios and drags, and gesture recognizers. A Swift object watched with key-value observing no longer crashes, and Swift's array storage is saved in archives as a plain array, as on a Mac.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | Swift overlays: `Data` and `DataProtocol` (from the open-source swift-foundation), the bridged value types, `CocoaError` and `URLError`, more `String` methods, `DispatchQueue` made with a label, for-in over `NSArray` | Ferry Swift | done |
+| 2 | Key-value observing a Swift class: the observing subclass copies Swift's class data; instance variables keep the place realizing gave them | Ferry runtime | done |
+| 3 | VideoToolbox, served from AppKit: sessions fail as a missing codec does, so FFmpeg goes on in software | Ferry AppKit | done |
+| 4 | Picture in picture (`PIPViewController`): a small floating window that keeps the app's view, closed through the app's delegate | Ferry AppKit | done |
+| 5 | Window aspect ratios, window drags, gesture recognizers (kept, not yet fired), `NSValue` with `CMTime` | Ferry AppKit | done |
+| 6 | ColorSync's device profiles (none), power sources from this system's batteries, IOKit notification ports | Ferry | done |
+| 7 | A system framework found by bundle identifier, so mpv finds OpenGL's functions | Ferry Foundation | done |
+| 8 | Swift's private storage classes archive and unarchive as `NSArray` and the like | Ferry Foundation | done |
+| 9 | IINA 1.3.5 opens a video and plays it | Ferry / IINA | done |
+| 10 | Metal, in software (from the Blender work): shaders built when the app runs, so clang and lld are now on the ISO and in Ferry's package | Ferry Metal, packaging | done |
+
 ## 1.261 "Swift apps run from the download" (done)
 
 Ferry 0.84.0: Swift's runtime and Ferry's Swift modules are now in Ferry's package, so they're on every freemac computer. Until now they were built only on the computers Ferry is made on, so a Mac app written in Swift (Rectangle, TomatoBar, apps made with SwiftUI) started there and nowhere else. The release now builds them from the open-source Swift project's source, as `swift/build-runtime.sh` always has, and the package puts them where Ferry looks. The runtime's build had stopped working with a recent change to Ferry's SDK headers; that's fixed.

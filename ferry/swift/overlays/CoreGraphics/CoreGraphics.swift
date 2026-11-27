@@ -128,3 +128,12 @@ extension CGRect {
         self = r
     }
 }
+
+// ---- freemac 1.262 (IINA)
+
+extension CGColor {
+    /// Core Graphics' own black, white and clear colors.
+    public static var black: CGColor { CGColorGetConstantColor(kCGColorBlack)!.takeUnretainedValue() }
+    public static var white: CGColor { CGColorGetConstantColor(kCGColorWhite)!.takeUnretainedValue() }
+    public static var clear: CGColor { CGColorGetConstantColor(kCGColorClear)!.takeUnretainedValue() }
+}

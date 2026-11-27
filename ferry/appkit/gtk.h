@@ -117,6 +117,20 @@ gboolean gdk_event_get_keyval(const GdkEvent *event, unsigned *keyval);
 gboolean gdk_event_get_keycode(const GdkEvent *event, uint16_t *keycode);
 gboolean gdk_event_get_scroll_direction(const GdkEvent *event, int *direction);
 gboolean gdk_event_get_scroll_deltas(const GdkEvent *event, double *dx, double *dy);
+/* freemac 1.262: the event being handled now, its place on the screen,
+ * and moving a window with the pointer and keeping its shape */
+GdkEvent *gtk_get_current_event(void);
+gboolean gdk_event_get_root_coords(const GdkEvent *event, double *x, double *y);
+void gdk_event_free(GdkEvent *event);
+void gtk_window_begin_move_drag(GtkWidget *window, int button, int root_x, int root_y, uint32_t timestamp);
+typedef struct {
+    int min_width, min_height, max_width, max_height, base_width, base_height, width_inc, height_inc;
+    double min_aspect, max_aspect;
+    int win_gravity;
+} GdkGeometry;
+enum { GDK_HINT_ASPECT = 1 << 4 };
+void gtk_window_set_geometry_hints(GtkWidget *window, GtkWidget *geometry_widget, const GdkGeometry *geometry,
+                                   int geom_mask);
 uint32_t gdk_keyval_to_unicode(unsigned keyval);
 unsigned gdk_keyval_to_lower(unsigned keyval);
 

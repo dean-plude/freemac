@@ -1791,6 +1791,13 @@ void dispatch_source_merge_data(struct dobj *s, unsigned long value)
 
 /* ---- setup ------------------------------------------------------------------ */
 
+static id q_init_with_queue(id self, SEL _cmd, id queue)
+{
+    (void)_cmd;
+    objc_release(self);
+    return objc_retain(queue);
+}
+
 void ferry_dispatch_init(void)
 {
     static const struct fmethod methods[] = {
@@ -1800,9 +1807,14 @@ void ferry_dispatch_init(void)
                           sizeof(struct dobj), methods, 1, NULL, 0, 0);
     static const char *const kinds[4] = {"OS_dispatch_queue", "OS_dispatch_group", "OS_dispatch_semaphore",
                                          "OS_dispatch_source"};
+    /* -initWithFerryQueue: (freemac 1.262), which Swift's DispatchQueue(label:...) on OS_dispatch_queue calls
+     * after +alloc: the queue Ferry made takes the place of the empty one */
+    static const struct fmethod queue_methods[] = {
+        M("initWithFerryQueue:", "@24@0:8@16", q_init_with_queue),
+    };
     for (int i = 0; i < 4; i++)
-        ferry_objc_make_class(&kind_class[i], &kind_meta[i], &dispatch_class, kinds[i], sizeof(struct dobj), NULL,
-                              0, NULL, 0, 0);
+        ferry_objc_make_class(&kind_class[i], &kind_meta[i], &dispatch_class, kinds[i], sizeof(struct dobj),
+                              i == K_QUEUE ? queue_methods : NULL, i == K_QUEUE ? 1 : 0, NULL, 0, 0);
     ferry_objc_make_class(&static_class, &static_meta, &kind_class[K_QUEUE], "OS_dispatch_queue_main",
                           sizeof(struct dobj), ferry_static_rr_methods, ferry_static_rr_count, NULL, 0,
                           RT_STATIC_INSTANCES);
