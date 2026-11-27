@@ -367,14 +367,30 @@ static const char **cstrings(NSArray *strings)
     return YES;
 }
 
+#define FOLDER_RESPONSE 1
+- (BOOL)_choosesFilesAndFolders { return NO; }
+
 - (NSModalResponse)_runChooser
 {
     int action = [self _action];
     NSString *title = [self title];
     if (![title length] || [title isEqualToString:@"Window"])
         title = _message ?: [self _defaultTitle];
-    GtkFileChooserNative *chooser = gtk_file_chooser_native_new(
-        [title UTF8String], NULL, action, [(_prompt ?: [self _defaultTitle]) UTF8String], "Cancel");
+    /* an Open panel for files and folders: a dialog with a button that
+     * chooses the folder that's selected, or the one being shown */
+    BOOL both = [self _choosesFilesAndFolders];
+    void *chooser;
+    if (both) {
+        chooser = gtk_file_chooser_dialog_new([title UTF8String], NULL, action, NULL, NULL);
+        if (chooser) {
+            gtk_dialog_add_button(chooser, "Cancel", GTK_RESPONSE_CANCEL);
+            gtk_dialog_add_button(chooser, "Choose Folder", FOLDER_RESPONSE);
+            gtk_dialog_add_button(chooser, [(_prompt ?: [self _defaultTitle]) UTF8String], GTK_RESPONSE_ACCEPT);
+        }
+    } else {
+        chooser = gtk_file_chooser_native_new([title UTF8String], NULL, action,
+                                              [(_prompt ?: [self _defaultTitle]) UTF8String], "Cancel");
+    }
     if (!chooser)
         return NSModalResponseCancel;
     gtk_file_chooser_set_select_multiple(chooser, [self _multiple]);
@@ -413,7 +429,8 @@ static const char **cstrings(NSArray *strings)
     [self _addChoices:choices toChooser:chooser];
     NSModalResponse answer = NSModalResponseCancel;
     for (;;) {
-        if (gtk_native_dialog_run(chooser) != GTK_RESPONSE_ACCEPT)
+        int response = both ? gtk_dialog_run(chooser) : gtk_native_dialog_run(chooser);
+        if (response != GTK_RESPONSE_ACCEPT && response != FOLDER_RESPONSE)
             break;
         [self _takeChoices:choices fromChooser:chooser];
         NSMutableArray *paths = [NSMutableArray array];
@@ -424,13 +441,33 @@ static const char **cstrings(NSArray *strings)
             g_free(n->data);
         }
         g_slist_free(names);
+        if (response == FOLDER_RESPONSE) {
+            NSMutableArray *dirs = [NSMutableArray array];
+            for (NSString *p in paths) {
+                BOOL dir = NO;
+                if ([[NSFileManager defaultManager] fileExistsAtPath:p isDirectory:&dir] && dir)
+                    [dirs addObject:p];
+            }
+            if (![dirs count]) {
+                char *here = gtk_file_chooser_get_current_folder(chooser);
+                if (here) {
+                    [dirs addObject:[[NSFileManager defaultManager] stringWithFileSystemRepresentation:here
+                                                                                                length:strlen(here)]];
+                    g_free(here);
+                }
+            }
+            paths = dirs;
+        }
         if ([self _accept:paths]) {
             answer = NSModalResponseOK;
             break;
         }
         NSBeep(); /* the delegate turned it down: ask again */
     }
-    g_object_unref(chooser);
+    if (both)
+        gtk_widget_destroy(chooser);
+    else
+        g_object_unref(chooser);
     return answer;
 }
 
@@ -533,10 +570,9 @@ static const char **cstrings(NSArray *strings)
 {
     if (_dirs && !_files)
         return GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER;
-    if (_dirs)
-        AWarnOnce("an Open panel choosing both files and folders (it chooses files)");
     return GTK_FILE_CHOOSER_ACTION_OPEN;
 }
+- (BOOL)_choosesFilesAndFolders { return _files && _dirs; }
 - (BOOL)_multiple { return _multipleSelection; }
 - (NSString *)_defaultTitle { return @"Open"; }
 

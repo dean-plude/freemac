@@ -116,6 +116,8 @@ NSData *FWriteXMLPlist(id plist);
 
 /* Paths for Mac folders on freemac */
 NSString *FHome(void);
+/* a volume key's value for a file (CFQtCore.m); *known says the key is one */
+id FVolumeResourceValue(NSString *path, NSString *key, BOOL *known);
 NSString *FConfigHome(void);
 NSString *FUserFolder(NSSearchPathDirectory dir);
 

@@ -882,6 +882,36 @@ Class *objc_copyClassList(unsigned *out)
     return list;
 }
 
+/* the names of the classes a binary defines (Sparkle's installer looks up
+ * its own; freemac 1.264); the caller frees the list, not the names */
+const char **objc_copyClassNamesForImage(const char *image, unsigned *out)
+{
+    unsigned n = 0, k = 0;
+    Class *all = objc_copyClassList(&n);
+    const char **names = calloc(n + 1, sizeof *names);
+    char want[4096];
+    if (!image || !realpath(image, want))
+        snprintf(want, sizeof want, "%s", image ? image : "");
+    for (unsigned i = 0; i < n && names; i++) {
+        const char *path = class_rt(all[i])->image;
+        char real[4096];
+        if (!path)
+            continue;
+        if (!realpath(path, real))
+            snprintf(real, sizeof real, "%s", path);
+        if (!strcmp(real, want))
+            names[k++] = class_rt(all[i])->name;
+    }
+    free(all);
+    if (out)
+        *out = k;
+    if (!k) {
+        free(names);
+        return NULL;
+    }
+    return names;
+}
+
 const char *class_getName(Class cls) { return cls ? class_rt(cls)->name : "nil"; }
 Class class_getSuperclass(Class cls) { return cls ? cls->superclass : NULL; }
 BOOL class_isMetaClass(Class cls) { return cls && (class_rt(cls)->flags & RT_META); }
@@ -1170,6 +1200,20 @@ Class objc_allocateClassPair(Class superclass, const char *name, size_t extra)
                           NULL, 0, NULL, 0, RT_CONSTRUCTING);
     if (swift)
         cls->bits = 2;
+    return cls;
+}
+
+/* objc_allocateClassPair in memory the caller gives (the class and its
+ * metaclass), as Sparkle's runtime helpers do (freemac 1.264) */
+Class objc_initializeClassPair(Class superclass, const char *name, Class cls, Class meta)
+{
+    if (!name || !cls || !meta || objc_getClass(name))
+        return NULL;
+    memset(cls, 0, sizeof *cls);
+    memset(meta, 0, sizeof *meta);
+    ferry_objc_make_class(cls, meta, superclass, strdup(name),
+                          superclass ? class_rt(superclass)->instance_size : sizeof(Class),
+                          NULL, 0, NULL, 0, RT_CONSTRUCTING);
     return cls;
 }
 

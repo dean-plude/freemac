@@ -18,11 +18,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <linux/fs.h>
+#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/xattr.h>
 #include <unistd.h>
 
 #include "ferry.h"
+
+#define MAC_AT_FDCWD (-2) /* a Mac's AT_FDCWD */
 
 #define CF_ACL (1u << 0)
 #define CF_STAT (1u << 1)
@@ -36,15 +40,101 @@
 #define CF_MOVE (1u << 20)
 #define CF_UNLINK (1u << 21)
 
+/* What a copy records for copyfile_state_get: the two ends, the status
+ * callback the program set (Ferry doesn't call it: a copy runs to the end
+ * in one go) and how many bytes of data were copied. */
 struct copyfile_state {
-    int unused;
+    int src_fd, dst_fd;
+    char *src_name, *dst_name;
+    void *status_cb, *status_ctx;
+    int64_t copied;
 };
 
-static void *mac_copyfile_state_alloc(void) { return calloc(1, sizeof(struct copyfile_state)); }
-static int mac_copyfile_state_free(void *s)
+#define STATE_SRC_FD 1
+#define STATE_SRC_FILENAME 2
+#define STATE_DST_FD 3
+#define STATE_DST_FILENAME 4
+#define STATE_QUARANTINE 5
+#define STATE_STATUS_CB 6
+#define STATE_STATUS_CTX 7
+#define STATE_COPIED 8
+#define STATE_XATTRNAME 9
+#define STATE_WAS_CLONED 10
+
+static void *mac_copyfile_state_alloc(void)
 {
+    struct copyfile_state *s = calloc(1, sizeof *s);
+    if (s)
+        s->src_fd = s->dst_fd = -1;
+    return s;
+}
+
+static int mac_copyfile_state_free(void *p)
+{
+    struct copyfile_state *s = p;
+    if (s) {
+        free(s->src_name);
+        free(s->dst_name);
+    }
     free(s);
     return 0;
+}
+
+static void set_name(char **slot, const char *name)
+{
+    free(*slot);
+    *slot = name ? strdup(name) : NULL;
+}
+
+static int mac_copyfile_state_get(void *p, uint32_t flag, void *dst)
+{
+    struct copyfile_state *s = p;
+    if (!s || !dst) {
+        errno = EINVAL;
+        return -1;
+    }
+    switch (flag) {
+    case STATE_SRC_FD: *(int *)dst = s->src_fd; return 0;
+    case STATE_DST_FD: *(int *)dst = s->dst_fd; return 0;
+    case STATE_SRC_FILENAME: *(const char **)dst = s->src_name; return 0;
+    case STATE_DST_FILENAME: *(const char **)dst = s->dst_name; return 0;
+    case STATE_STATUS_CB: *(void **)dst = s->status_cb; return 0;
+    case STATE_STATUS_CTX: *(void **)dst = s->status_ctx; return 0;
+    case STATE_COPIED: *(int64_t *)dst = s->copied; return 0;
+    case STATE_XATTRNAME: *(const char **)dst = NULL; return 0;
+    case STATE_WAS_CLONED: *(_Bool *)dst = 0; return 0;
+    case STATE_QUARANTINE: *(void **)dst = NULL; return 0;
+    }
+    errno = EINVAL;
+    return -1;
+}
+
+static int mac_copyfile_state_set(void *p, uint32_t flag, const void *src)
+{
+    struct copyfile_state *s = p;
+    if (!s || (!src && flag != STATE_STATUS_CB && flag != STATE_STATUS_CTX && flag != STATE_QUARANTINE)) {
+        errno = EINVAL;
+        return -1;
+    }
+    switch (flag) {
+    case STATE_SRC_FD: s->src_fd = *(const int *)src; return 0;
+    case STATE_DST_FD: s->dst_fd = *(const int *)src; return 0;
+    case STATE_SRC_FILENAME: set_name(&s->src_name, src); return 0;
+    case STATE_DST_FILENAME: set_name(&s->dst_name, src); return 0;
+    case STATE_STATUS_CB: s->status_cb = (void *)src; return 0;
+    case STATE_STATUS_CTX: s->status_ctx = (void *)src; return 0;
+    case STATE_QUARANTINE: return 0;
+    }
+    errno = EINVAL;
+    return -1;
+}
+
+/* After a copy: how much data the destination now holds. */
+static void note_copied(struct copyfile_state *s, int to)
+{
+    struct stat st;
+    if (s && to >= 0 && fstat(to, &st) == 0 && S_ISREG(st.st_mode))
+        s->copied = st.st_size;
 }
 
 static int copy_data(int from, int to)
@@ -136,10 +226,17 @@ static int fd_copy(int from, int to, uint32_t flags)
 
 static int mac_fcopyfile(int from, int to, void *state, uint32_t flags)
 {
-    (void)state;
+    struct copyfile_state *s = state;
     if (flags & CF_CHECK)
         return (int)(flags & (CF_STAT | CF_XATTR | CF_DATA));
-    return fd_copy(from, to, flags) < 0 ? -1 : 0;
+    if (s) {
+        s->src_fd = from;
+        s->dst_fd = to;
+    }
+    if (fd_copy(from, to, flags) < 0)
+        return -1;
+    note_copied(s, to);
+    return 0;
 }
 
 static int path_copy(const char *from, const char *to, uint32_t flags);
@@ -219,10 +316,14 @@ static int path_copy(const char *from, const char *to, uint32_t flags)
 
 static int mac_copyfile(const char *from, const char *to, void *state, uint32_t flags)
 {
-    (void)state;
+    struct copyfile_state *s = state;
     if (!from || !to) {
         errno = EINVAL;
         return -1;
+    }
+    if (s) {
+        set_name(&s->src_name, from);
+        set_name(&s->dst_name, to);
     }
     if (flags & CF_CHECK)
         return (int)(flags & (CF_STAT | CF_XATTR | CF_DATA));
@@ -237,6 +338,9 @@ static int mac_copyfile(const char *from, const char *to, void *state, uint32_t 
     }
     if (path_copy(from, to, flags) < 0)
         return -1;
+    struct stat done;
+    if (s && stat(to, &done) == 0 && S_ISREG(done.st_mode))
+        s->copied = done.st_size;
     if (flags & CF_UNLINK) {
         struct stat st;
         if (lstat(from, &st) == 0 && S_ISDIR(st.st_mode))
@@ -246,10 +350,72 @@ static int mac_copyfile(const char *from, const char *to, void *state, uint32_t 
     return 0;
 }
 
+/* clonefile(2): a copy that shares the original's blocks until either is
+ * changed. Where the disk can (btrfs, XFS) the file is cloned with FICLONE;
+ * elsewhere, and for folders, it fails with ENOTSUP, which tells Mac
+ * programs to copy the usual way. The new file mustn't exist yet. */
+#define CLONE_NOFOLLOW 0x1
+#define CLONE_NOOWNERCOPY 0x2
+
+static int clone_fd(int src, int dirfd, const char *to, uint32_t flags)
+{
+    struct stat st;
+    if (fstat(src, &st) < 0)
+        return -1;
+    if (!S_ISREG(st.st_mode)) {
+        errno = EOPNOTSUPP;
+        return -1;
+    }
+    int t = openat(dirfd, to, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, st.st_mode & 07777);
+    if (t < 0)
+        return -1;
+    if (ioctl(t, FICLONE, src) < 0) {
+        close(t);
+        unlinkat(dirfd, to, 0);
+        errno = EOPNOTSUPP;
+        return -1;
+    }
+    if (!(flags & CLONE_NOOWNERCOPY) && fchown(t, st.st_uid, st.st_gid) < 0) {
+        /* not the owner: the clone stays the caller's, as on a Mac */
+    }
+    struct timespec times[2] = {st.st_atim, st.st_mtim};
+    futimens(t, times);
+    close(t);
+    return 0;
+}
+
+static int mac_fclonefileat(int src, int dirfd, const char *to, uint32_t flags)
+{
+    return clone_fd(src, dirfd == MAC_AT_FDCWD ? AT_FDCWD : dirfd, to, flags);
+}
+
+static int mac_clonefileat(int srcdir, const char *from, int dstdir, const char *to, uint32_t flags)
+{
+    int f = openat(srcdir == MAC_AT_FDCWD ? AT_FDCWD : srcdir, from,
+                   O_RDONLY | O_CLOEXEC | ((flags & CLONE_NOFOLLOW) ? O_NOFOLLOW : 0));
+    if (f < 0)
+        return -1;
+    int r = clone_fd(f, dstdir == MAC_AT_FDCWD ? AT_FDCWD : dstdir, to, flags);
+    int e = errno;
+    close(f);
+    errno = e;
+    return r;
+}
+
+static int mac_clonefile(const char *from, const char *to, uint32_t flags)
+{
+    return mac_clonefileat(MAC_AT_FDCWD, from, MAC_AT_FDCWD, to, flags);
+}
+
 const struct ferry_symbol ferry_copyfile_symbols[] = {
     {"copyfile", mac_copyfile},
     {"fcopyfile", mac_fcopyfile},
     {"copyfile_state_alloc", mac_copyfile_state_alloc},
     {"copyfile_state_free", mac_copyfile_state_free},
+    {"copyfile_state_get", mac_copyfile_state_get},
+    {"copyfile_state_set", mac_copyfile_state_set},
+    {"clonefile", mac_clonefile},
+    {"clonefileat", mac_clonefileat},
+    {"fclonefileat", mac_fclonefileat},
     {NULL, NULL},
 };

@@ -1,0 +1,23 @@
+AAC encoder: made
+rate control mode set: yes
+bit rates: 14, from 32000 to 320000
+bit rate set: yes
+bit rate: 160000
+frames per packet: 1024, bytes per packet: 0
+largest packet: 1536
+priming frames: some
+cookie: given, ES descriptor: yes, decoder info inside: yes
+encoded: yes, packets: a second's worth
+size near the bit rate: yes
+AAC decoder: made
+cookie taken: yes
+decoded: all of it
+the tone comes back: yes
+Apple Lossless encoder: made
+lossless frames per packet: 4096
+bit rate offered: no
+lossless cookie: 24 bytes
+lossless encoded: yes, smaller: yes
+lossless decoded: 48000 frames, the same: yes
+QDesign: not supported
+exit=0

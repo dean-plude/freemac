@@ -176,6 +176,21 @@ BOOL NSEqualRects(NSRect a, NSRect b);
 BOOL NSIsEmptyRect(NSRect r);
 NSRect NSInsetRect(NSRect r, CGFloat dx, CGFloat dy);
 NSRect NSIntegralRect(NSRect r);
+typedef NS_OPTIONS(unsigned long long, NSAlignmentOptions) {
+    NSAlignMinXInward = 1ULL << 0, NSAlignMinYInward = 1ULL << 1, NSAlignMaxXInward = 1ULL << 2,
+    NSAlignMaxYInward = 1ULL << 3, NSAlignWidthInward = 1ULL << 4, NSAlignHeightInward = 1ULL << 5,
+    NSAlignMinXOutward = 1ULL << 8, NSAlignMinYOutward = 1ULL << 9, NSAlignMaxXOutward = 1ULL << 10,
+    NSAlignMaxYOutward = 1ULL << 11, NSAlignWidthOutward = 1ULL << 12, NSAlignHeightOutward = 1ULL << 13,
+    NSAlignMinXNearest = 1ULL << 16, NSAlignMinYNearest = 1ULL << 17, NSAlignMaxXNearest = 1ULL << 18,
+    NSAlignMaxYNearest = 1ULL << 19, NSAlignWidthNearest = 1ULL << 20, NSAlignHeightNearest = 1ULL << 21,
+    NSAlignRectFlipped = 1ULL << 63,
+    NSAlignAllEdgesInward = NSAlignMinXInward | NSAlignMaxXInward | NSAlignMinYInward | NSAlignMaxYInward,
+    NSAlignAllEdgesOutward = NSAlignMinXOutward | NSAlignMaxXOutward | NSAlignMinYOutward | NSAlignMaxYOutward,
+    NSAlignAllEdgesNearest = NSAlignMinXNearest | NSAlignMaxXNearest | NSAlignMinYNearest | NSAlignMaxYNearest,
+};
+/* r with each edge (or its width and height) moved to a whole number: in,
+ * out or to the nearest, as the options say. */
+NSRect NSIntegralRectWithOptions(NSRect r, NSAlignmentOptions options);
 NSRect NSUnionRect(NSRect a, NSRect b);
 NSRect NSIntersectionRect(NSRect a, NSRect b);
 NSRect NSOffsetRect(NSRect r, CGFloat dx, CGFloat dy);
@@ -1223,7 +1238,7 @@ typedef NS_OPTIONS(NSUInteger, NSDataBase64DecodingOptions) {
 
 /* Named zones come from this system's time zone database. NSLocale knows
  * identifiers only: Ferry formats everything in English (United States). */
-@interface NSTimeZone : NSObject <NSCopying>
+@interface NSTimeZone : NSObject <NSCopying, NSSecureCoding>
 + (NSTimeZone *)systemTimeZone;
 + (void)resetSystemTimeZone;
 @property (class, readonly, strong) NSTimeZone * FERRY_SWIFT_NONNULL defaultTimeZone;
@@ -1280,7 +1295,7 @@ FOUNDATION_EXPORT NSLocaleKey const NSLocaleCurrencyCode;
 FOUNDATION_EXPORT NSLocaleKey const NSLocaleCurrencySymbol;
 FOUNDATION_EXPORT NSString *const NSCurrentLocaleDidChangeNotification;
 
-@interface NSLocale : NSObject <NSCopying>
+@interface NSLocale : NSObject <NSCopying, NSSecureCoding>
 @property (class, readonly, strong) NSLocale * FERRY_SWIFT_NONNULL currentLocale;
 @property (class, readonly, strong) NSLocale * FERRY_SWIFT_NONNULL autoupdatingCurrentLocale;
 + (NSLocale *)systemLocale;
@@ -2297,6 +2312,10 @@ FOUNDATION_EXPORT NSURLResourceKey const NSURLIsUserImmutableKey;
  * space is the same for important and opportunistic use */
 FOUNDATION_EXPORT NSURLResourceKey const NSURLVolumeTotalCapacityKey, NSURLVolumeAvailableCapacityKey,
     NSURLVolumeAvailableCapacityForImportantUsageKey, NSURLVolumeAvailableCapacityForOpportunisticUsageKey;
+/* the volume a file is on: its mount point, name (the system disk is
+ * "Macintosh HD"), whether it is read-only, tells case apart, or comes out */
+FOUNDATION_EXPORT NSURLResourceKey const NSURLVolumeURLKey, NSURLVolumeNameKey, NSURLVolumeLocalizedNameKey,
+    NSURLVolumeIsReadOnlyKey, NSURLVolumeSupportsCaseSensitiveNamesKey, NSURLVolumeIsRemovableKey;
 FOUNDATION_EXPORT NSString *const NSURLFileResourceTypeNamedPipe, *const NSURLFileResourceTypeCharacterSpecial,
     *const NSURLFileResourceTypeDirectory, *const NSURLFileResourceTypeBlockSpecial,
     *const NSURLFileResourceTypeRegular, *const NSURLFileResourceTypeSymbolicLink,
@@ -2313,6 +2332,9 @@ FOUNDATION_EXPORT NSString *const NSURLFileResourceTypeNamedPipe, *const NSURLFi
 - (NSURL *)fileReferenceURL;
 @property (readonly, copy) NSURL *filePathURL;
 - (BOOL)checkResourceIsReachableAndReturnError:(NSError **)error;
+- (void)removeCachedResourceValueForKey:(NSURLResourceKey)key;
+- (void)removeAllCachedResourceValues;
+- (void)setTemporaryResourceValue:(id)value forKey:(NSURLResourceKey)key;
 - (BOOL)getResourceValue:(id *)value forKey:(NSURLResourceKey)key error:(NSError **)error;
 - (NSDictionary<NSURLResourceKey, id> *)resourceValuesForKeys:(NSArray<NSURLResourceKey> *)keys error:(NSError **)error;
 - (BOOL)setResourceValue:(id)value forKey:(NSURLResourceKey)key error:(NSError **)error;

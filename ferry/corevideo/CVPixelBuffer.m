@@ -14,6 +14,7 @@
  * without ARC. */
 #import <Foundation/Foundation.h>
 #import <CoreVideo/CoreVideo.h>
+#include <objc/message.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1285,3 +1286,205 @@ void CVOpenGLTextureCacheFlush(CVOpenGLTextureCacheRef cache, CVOptionFlags opti
         delete_dead_locked(c);
     pthread_mutex_unlock(&c->_lock);
 }
+
+/* ---- Metal texture caches (freemac 1.264, HandBrake) --------------------------------- */
+
+/* A texture made from a pixel buffer (or one plane of it) on the program's
+ * own Metal device. Ferry's Metal draws in memory, so the cache copies the
+ * buffer's pixels into a new texture when it is made, where a Mac shares
+ * the buffer's memory with the GPU: a buffer filled after its texture was
+ * made needs a new texture to show the change. Metal is called through
+ * the Objective-C runtime, so Core Video doesn't need to link it. */
+typedef struct {
+    NSUInteger x, y, z;
+} FerryMTLOrigin;
+typedef struct {
+    NSUInteger width, height, depth;
+} FerryMTLSize;
+typedef struct {
+    FerryMTLOrigin origin;
+    FerryMTLSize size;
+} FerryMTLRegion;
+
+@interface FerryCVMetalTextureCache : NSObject {
+  @public
+    id _device;
+    NSDictionary *_attributes;
+}
+@end
+@implementation FerryCVMetalTextureCache
+- (void)dealloc
+{
+    [_device release];
+    [_attributes release];
+    [super dealloc];
+}
+@end
+
+@interface FerryCVMetalTexture : FerryCVBuffer {
+  @public
+    id _texture;
+    CVImageBufferRef _image;
+    size_t _width, _height;
+}
+@end
+@implementation FerryCVMetalTexture
+- (void)dealloc
+{
+    [_texture release];
+    if (_image)
+        CFRelease(_image);
+    [super dealloc];
+}
+@end
+
+#define MTEX(ref) ((FerryCVMetalTexture *)(ref))
+static BOOL is_mtex(CVMetalTextureRef t) { return t && [(id)t isKindOfClass:[FerryCVMetalTexture class]]; }
+
+CFTypeID CVMetalTextureCacheGetTypeID(void) { return (CFTypeID)[FerryCVMetalTextureCache class]; }
+CFTypeID CVMetalTextureGetTypeID(void) { return (CFTypeID)[FerryCVMetalTexture class]; }
+
+CVReturn CVMetalTextureCacheCreate(CFAllocatorRef allocator, CFDictionaryRef cacheAttributes, id<MTLDevice> device,
+                                   CFDictionaryRef textureAttributes, CVMetalTextureCacheRef *out)
+{
+    (void)allocator;
+    (void)cacheAttributes;
+    if (!out)
+        return kCVReturnInvalidArgument;
+    *out = NULL;
+    if (!device || ![(id)device respondsToSelector:@selector(newTextureWithDescriptor:)])
+        return kCVReturnInvalidArgument;
+    FerryCVMetalTextureCache *c = [[FerryCVMetalTextureCache alloc] init];
+    c->_device = [(id)device retain];
+    c->_attributes = [(NSDictionary *)textureAttributes copy];
+    *out = (CVMetalTextureCacheRef)c;
+    return kCVReturnSuccess;
+}
+
+CVReturn CVMetalTextureCacheCreateTextureFromImage(CFAllocatorRef allocator, CVMetalTextureCacheRef cache,
+                                                   CVImageBufferRef image, CFDictionaryRef textureAttributes,
+                                                   unsigned long pixelFormat, size_t width, size_t height,
+                                                   size_t planeIndex, CVMetalTextureRef *out)
+{
+    (void)allocator;
+    (void)textureAttributes;
+    if (!out)
+        return kCVReturnInvalidArgument;
+    *out = NULL;
+    if (!cache || ![(id)cache isKindOfClass:[FerryCVMetalTextureCache class]] || !is_pb(image) || !width || !height)
+        return kCVReturnInvalidArgument;
+    FerryCVMetalTextureCache *c = (FerryCVMetalTextureCache *)cache;
+    Class descClass = NSClassFromString(@"MTLTextureDescriptor");
+    if (!descClass)
+        return kCVReturnUnsupported;
+    BOOL planar = CVPixelBufferIsPlanar(image);
+    if (planar ? planeIndex >= CVPixelBufferGetPlaneCount(image) : planeIndex != 0)
+        return kCVReturnInvalidArgument;
+    id (*descriptor)(id, SEL, NSUInteger, NSUInteger, NSUInteger, BOOL) = (void *)objc_msgSend;
+    id d = descriptor(descClass, @selector(texture2DDescriptorWithPixelFormat:width:height:mipmapped:), pixelFormat,
+                      width, height, NO);
+    if (!d)
+        return kCVReturnInvalidPixelFormat;
+    void (*set_usage)(id, SEL, NSUInteger) = (void *)objc_msgSend;
+    set_usage(d, @selector(setUsage:), 0x1 | 0x2); /* shader read and write */
+    id texture = [c->_device performSelector:@selector(newTextureWithDescriptor:) withObject:d];
+    if (!texture)
+        return kCVReturnInvalidPixelFormat;
+    if (CVPixelBufferLockBaseAddress(image, kCVPixelBufferLock_ReadOnly) != kCVReturnSuccess) {
+        [texture release];
+        return kCVReturnError;
+    }
+    const void *base = planar ? CVPixelBufferGetBaseAddressOfPlane(image, planeIndex) : CVPixelBufferGetBaseAddress(image);
+    size_t row = planar ? CVPixelBufferGetBytesPerRowOfPlane(image, planeIndex) : CVPixelBufferGetBytesPerRow(image);
+    size_t have_w = planar ? CVPixelBufferGetWidthOfPlane(image, planeIndex) : CVPixelBufferGetWidth(image);
+    size_t have_h = planar ? CVPixelBufferGetHeightOfPlane(image, planeIndex) : CVPixelBufferGetHeight(image);
+    if (base) {
+        FerryMTLRegion r = {{0, 0, 0}, {width < have_w ? width : have_w, height < have_h ? height : have_h, 1}};
+        void (*replace)(id, SEL, FerryMTLRegion, NSUInteger, const void *, NSUInteger) = (void *)objc_msgSend;
+        replace(texture, @selector(replaceRegion:mipmapLevel:withBytes:bytesPerRow:), r, 0, base, row);
+    }
+    CVPixelBufferUnlockBaseAddress(image, kCVPixelBufferLock_ReadOnly);
+    FerryCVMetalTexture *t = [[FerryCVMetalTexture alloc] init];
+    t->_texture = texture;
+    t->_image = (CVImageBufferRef)CFRetain(image);
+    t->_width = width;
+    t->_height = height;
+    CVBufferPropagateAttachments(image, (CVBufferRef)t);
+    *out = (CVMetalTextureRef)t;
+    return kCVReturnSuccess;
+}
+
+void CVMetalTextureCacheFlush(CVMetalTextureCacheRef cache, CVOptionFlags options)
+{
+    (void)cache;
+    (void)options; /* each texture is let go when the program releases it */
+}
+
+id<MTLTexture> CVMetalTextureGetTexture(CVMetalTextureRef t) { return is_mtex(t) ? MTEX(t)->_texture : nil; }
+/* the texture's first row is the image's top one, as Metal reads it */
+Boolean CVMetalTextureIsFlipped(CVMetalTextureRef t) { (void)t; return false; }
+void CVMetalTextureGetCleanTexCoords(CVMetalTextureRef t, float ll[2], float lr[2], float ur[2], float ul[2])
+{
+    float w = is_mtex(t) ? 1.0f : 0, h = is_mtex(t) ? 1.0f : 0;
+    if (ll)
+        ll[0] = 0, ll[1] = h;
+    if (lr)
+        lr[0] = w, lr[1] = h;
+    if (ur)
+        ur[0] = w, ur[1] = 0;
+    if (ul)
+        ul[0] = 0, ul[1] = 0;
+}
+
+/* ---- the numbers video files use for colour (ITU-T H.273) ---------------------------- */
+
+struct code_point {
+    int code;
+    const CFStringRef *name;
+};
+
+static const struct code_point primaries[] = {
+    {1, &kCVImageBufferColorPrimaries_ITU_R_709_2}, {5, &kCVImageBufferColorPrimaries_EBU_3213},
+    {6, &kCVImageBufferColorPrimaries_SMPTE_C},     {7, &kCVImageBufferColorPrimaries_SMPTE_C},
+    {9, &kCVImageBufferColorPrimaries_ITU_R_2020},  {11, &kCVImageBufferColorPrimaries_DCI_P3},
+    {12, &kCVImageBufferColorPrimaries_P3_D65},     {22, &kCVImageBufferColorPrimaries_P22},
+    {0, NULL},
+};
+static const struct code_point transfers[] = {
+    {1, &kCVImageBufferTransferFunction_ITU_R_709_2},       {6, &kCVImageBufferTransferFunction_ITU_R_709_2},
+    {7, &kCVImageBufferTransferFunction_SMPTE_240M_1995},   {8, &kCVImageBufferTransferFunction_Linear},
+    {13, &kCVImageBufferTransferFunction_sRGB},             {14, &kCVImageBufferTransferFunction_ITU_R_2020},
+    {15, &kCVImageBufferTransferFunction_ITU_R_2020},       {16, &kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ},
+    {17, &kCVImageBufferTransferFunction_SMPTE_ST_428_1},   {18, &kCVImageBufferTransferFunction_ITU_R_2100_HLG},
+    {0, NULL},
+};
+static const struct code_point matrices[] = {
+    {1, &kCVImageBufferYCbCrMatrix_ITU_R_709_2}, {5, &kCVImageBufferYCbCrMatrix_ITU_R_601_4},
+    {6, &kCVImageBufferYCbCrMatrix_ITU_R_601_4}, {7, &kCVImageBufferYCbCrMatrix_SMPTE_240M_1995},
+    {9, &kCVImageBufferYCbCrMatrix_ITU_R_2020},  {0, NULL},
+};
+
+static CFStringRef name_for(const struct code_point *t, int code)
+{
+    for (; t->name; t++)
+        if (t->code == code)
+            return *t->name;
+    return NULL;
+}
+
+/* A name not in the table is 2, "unspecified". */
+static int code_for(const struct code_point *t, CFStringRef name)
+{
+    if (name)
+        for (; t->name; t++)
+            if ([(NSString *)*t->name isEqualToString:(NSString *)name])
+                return t->code;
+    return 2;
+}
+
+CFStringRef CVColorPrimariesGetStringForIntegerCodePoint(int code) { return name_for(primaries, code); }
+CFStringRef CVTransferFunctionGetStringForIntegerCodePoint(int code) { return name_for(transfers, code); }
+CFStringRef CVYCbCrMatrixGetStringForIntegerCodePoint(int code) { return name_for(matrices, code); }
+int CVColorPrimariesGetIntegerCodePointForString(CFStringRef s) { return code_for(primaries, s); }
+int CVTransferFunctionGetIntegerCodePointForString(CFStringRef s) { return code_for(transfers, s); }
+int CVYCbCrMatrixGetIntegerCodePointForString(CFStringRef s) { return code_for(matrices, s); }

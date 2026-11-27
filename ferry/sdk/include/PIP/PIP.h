@@ -24,7 +24,7 @@
 @interface PIPViewController : NSViewController <NSWindowDelegate>
 @property (assign) id<PIPViewControllerDelegate> delegate;
 @property (copy) NSString *name;
-@property NSSize aspectRatio;          /* of the floating window's content */
+@property (nonatomic) NSSize aspectRatio;         /* of the floating window's content */
 @property NSSize minSize, maxSize;
 @property BOOL playing;                /* which of play and pause the window offers */
 @property BOOL userCanResize;

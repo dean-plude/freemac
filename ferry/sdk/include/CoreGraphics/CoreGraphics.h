@@ -63,6 +63,8 @@ CGColorRef CGColorCreateGenericCMYK(CGFloat c, CGFloat m, CGFloat y, CGFloat k, 
 CGColorRef CGColorCreateSRGB(CGFloat red, CGFloat green, CGFloat blue, CGFloat alpha);
 CGColorRef CGColorCreateCopy(CGColorRef color);
 CGColorRef CGColorCreateCopyWithAlpha(CGColorRef color, CGFloat alpha);
+CGColorRef CGColorCreateCopyByMatchingToColorSpace(CGColorSpaceRef space, CGColorRenderingIntent intent,
+                                                   CGColorRef color, CFDictionaryRef options);
 CGColorRef CGColorGetConstantColor(CFStringRef name);
 CGColorRef CGColorRetain(CGColorRef color);
 void CGColorRelease(CGColorRef color);

@@ -53,6 +53,28 @@ kern_return_t IOObjectRelease(io_object_t object) { return object == IO_OBJECT_N
 kern_return_t IOObjectRetain(io_object_t object) { return IOObjectRelease(object); }
 io_registry_entry_t IORegistryEntryFromPath(mach_port_t mainPort, const io_string_t path) { return IO_OBJECT_NULL; }
 io_registry_entry_t IORegistryGetRootEntry(mach_port_t mainPort) { return IO_OBJECT_NULL; }
+/* Walking the registry finds nothing: an empty iterator, and no parent. */
+kern_return_t IORegistryEntryCreateIterator(io_registry_entry_t entry, const char *plane, uint32_t options,
+                                            io_iterator_t *iterator)
+{
+    if (iterator)
+        *iterator = IO_OBJECT_NULL;
+    return iterator ? kIOReturnSuccess : kIOReturnBadArgument;
+}
+kern_return_t IORegistryEntryGetChildIterator(io_registry_entry_t entry, const char *plane, io_iterator_t *iterator)
+{
+    return IORegistryEntryCreateIterator(entry, plane, 0, iterator);
+}
+kern_return_t IORegistryEntryGetParentIterator(io_registry_entry_t entry, const char *plane, io_iterator_t *iterator)
+{
+    return IORegistryEntryCreateIterator(entry, plane, 0, iterator);
+}
+kern_return_t IORegistryEntryGetParentEntry(io_registry_entry_t entry, const char *plane, io_registry_entry_t *parent)
+{
+    if (parent)
+        *parent = IO_OBJECT_NULL;
+    return kIOReturnNoDevice;
+}
 CFTypeRef IORegistryEntryCreateCFProperty(io_registry_entry_t entry, CFStringRef key, CFAllocatorRef allocator,
                                           IOOptionBits options)
 {
@@ -283,6 +305,49 @@ CFDictionaryRef IOPSGetPowerSourceDescription(CFTypeRef blob, CFTypeRef ps)
     return [(id)ps isKindOfClass:[NSDictionary class]] ? (CFDictionaryRef)ps : NULL;
 }
 
+/* Notices when the power source or the battery level changes: the source
+ * is a real run-loop source the program can add and remove, but nothing
+ * signals it, since freemac doesn't pass these changes on yet. A program
+ * that reads the power state again when it needs it still sees it right. */
+typedef void (*IOPowerSourceCallbackType)(void *context);
+
+static void power_schedule(void *info, CFRunLoopRef rl, CFStringRef mode) { (void)info; (void)rl; (void)mode; }
+static void power_perform(void *info)
+{
+    void **pair = info;
+    if (pair && pair[0])
+        ((IOPowerSourceCallbackType)pair[0])(pair[1]);
+}
+static void power_release(const void *info) { free((void *)info); }
+
+static CFRunLoopSourceRef power_source(IOPowerSourceCallbackType callback, void *context)
+{
+    void **pair = calloc(2, sizeof(void *));
+    if (!pair)
+        return NULL;
+    pair[0] = (void *)callback;
+    pair[1] = context;
+    CFRunLoopSourceContext c = {0};
+    c.info = pair;
+    c.release = power_release;
+    c.schedule = power_schedule;
+    c.perform = power_perform;
+    return CFRunLoopSourceCreate(NULL, 0, &c);
+}
+
+CFRunLoopSourceRef IOPSNotificationCreateRunLoopSource(IOPowerSourceCallbackType callback, void *context)
+{
+    return power_source(callback, context);
+}
+
+CFRunLoopSourceRef IOPSCreateLimitedPowerNotification(IOPowerSourceCallbackType callback, void *context)
+{
+    return power_source(callback, context);
+}
+
+/* -1 is kIOPSTimeRemainingUnknown, -2 kIOPSTimeRemainingUnlimited (on AC). */
+double IOPSGetTimeRemainingEstimate(void) { return on_ac_power() ? -2.0 : -1.0; }
+
 CFStringRef IOPSGetProvidingPowerSourceType(CFTypeRef blob)
 {
     BOOL ac = blob ? [[(NSDictionary *)blob objectForKey:@"AC"] boolValue] : on_ac_power();
@@ -377,13 +442,6 @@ kern_return_t IORegistryEntryCreateCFProperties(io_registry_entry_t entry, CFMut
 /* comparing objects, a parent and registry entry IDs (freemac Godot work):
  * with no registry the only object is the null one */
 boolean_t IOObjectIsEqualTo(io_object_t object, io_object_t anObject) { return object == anObject; }
-kern_return_t IORegistryEntryGetParentEntry(io_registry_entry_t entry, const io_name_t plane,
-                                            io_registry_entry_t *parent)
-{
-    if (parent)
-        *parent = IO_OBJECT_NULL;
-    return kIOReturnNoDevice;
-}
 kern_return_t IORegistryEntryGetRegistryEntryID(io_registry_entry_t entry, uint64_t *entryID)
 {
     if (entryID)

@@ -151,6 +151,60 @@ void *VTCompressionSessionGetPixelBufferPool(VTSessionRef session)
 
 void VTCompressionSessionInvalidate(VTSessionRef session) { (void)session; }
 
+/* ---- multi-pass encoding: with no encoder sessions there are no passes to
+ * run, and no storage to keep a first pass's results in (freemac 1.264,
+ * HandBrake) */
+
+typedef struct {
+    int64_t value;
+    int32_t timescale;
+    uint32_t flags;
+    int64_t epoch;
+} VTTime;
+typedef struct {
+    VTTime start, duration;
+} VTTimeRange;
+typedef void *VTMultiPassStorageRef;
+
+OSStatus VTCompressionSessionBeginPass(VTSessionRef session, uint32_t beginPassFlags, uint32_t *reserved)
+{
+    (void)session; (void)beginPassFlags; (void)reserved;
+    return kVTInvalidSessionErr;
+}
+
+OSStatus VTCompressionSessionEndPass(VTSessionRef session, Boolean *furtherPassesRequestedOut, uint32_t *reserved)
+{
+    (void)session; (void)reserved;
+    if (furtherPassesRequestedOut)
+        *furtherPassesRequestedOut = false;
+    return kVTInvalidSessionErr;
+}
+
+OSStatus VTCompressionSessionGetTimeRangesForNextPass(VTSessionRef session, long *timeRangeCountOut,
+                                                      const VTTimeRange **timeRangeArrayOut)
+{
+    (void)session;
+    if (timeRangeCountOut)
+        *timeRangeCountOut = 0;
+    if (timeRangeArrayOut)
+        *timeRangeArrayOut = NULL;
+    return kVTInvalidSessionErr;
+}
+
+OSStatus VTMultiPassStorageCreate(CFAllocatorRef allocator, CFURLRef fileURL, VTTimeRange timeRange,
+                                  CFDictionaryRef options, VTMultiPassStorageRef *multiPassStorageOut)
+{
+    (void)allocator; (void)fileURL; (void)timeRange; (void)options;
+    if (multiPassStorageOut)
+        *multiPassStorageOut = NULL;
+    return kVTCouldNotFindVideoEncoderErr;
+}
+
+OSStatus VTMultiPassStorageClose(VTMultiPassStorageRef multiPassStorage)
+{
+    return multiPassStorage ? 0 : -12902 /* kVTParameterErr */;
+}
+
 /* ---- the list of encoders: none in hardware, so an empty list, and a
  * program such as OBS offers its own software encoders (freemac 1.263) */
 
@@ -215,6 +269,25 @@ VT_KEY(kVTCompressionPropertyKey_RealTime)
 VT_KEY(kVTCompressionPropertyKey_TransferFunction)
 VT_KEY(kVTCompressionPropertyKey_YCbCrMatrix)
 VT_KEY(kVTCompressionPropertyKey_MaxH264SliceBytes)
+/* freemac 1.264, HandBrake */
+VT_KEY(kVTCompressionPropertyKey_AllowTemporalCompression)
+VT_KEY(kVTCompressionPropertyKey_ContentLightLevelInfo)
+VT_KEY(kVTCompressionPropertyKey_EncoderID)
+VT_KEY(kVTCompressionPropertyKey_ExpectedFrameRate)
+VT_KEY(kVTCompressionPropertyKey_FieldCount)
+VT_KEY(kVTCompressionPropertyKey_FieldDetail)
+VT_KEY(kVTCompressionPropertyKey_H264EntropyMode)
+VT_KEY(kVTCompressionPropertyKey_MasteringDisplayColorVolume)
+VT_KEY(kVTCompressionPropertyKey_MaxFrameDelayCount)
+VT_KEY(kVTCompressionPropertyKey_MultiPassStorage)
+VT_KEY(kVTDownsamplingMode_Average)
+VT_KEY(kVTH264EntropyMode_CABAC)
+VT_KEY(kVTH264EntropyMode_CAVLC)
+VT_KEY(kVTPixelTransferPropertyKey_DestinationCleanAperture)
+VT_KEY(kVTPixelTransferPropertyKey_DownsamplingMode)
+VT_KEY(kVTPixelTransferPropertyKey_ScalingMode)
+VT_KEY(kVTPropertySupportedValueListKey)
+VT_KEY(kVTScalingMode_CropSourceToCleanAperture)
 VT_KEY(kVTDecompressionPropertyKey_RealTime)
 VT_KEY(kVTVideoEncoderList_CodecName)
 VT_KEY(kVTVideoEncoderList_CodecType)

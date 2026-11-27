@@ -496,6 +496,23 @@ static NSTimeZone *default_zone, *system_zone;
 }
 
 - (id)copyWithZone:(NSZone *)zone { return [self retain]; }
+/* As a Mac archives them (freemac 1.264): a time zone by its name, so a
+ * date formatter kept in a nib comes back with its zone. */
++ (BOOL)supportsSecureCoding { return YES; }
+- (void)encodeWithCoder:(NSCoder *)coder
+{
+    if ([coder allowsKeyedCoding])
+        [coder encodeObject:_name forKey:@"NS.name"];
+    else
+        [coder encodeObject:_name];
+}
+- (instancetype)initWithCoder:(NSCoder *)coder
+{
+    NSString *name = [coder allowsKeyedCoding] ? [coder decodeObjectForKey:@"NS.name"] : [coder decodeObject];
+    NSTimeZone *z = [name isKindOfClass:[NSString class]] ? [NSTimeZone timeZoneWithName:name] : nil;
+    [self release];
+    return [(z ?: [NSTimeZone defaultTimeZone]) retain];
+}
 
 - (NSString *)name { return _name; }
 - (NSData *)data { return _data ?: [NSData data]; }
@@ -800,6 +817,20 @@ static NSString *gmt_offset(NSInteger secs)
 }
 
 - (id)copyWithZone:(NSZone *)zone { return [self retain]; }
+/* As a Mac archives it (freemac 1.264): by its identifier. */
++ (BOOL)supportsSecureCoding { return YES; }
+- (void)encodeWithCoder:(NSCoder *)coder
+{
+    if ([coder allowsKeyedCoding])
+        [coder encodeObject:_id forKey:@"NS.identifier"];
+    else
+        [coder encodeObject:_id];
+}
+- (instancetype)initWithCoder:(NSCoder *)coder
+{
+    NSString *ident = [coder allowsKeyedCoding] ? [coder decodeObjectForKey:@"NS.identifier"] : [coder decodeObject];
+    return [self initWithLocaleIdentifier:[ident isKindOfClass:[NSString class]] ? ident : @""];
+}
 
 + (NSLocale *)currentLocale
 {

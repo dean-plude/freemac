@@ -299,6 +299,19 @@ static NSImage *standard_image(NSString *name)
                 NSRectFill(NSMakeRect(6, 2, 2, 10));
         });
     }
+    /* the freestanding one is a cross in a filled circle (HandBrake's queue) */
+    if ([name isEqualToString:@"NSStopProgressFreestandingTemplate"])
+        return drawn(NSMakeSize(14, 14), YES, ^(NSRect r) {
+            [[NSColor blackColor] set];
+            [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(0.5, 0.5, 13, 13)] fill];
+            [[NSGraphicsContext currentContext] setCompositingOperation:NSCompositingOperationClear];
+            NSBezierPath *p = stroked(1.6);
+            [p moveToPoint:NSMakePoint(4.5, 4.5)];
+            [p lineToPoint:NSMakePoint(9.5, 9.5)];
+            [p moveToPoint:NSMakePoint(4.5, 9.5)];
+            [p lineToPoint:NSMakePoint(9.5, 4.5)];
+            [p stroke];
+        });
     if ([name isEqualToString:NSImageNameStopProgressTemplate])
         return drawn(NSMakeSize(14, 14), YES, ^(NSRect r) {
             [[NSColor blackColor] set];

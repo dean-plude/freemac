@@ -466,6 +466,7 @@ CFTypeRef SecTaskCopyValueForEntitlement(SecTaskRef task, CFStringRef entitlemen
 CFDictionaryRef SecTaskCopyValuesForEntitlements(SecTaskRef task, CFArrayRef entitlements, CFErrorRef *error)
     CF_RETURNS_RETAINED;
 CFStringRef SecTaskCopySigningIdentifier(SecTaskRef task, CFErrorRef *error) CF_RETURNS_RETAINED;
+uint32_t SecTaskGetCodeSignStatus(SecTaskRef task);
 
 /* ---- certificates, policies and trust (SecCertificate.h, SecPolicy.h, SecTrust.h) -------- */
 

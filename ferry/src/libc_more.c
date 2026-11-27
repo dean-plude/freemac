@@ -36,7 +36,9 @@
 #include <fts.h>
 #include <limits.h>
 #include <malloc.h>
+#include <math.h>
 #include <pthread.h>
+#include <regex.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -736,6 +738,98 @@ static int mac_fstatfs64(int fd, struct mac_statfs *out)
     return 0;
 }
 
+/* getfsstat: the mounted disks, as Mac programs list volumes (a disk
+ * picker, a free-space check). Linux's own kinds of mount (proc, sysfs,
+ * cgroups and the like) are left out, as a Mac lists only its volumes and
+ * devfs; a mount point seen twice is listed once. With no buffer, the
+ * count. MNT_WAIT and MNT_NOWAIT read the same here. */
+static int listed_mount(const char *type, const char *source)
+{
+    static const char *const kinds[] = {"ext2", "ext3", "ext4", "btrfs", "xfs", "vfat", "exfat", "ntfs", "ntfs3",
+                                        "fuseblk", "f2fs", "hfsplus", "apfs", "iso9660", "udf", "overlay", NULL};
+    if (strncmp(source, "/dev/", 5) == 0)
+        return 1;
+    for (int i = 0; kinds[i]; i++)
+        if (strcmp(type, kinds[i]) == 0)
+            return 1;
+    return 0;
+}
+
+static int mac_getfsstat64(struct mac_statfs *buf, int bufsize, int mode)
+{
+    (void)mode;
+    FILE *f = fopen("/proc/self/mountinfo", "re");
+    if (!f)
+        return -1;
+    int room = buf && bufsize > 0 ? bufsize / (int)sizeof(struct mac_statfs) : 0;
+    int count = 0;
+    char line[4096];
+    char (*seen)[1024] = NULL;
+    while (fgets(line, sizeof line, f)) {
+        char point[1024];
+        if (sscanf(line, "%*d %*d %*u:%*u %*s %1023s", point) != 1)
+            continue;
+        char *dash = strstr(line, " - ");
+        char type[64] = "", source[1024] = "";
+        if (dash)
+            sscanf(dash + 3, "%63s %1023s", type, source);
+        if (!listed_mount(type, source))
+            continue;
+        int dup = 0;
+        for (int i = 0; i < count && !dup; i++)
+            dup = strcmp(seen[i], point) == 0;
+        if (dup)
+            continue;
+        struct mac_statfs m;
+        if (mac_statfs64(point, &m))
+            continue;
+        void *more = realloc(seen, (size_t)(count + 1) * sizeof *seen);
+        if (!more)
+            break;
+        seen = more;
+        snprintf(seen[count], sizeof seen[count], "%s", point);
+        if (buf) {
+            if (count >= room) {
+                count++;
+                break;
+            }
+            buf[count] = m;
+        }
+        count++;
+    }
+    fclose(f);
+    free(seen);
+    return buf && count > room ? room : count;
+}
+
+/* ---- classifying numbers -------------------------------------------------------------- */
+
+/* What <math.h>'s fpclassify, isfinite, isinf, isnan, isnormal and signbit
+ * call on a Mac when the compiler doesn't work them out itself. A Mac
+ * numbers the kinds its own way: NaN 1, infinite 2, zero 3, normal 4,
+ * subnormal 5. */
+static int mac_fp_kind(int k)
+{
+    switch (k) {
+    case FP_NAN: return 1;
+    case FP_INFINITE: return 2;
+    case FP_ZERO: return 3;
+    case FP_SUBNORMAL: return 5;
+    default: return 4;
+    }
+}
+
+#define CLASSIFIERS(suffix, type)                                                                                    \
+    static int mac_fpclassify##suffix(type x) { return mac_fp_kind(fpclassify(x)); }                                  \
+    static int mac_isfinite##suffix(type x) { return isfinite(x) != 0; }                                              \
+    static int mac_isinf##suffix(type x) { return isinf(x) != 0; }                                                    \
+    static int mac_isnan##suffix(type x) { return isnan(x) != 0; }                                                    \
+    static int mac_isnormal##suffix(type x) { return isnormal(x) != 0; }                                              \
+    static int mac_signbit##suffix(type x) { return signbit(x) != 0; }
+CLASSIFIERS(f, float)
+CLASSIFIERS(d, double)
+CLASSIFIERS(l, long double)
+
 /* ---- asl ------------------------------------------------------------------------------ */
 
 #define ASL_KEYS 16
@@ -977,6 +1071,123 @@ static int mac_asl_set_query(struct asl_object *q, const char *key, const char *
     return mac_asl_set(q, key, value ? value : "");
 }
 
+/* ---- POSIX regular expressions (freemac 1.264, HandBrake's filter checks)
+ * A Mac's regex_t is 32 bytes (re_magic, re_nsub, re_endp, re_g) and its
+ * regmatch_t holds two 64-bit offsets; this system's regex_t is 64 bytes
+ * and its offsets are 32-bit, so the host's regcomp wrote past the end of
+ * a Mac program's regex_t. Ferry keeps the host's pattern on the heap,
+ * pointed to by re_g, and translates the flags and the matches. */
+struct mac_regex {
+    int re_magic;
+    size_t re_nsub;
+    const char *re_endp;
+    regex_t *re_g;
+};
+struct mac_regmatch {
+    int64_t rm_so, rm_eo;
+};
+#define MAC_RE_MAGIC 0xf1e7c0de
+enum { MAC_REG_EXTENDED = 1, MAC_REG_ICASE = 2, MAC_REG_NOSUB = 4, MAC_REG_NEWLINE = 8, MAC_REG_NOSPEC = 0x10,
+       MAC_REG_PEND = 0x20 };
+enum { MAC_REG_ESPACE = 12, MAC_REG_INVARG = 16 };
+
+static int mac_regcomp(struct mac_regex *preg, const char *pattern, int cflags)
+{
+    if (!preg || !pattern)
+        return MAC_REG_INVARG;
+    int host = 0;
+    if (cflags & MAC_REG_EXTENDED)
+        host |= REG_EXTENDED;
+    if (cflags & MAC_REG_ICASE)
+        host |= REG_ICASE;
+    if (cflags & MAC_REG_NOSUB)
+        host |= REG_NOSUB;
+    if (cflags & MAC_REG_NEWLINE)
+        host |= REG_NEWLINE;
+    /* REG_NOSPEC (the pattern is plain text) and REG_PEND (it ends at
+     * re_endp) need a copy of the pattern: plain text gets its specials
+     * escaped */
+    char *copy = NULL;
+    if (cflags & (MAC_REG_NOSPEC | MAC_REG_PEND)) {
+        size_t n = (cflags & MAC_REG_PEND) && preg->re_endp >= pattern ? (size_t)(preg->re_endp - pattern)
+                                                                       : strlen(pattern);
+        copy = malloc(2 * n + 1);
+        if (!copy)
+            return MAC_REG_ESPACE;
+        size_t o = 0;
+        for (size_t i = 0; i < n; i++) {
+            if ((cflags & MAC_REG_NOSPEC) && strchr("\\^$.[]|()?*+{}", pattern[i]))
+                copy[o++] = '\\';
+            copy[o++] = pattern[i];
+        }
+        copy[o] = 0;
+        pattern = copy;
+        if (cflags & MAC_REG_NOSPEC)
+            host |= REG_EXTENDED;
+    }
+    regex_t *re = calloc(1, sizeof *re);
+    if (!re) {
+        free(copy);
+        return MAC_REG_ESPACE;
+    }
+    int r = regcomp(re, pattern, host);
+    free(copy);
+    if (r) {
+        free(re);
+        return r; /* the same numbers as a Mac's, REG_NOMATCH to REG_BADRPT */
+    }
+    preg->re_magic = (int)MAC_RE_MAGIC;
+    preg->re_nsub = re->re_nsub;
+    preg->re_g = re;
+    return 0;
+}
+
+static int mac_regexec(const struct mac_regex *preg, const char *string, size_t nmatch,
+                       struct mac_regmatch *pmatch, int eflags)
+{
+    if (!preg || preg->re_magic != (int)MAC_RE_MAGIC || !preg->re_g)
+        return MAC_REG_INVARG;
+    regmatch_t local[16], *m = nmatch <= 16 ? local : malloc(nmatch * sizeof *m);
+    if (!m)
+        return MAC_REG_ESPACE;
+    if ((eflags & REG_STARTEND) && pmatch) { /* the same flag values as a Mac's */
+        m[0].rm_so = (regoff_t)pmatch[0].rm_so;
+        m[0].rm_eo = (regoff_t)pmatch[0].rm_eo;
+    }
+    int r = regexec(preg->re_g, string, pmatch ? nmatch : 0, m, eflags & (REG_NOTBOL | REG_NOTEOL | REG_STARTEND));
+    if (!r && pmatch)
+        for (size_t i = 0; i < nmatch; i++) {
+            pmatch[i].rm_so = m[i].rm_so;
+            pmatch[i].rm_eo = m[i].rm_eo;
+        }
+    if (m != local)
+        free(m);
+    return r;
+}
+
+static void mac_regfree(struct mac_regex *preg)
+{
+    if (!preg || preg->re_magic != (int)MAC_RE_MAGIC || !preg->re_g)
+        return;
+    regfree(preg->re_g);
+    free(preg->re_g);
+    preg->re_g = NULL;
+    preg->re_magic = 0;
+}
+
+static size_t mac_regerror(int code, const struct mac_regex *preg, char *buf, size_t size)
+{
+    const regex_t *re = preg && preg->re_magic == (int)MAC_RE_MAGIC ? preg->re_g : NULL;
+    if (code == MAC_REG_INVARG) {
+        const char *t = "invalid argument to regex routine";
+        if (size) {
+            snprintf(buf, size, "%s", t);
+        }
+        return strlen(t) + 1;
+    }
+    return regerror(code, re, buf, size);
+}
+
 const struct ferry_symbol ferry_libc_more_symbols[] = {
     {"malloc_good_size", mac_malloc_good_size},
     {"memset_pattern4", mac_memset_pattern4},
@@ -1022,6 +1233,19 @@ const struct ferry_symbol ferry_libc_more_symbols[] = {
     {"fstatfs$INODE64", mac_fstatfs64},
     {"statfs64", mac_statfs64},
     {"fstatfs64", mac_fstatfs64},
+    {"getfsstat$INODE64", mac_getfsstat64},
+    {"getfsstat64", mac_getfsstat64},
+    {"regcomp", mac_regcomp},
+    {"regexec", mac_regexec},
+    {"regfree", mac_regfree},
+    {"regerror", mac_regerror},
+    {"__fpclassifyf", mac_fpclassifyf}, {"__fpclassifyd", mac_fpclassifyd}, {"__fpclassifyl", mac_fpclassifyl},
+    {"__fpclassify", mac_fpclassifyd},   {"__isfinitef", mac_isfinitef},     {"__isfinited", mac_isfinited},
+    {"__isfinitel", mac_isfinitel},     {"__isinff", mac_isinff},           {"__isinfd", mac_isinfd},
+    {"__isinfl", mac_isinfl},           {"__isnanf", mac_isnanf},           {"__isnand", mac_isnand},
+    {"__isnanl", mac_isnanl},           {"__isnormalf", mac_isnormalf},     {"__isnormald", mac_isnormald},
+    {"__isnormall", mac_isnormall},     {"__signbitf", mac_signbitf},       {"__signbitd", mac_signbitd},
+    {"__signbitl", mac_signbitl},
     {"asl_open", mac_asl_open},
     {"asl_close", mac_asl_free},
     {"asl_new", mac_asl_new},

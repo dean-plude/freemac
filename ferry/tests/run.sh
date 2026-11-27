@@ -657,6 +657,7 @@ run_one quartzcore_animations "$here/quartzcore/animations.m" "$here/quartzcore/
 run_one appkit_views "$here/appkit/views.m" "$here/appkit/views.out" -fblocks -framework Cocoa
 run_one appkit_hidden_redraw "$here/appkit/hidden_redraw.m" "$here/appkit/hidden_redraw.out" -framework Cocoa
 run_one appkit_partial_redraw "$here/appkit/partial_redraw.m" "$here/appkit/partial_redraw.out" -framework Cocoa
+run_one appkit_handbrake_calls "$here/appkit/handbrake_calls.m" "$here/appkit/handbrake_calls.out" -fblocks -framework Cocoa
 # (1.238) no untitled document, and no error, at the launch of an app with
 # no document class that uses the document controller for recents (VLC)
 run_one appkit_viewer_launch "$here/appkit/viewer_launch.m" "$here/appkit/viewer_launch.out" -framework Cocoa
@@ -1805,6 +1806,39 @@ run_one coreaudio_devices "$here/coreaudio/hal.c" "$here/coreaudio/hal.out" -fbl
 run_one coreaudio_missing "$here/coreaudio/hal.c" "$here/coreaudio/hal.out" -fblocks $ca_frameworks
 run_one coreaudio_auhal "$here/coreaudio/auhal.c" "$here/coreaudio/auhal.out" -fblocks $ca_frameworks
 run_one coreaudio_queue "$here/coreaudio/queue.c" "$here/coreaudio/queue.out" -fblocks $ca_frameworks
+# An app and its XPC service (freemac 1.264): the service in the app's
+# Contents/XPCServices, started by the app's first message to it
+app="$build/XPCApp.app"; svc="$app/Contents/XPCServices/Echo.xpc"
+rm -rf "$app"; mkdir -p "$app/Contents/MacOS" "$svc/Contents/MacOS"
+printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' '<plist version="1.0"><dict>' \
+    '<key>CFBundleExecutable</key><string>XPCApp</string>' \
+    '<key>CFBundleIdentifier</key><string>org.freemac.ferry.xpcapp</string>' '</dict></plist>' > "$app/Contents/Info.plist"
+printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' '<plist version="1.0"><dict>' \
+    '<key>CFBundleExecutable</key><string>Echo</string>' \
+    '<key>CFBundleIdentifier</key><string>org.freemac.ferry.echo</string>' \
+    '<key>CFBundlePackageType</key><string>XPC!</string>' '</dict></plist>' > "$svc/Contents/Info.plist"
+if "$top/sdk/ferry-cc" -O1 -fobjc-arc -o "$app/Contents/MacOS/XPCApp" "$here/xpc/app.m" -framework Foundation \
+        2> "$build/xpc_app.cc.log" &&
+    "$top/sdk/ferry-cc" -O1 -fobjc-arc -o "$svc/Contents/MacOS/Echo" "$here/xpc/service.m" -framework Foundation \
+        2>> "$build/xpc_app.cc.log"; then
+    timeout 120 "$top/ferry" "$app/Contents/MacOS/XPCApp" > "$build/xpc_app.got" 2> "$build/xpc_app.err"
+    echo "exit=$?" >> "$build/xpc_app.got"
+    if diff -u "$here/xpc/app.out" "$build/xpc_app.got" > "$build/xpc_app.diff"; then
+        echo "ok   xpc_app"; pass=$((pass + 1))
+    else
+        echo "FAIL xpc_app"; sed 's/^/    /' "$build/xpc_app.diff"; sed 's/^/    stderr: /' "$build/xpc_app.err"
+        fail=$((fail + 1))
+    fi
+else
+    echo "FAIL xpc_app (did not compile)"; sed 's/^/    /' "$build/xpc_app.cc.log"
+    fail=$((fail + 1))
+fi
+# encoding and decoding with this system's FFmpeg (freemac 1.264)
+if ls /lib/x86_64-linux-gnu/libavcodec.so.* /usr/lib/x86_64-linux-gnu/libavcodec.so.* > /dev/null 2>&1; then
+    run_one coreaudio_codec "$here/coreaudio/codec.c" "$here/coreaudio/codec.out" -fblocks $ca_frameworks
+else
+    echo "skip coreaudio_codec (it needs this system's FFmpeg libraries)"
+fi
 # the synth units and AUGraph, as VLC's MIDI decoder uses them: always as if
 # FluidSynth weren't installed, and with this system's FluidSynth and a
 # General MIDI SoundFont where it has them (FERRY_TEST_FLUIDSYNTH and

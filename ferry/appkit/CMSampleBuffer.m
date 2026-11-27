@@ -127,6 +127,26 @@ FKEY(kCMFormatDescriptionExtension_YCbCrMatrix, "CVImageBufferYCbCrMatrix")
 FKEY(kCMFormatDescriptionExtension_FullRangeVideo, "FullRangeVideo")
 FKEY(kCMFormatDescriptionExtension_BytesPerRow, "CVBytesPerRow")
 FKEY(kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms, "SampleDescriptionExtensionAtoms")
+FKEY(kCMFormatDescriptionColorPrimaries_ITU_R_709_2, "ITU_R_709_2")
+FKEY(kCMFormatDescriptionColorPrimaries_EBU_3213, "EBU_3213")
+FKEY(kCMFormatDescriptionColorPrimaries_SMPTE_C, "SMPTE_C")
+FKEY(kCMFormatDescriptionColorPrimaries_DCI_P3, "DCI_P3")
+FKEY(kCMFormatDescriptionColorPrimaries_P3_D65, "P3_D65")
+FKEY(kCMFormatDescriptionColorPrimaries_ITU_R_2020, "ITU_R_2020")
+FKEY(kCMFormatDescriptionColorPrimaries_P22, "P22")
+FKEY(kCMFormatDescriptionTransferFunction_ITU_R_709_2, "ITU_R_709_2")
+FKEY(kCMFormatDescriptionTransferFunction_SMPTE_240M_1995, "SMPTE_240M_1995")
+FKEY(kCMFormatDescriptionTransferFunction_UseGamma, "UseGamma")
+FKEY(kCMFormatDescriptionTransferFunction_ITU_R_2020, "ITU_R_2020")
+FKEY(kCMFormatDescriptionTransferFunction_SMPTE_ST_428_1, "SMPTE_ST_428_1")
+FKEY(kCMFormatDescriptionTransferFunction_SMPTE_ST_2084_PQ, "SMPTE_ST_2084_PQ")
+FKEY(kCMFormatDescriptionTransferFunction_ITU_R_2100_HLG, "ITU_R_2100_HLG")
+FKEY(kCMFormatDescriptionTransferFunction_Linear, "Linear")
+FKEY(kCMFormatDescriptionTransferFunction_sRGB, "IEC_sRGB")
+FKEY(kCMFormatDescriptionYCbCrMatrix_ITU_R_709_2, "ITU_R_709_2")
+FKEY(kCMFormatDescriptionYCbCrMatrix_ITU_R_601_4, "ITU_R_601_4")
+FKEY(kCMFormatDescriptionYCbCrMatrix_SMPTE_240M_1995, "SMPTE_240M_1995")
+FKEY(kCMFormatDescriptionYCbCrMatrix_ITU_R_2020, "ITU_R_2020")
 
 @interface FerryCMFormatDescription : NSObject {
   @public
@@ -260,6 +280,372 @@ CMVideoDimensions CMVideoFormatDescriptionGetDimensions(CMVideoFormatDescription
 {
     return is_format(d) ? FD(d)->_dimensions : (CMVideoDimensions){0, 0};
 }
+/* ---- H.264 and HEVC parameter sets ------------------------------------------------------
+ * Kept as an MP4 file keeps them, in an avcC or hvcC atom under the
+ * description's SampleDescriptionExtensionAtoms (ISO/IEC 14496-15), so a
+ * description read from a file and one made from parameter sets match. */
+
+static NSData *config_atom(CMFormatDescriptionRef d, NSString *name)
+{
+    if (!is_format(d))
+        return nil;
+    NSDictionary *atoms = FD(d)->_extensions[(id)kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms];
+    if (![atoms isKindOfClass:[NSDictionary class]])
+        return nil;
+    id v = atoms[name];
+    if ([v isKindOfClass:[NSArray class]])
+        v = [v firstObject];
+    return [v isKindOfClass:[NSData class]] ? v : nil;
+}
+
+/* The index-th parameter set in a list of [16-bit length, bytes] entries. */
+static BOOL take_set(const uint8_t **p, const uint8_t *end, const uint8_t **set, size_t *size)
+{
+    if (end - *p < 2)
+        return NO;
+    size_t n = (size_t)((*p)[0] << 8 | (*p)[1]);
+    if ((size_t)(end - *p - 2) < n)
+        return NO;
+    *set = *p + 2;
+    *size = n;
+    *p += 2 + n;
+    return YES;
+}
+
+static OSStatus answer_set(size_t index, size_t count, const uint8_t *found, size_t foundSize, int lengthSize,
+                           const uint8_t **ptr, size_t *size, size_t *countOut, int *lengthOut)
+{
+    if (countOut)
+        *countOut = count;
+    if (lengthOut)
+        *lengthOut = lengthSize;
+    if ((ptr || size) && index >= count)
+        return kCMFormatDescriptionError_InvalidParameter;
+    if (ptr)
+        *ptr = index < count ? found : NULL;
+    if (size)
+        *size = index < count ? foundSize : 0;
+    return noErr;
+}
+
+OSStatus CMVideoFormatDescriptionGetH264ParameterSetAtIndex(CMFormatDescriptionRef d, size_t index,
+                                                            const uint8_t **ptr, size_t *size, size_t *countOut,
+                                                            int *lengthOut)
+{
+    if (!is_format(d))
+        return kCMFormatDescriptionError_InvalidParameter;
+    NSData *avcC = config_atom(d, @"avcC");
+    if ([avcC length] < 7)
+        return kCMFormatDescriptionError_ValueNotAvailable;
+    const uint8_t *b = [avcC bytes], *end = b + [avcC length], *p = b + 6;
+    int lengthSize = (b[4] & 3) + 1;
+    size_t count = 0, foundSize = 0;
+    const uint8_t *found = NULL, *set;
+    size_t n;
+    for (int kind = 0; kind < 2; kind++) {
+        if (p >= end)
+            break;
+        unsigned sets = kind == 0 ? (b[5] & 0x1F) : *p;
+        if (kind == 1)
+            p++;
+        for (unsigned i = 0; i < sets && take_set(&p, end, &set, &n); i++, count++)
+            if (count == index)
+                found = set, foundSize = n;
+    }
+    return answer_set(index, count, found, foundSize, lengthSize, ptr, size, countOut, lengthOut);
+}
+
+OSStatus CMVideoFormatDescriptionGetHEVCParameterSetAtIndex(CMFormatDescriptionRef d, size_t index,
+                                                            const uint8_t **ptr, size_t *size, size_t *countOut,
+                                                            int *lengthOut)
+{
+    if (!is_format(d))
+        return kCMFormatDescriptionError_InvalidParameter;
+    NSData *hvcC = config_atom(d, @"hvcC");
+    if ([hvcC length] < 23)
+        return kCMFormatDescriptionError_ValueNotAvailable;
+    const uint8_t *b = [hvcC bytes], *end = b + [hvcC length], *p = b + 23;
+    int lengthSize = (b[21] & 3) + 1;
+    size_t count = 0, foundSize = 0;
+    const uint8_t *found = NULL, *set;
+    size_t n;
+    for (unsigned a = 0; a < b[22] && end - p >= 3; a++) {
+        unsigned sets = (unsigned)(p[1] << 8 | p[2]);
+        p += 3;
+        for (unsigned i = 0; i < sets && take_set(&p, end, &set, &n); i++, count++)
+            if (count == index)
+                found = set, foundSize = n;
+    }
+    return answer_set(index, count, found, foundSize, lengthSize, ptr, size, countOut, lengthOut);
+}
+
+static void put_set(NSMutableData *m, const uint8_t *set, size_t n)
+{
+    uint8_t len[2] = {(uint8_t)(n >> 8), (uint8_t)n};
+    [m appendBytes:len length:2];
+    [m appendBytes:set length:n];
+}
+
+static NSDictionary *with_atom(CFDictionaryRef extensions, NSString *name, NSData *atom)
+{
+    NSMutableDictionary *ext =
+        extensions ? [[(NSDictionary *)extensions mutableCopy] autorelease] : [NSMutableDictionary dictionary];
+    NSMutableDictionary *atoms = [[ext[(id)kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms] mutableCopy]
+                                     autorelease] ?: [NSMutableDictionary dictionary];
+    atoms[name] = atom;
+    ext[(id)kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms] = atoms;
+    return ext;
+}
+
+/* A sequence parameter set's picture size, read from its first fields
+ * (H.264 7.3.2.1.1) with emulation-prevention bytes taken out. */
+struct bits {
+    const uint8_t *b;
+    size_t n, at;
+};
+static unsigned bit(struct bits *r)
+{
+    if (r->at >= r->n * 8)
+        return 0;
+    unsigned v = (r->b[r->at / 8] >> (7 - r->at % 8)) & 1;
+    r->at++;
+    return v;
+}
+static unsigned bits_u(struct bits *r, int k)
+{
+    unsigned v = 0;
+    while (k-- > 0)
+        v = v << 1 | bit(r);
+    return v;
+}
+static unsigned bits_ue(struct bits *r)
+{
+    int zeros = 0;
+    while (!bit(r) && zeros < 32 && r->at < r->n * 8)
+        zeros++;
+    return ((1u << zeros) - 1) + bits_u(r, zeros);
+}
+static int bits_se(struct bits *r)
+{
+    unsigned k = bits_ue(r);
+    return k & 1 ? (int)((k + 1) / 2) : -(int)(k / 2);
+}
+static NSData *unescaped(const uint8_t *p, size_t n)
+{
+    NSMutableData *m = [NSMutableData dataWithCapacity:n];
+    int zeros = 0;
+    for (size_t i = 0; i < n; i++) {
+        if (zeros >= 2 && p[i] == 3) {
+            zeros = 0;
+            continue;
+        }
+        zeros = p[i] == 0 ? zeros + 1 : 0;
+        [m appendBytes:&p[i] length:1];
+    }
+    return m;
+}
+
+static CMVideoDimensions h264_size(const uint8_t *sps, size_t n)
+{
+    NSData *raw = unescaped(sps, n);
+    struct bits r = {[raw bytes], [raw length], 8};
+    unsigned profile = bits_u(&r, 8);
+    bits_u(&r, 16); /* constraint flags, level */
+    bits_ue(&r);    /* seq_parameter_set_id */
+    unsigned chroma = 1;
+    if (profile == 100 || profile == 110 || profile == 122 || profile == 244 || profile == 44 || profile == 83 ||
+        profile == 86 || profile == 118 || profile == 128 || profile == 138 || profile == 139 || profile == 134) {
+        chroma = bits_ue(&r);
+        if (chroma == 3)
+            bit(&r);
+        bits_ue(&r);
+        bits_ue(&r);
+        bit(&r);
+        if (bit(&r)) /* scaling matrices */
+            for (int i = 0; i < (chroma == 3 ? 12 : 8); i++)
+                if (bit(&r)) {
+                    int size = i < 6 ? 16 : 64, last = 8, next = 8;
+                    for (int j = 0; j < size; j++) {
+                        if (next)
+                            next = (last + bits_se(&r) + 256) % 256;
+                        last = next ? next : last;
+                    }
+                }
+    }
+    bits_ue(&r); /* log2_max_frame_num */
+    unsigned poc = bits_ue(&r);
+    if (poc == 0)
+        bits_ue(&r);
+    else if (poc == 1) {
+        bit(&r);
+        bits_se(&r);
+        bits_se(&r);
+        unsigned cycle = bits_ue(&r);
+        for (unsigned i = 0; i < cycle && i < 256; i++)
+            bits_se(&r);
+    }
+    bits_ue(&r); /* max_num_ref_frames */
+    bit(&r);
+    unsigned w = bits_ue(&r) + 1, h = bits_ue(&r) + 1;
+    unsigned frames_only = bit(&r);
+    if (!frames_only)
+        bit(&r);
+    bit(&r);
+    int width = (int)(w * 16), height = (int)(h * 16 * (2 - frames_only));
+    if (bit(&r)) { /* cropping */
+        unsigned l = bits_ue(&r), rt = bits_ue(&r), t = bits_ue(&r), b = bits_ue(&r);
+        int cx = chroma == 0 || chroma == 3 ? 1 : 2, cy = (chroma == 1 ? 2 : 1) * (2 - (int)frames_only);
+        width -= (int)(l + rt) * cx;
+        height -= (int)(t + b) * cy;
+    }
+    return (CMVideoDimensions){width > 0 ? width : 0, height > 0 ? height : 0};
+}
+
+OSStatus CMVideoFormatDescriptionCreateFromH264ParameterSets(CFAllocatorRef allocator, size_t count,
+                                                             const uint8_t *const *sets, const size_t *sizes,
+                                                             int lengthSize, CMFormatDescriptionRef *out)
+{
+    (void)allocator;
+    if (!out || count < 2 || !sets || !sizes || (lengthSize != 1 && lengthSize != 2 && lengthSize != 4))
+        return kCMFormatDescriptionError_InvalidParameter;
+    *out = NULL;
+    const uint8_t *sps = NULL;
+    size_t spsSize = 0, nsps = 0, npps = 0;
+    for (size_t i = 0; i < count; i++) {
+        if (!sets[i] || !sizes[i] || sizes[i] > 0xFFFF)
+            return kCMFormatDescriptionError_InvalidParameter;
+        int type = sets[i][0] & 0x1F;
+        if (type == 7) {
+            if (!sps)
+                sps = sets[i], spsSize = sizes[i];
+            nsps++;
+        } else if (type == 8)
+            npps++;
+        else
+            return kCMFormatDescriptionError_InvalidParameter;
+    }
+    if (!nsps || !npps || spsSize < 4 || nsps > 31 || npps > 255)
+        return kCMFormatDescriptionError_InvalidParameter;
+    @autoreleasepool {
+        NSMutableData *m = [NSMutableData data];
+        uint8_t head[6] = {1, sps[1], sps[2], sps[3], (uint8_t)(0xFC | (lengthSize - 1)), (uint8_t)(0xE0 | nsps)};
+        [m appendBytes:head length:6];
+        for (size_t i = 0; i < count; i++)
+            if ((sets[i][0] & 0x1F) == 7)
+                put_set(m, sets[i], sizes[i]);
+        uint8_t np = (uint8_t)npps;
+        [m appendBytes:&np length:1];
+        for (size_t i = 0; i < count; i++)
+            if ((sets[i][0] & 0x1F) == 8)
+                put_set(m, sets[i], sizes[i]);
+        FerryCMFormatDescription *d =
+            new_format(kCMMediaType_Video, kCMVideoCodecType_H264, (CFDictionaryRef)with_atom(NULL, @"avcC", m));
+        d->_dimensions = h264_size(sps, spsSize);
+        *out = (CMFormatDescriptionRef)d;
+    }
+    return noErr;
+}
+
+/* HEVC's sequence parameter set: its profile, tier and level (copied into
+ * the hvcC atom) and its picture size (H.265 7.3.2.2). */
+static CMVideoDimensions hevc_size(NSData *raw, uint8_t ptl[12], unsigned *chromaOut)
+{
+    struct bits r = {[raw bytes], [raw length], 16};
+    bits_u(&r, 4);
+    unsigned sub_layers = bits_u(&r, 3);
+    bit(&r);
+    for (int i = 0; i < 12; i++)
+        ptl[i] = (uint8_t)bits_u(&r, 8);
+    unsigned present[8] = {0};
+    for (unsigned i = 0; i < sub_layers; i++)
+        present[i] = bits_u(&r, 2);
+    if (sub_layers)
+        for (unsigned i = sub_layers; i < 8; i++)
+            bits_u(&r, 2);
+    for (unsigned i = 0; i < sub_layers; i++) {
+        if (present[i] & 2)
+            bits_u(&r, 32), bits_u(&r, 32), bits_u(&r, 24);
+        if (present[i] & 1)
+            bits_u(&r, 8);
+    }
+    bits_ue(&r); /* sps id */
+    unsigned chroma = bits_ue(&r);
+    if (chroma == 3)
+        bit(&r);
+    *chromaOut = chroma;
+    int width = (int)bits_ue(&r), height = (int)bits_ue(&r);
+    if (bit(&r)) {
+        unsigned l = bits_ue(&r), rt = bits_ue(&r), t = bits_ue(&r), b = bits_ue(&r);
+        int cx = chroma == 1 || chroma == 2 ? 2 : 1, cy = chroma == 1 ? 2 : 1;
+        width -= (int)(l + rt) * cx;
+        height -= (int)(t + b) * cy;
+    }
+    return (CMVideoDimensions){width > 0 ? width : 0, height > 0 ? height : 0};
+}
+
+OSStatus CMVideoFormatDescriptionCreateFromHEVCParameterSets(CFAllocatorRef allocator, size_t count,
+                                                             const uint8_t *const *sets, const size_t *sizes,
+                                                             int lengthSize, CFDictionaryRef extensions,
+                                                             CMFormatDescriptionRef *out)
+{
+    (void)allocator;
+    if (!out || count < 3 || !sets || !sizes || (lengthSize != 1 && lengthSize != 2 && lengthSize != 4))
+        return kCMFormatDescriptionError_InvalidParameter;
+    *out = NULL;
+    /* the arrays an hvcC holds, in the usual order: VPS, SPS, PPS, then SEI */
+    static const int kinds[] = {32, 33, 34, 39, 40};
+    size_t per[5] = {0};
+    const uint8_t *sps = NULL;
+    size_t spsSize = 0;
+    for (size_t i = 0; i < count; i++) {
+        if (!sets[i] || sizes[i] < 2 || sizes[i] > 0xFFFF)
+            return kCMFormatDescriptionError_InvalidParameter;
+        int type = (sets[i][0] >> 1) & 0x3F, k;
+        for (k = 0; k < 5 && kinds[k] != type; k++)
+            ;
+        if (k == 5)
+            return kCMFormatDescriptionError_InvalidParameter;
+        per[k]++;
+        if (type == 33 && !sps)
+            sps = sets[i], spsSize = sizes[i];
+    }
+    if (!per[0] || !per[1] || !per[2])
+        return kCMFormatDescriptionError_InvalidParameter;
+    @autoreleasepool {
+        uint8_t ptl[12] = {0};
+        unsigned chroma = 1;
+        CMVideoDimensions dims = hevc_size(unescaped(sps, spsSize), ptl, &chroma);
+        NSMutableData *m = [NSMutableData data];
+        uint8_t head[23] = {1};
+        memcpy(head + 1, ptl, 12);
+        head[13] = 0xF0; /* min_spatial_segmentation 0 */
+        head[15] = 0xFC; /* parallelism unknown */
+        head[16] = (uint8_t)(0xFC | (chroma & 3));
+        head[17] = 0xF8; /* bit depths: not read here, left as 8 */
+        head[18] = 0xF8;
+        head[21] = (uint8_t)(lengthSize - 1);
+        uint8_t arrays = 0;
+        for (int k = 0; k < 5; k++)
+            arrays += per[k] ? 1 : 0;
+        head[22] = arrays;
+        [m appendBytes:head length:23];
+        for (int k = 0; k < 5; k++) {
+            if (!per[k])
+                continue;
+            uint8_t a[3] = {(uint8_t)(0x80 | kinds[k]), (uint8_t)(per[k] >> 8), (uint8_t)per[k]};
+            [m appendBytes:a length:3];
+            for (size_t i = 0; i < count; i++)
+                if (((sets[i][0] >> 1) & 0x3F) == kinds[k])
+                    put_set(m, sets[i], sizes[i]);
+        }
+        FerryCMFormatDescription *d =
+            new_format(kCMMediaType_Video, kCMVideoCodecType_HEVC, (CFDictionaryRef)with_atom(extensions, @"hvcC", m));
+        d->_dimensions = dims;
+        *out = (CMFormatDescriptionRef)d;
+    }
+    return noErr;
+}
+
 CGSize CMVideoFormatDescriptionGetPresentationDimensions(CMVideoFormatDescriptionRef d, Boolean usePixelAspectRatio,
                                                          Boolean useCleanAperture)
 {
@@ -1308,4 +1694,105 @@ void CMPropagateAttachments(CMAttachmentBearerRef source, CMAttachmentBearerRef 
         CMSetAttachments(destination, d, kCMAttachmentMode_ShouldPropagate);
         CFRelease(d);
     }
+}
+
+/* ---- CMSimpleQueue (freemac 1.264, HandBrake) ---------------------------------------
+ * A ring of pointers with a lock, so one thread can fill it while another
+ * empties it, as Apple documents. The queue doesn't retain what it holds. */
+@interface FerryCMSimpleQueue : NSObject {
+  @public
+    const void **_slots;
+    int32_t _capacity, _head, _count;
+    pthread_mutex_t _lock;
+}
+@end
+@implementation FerryCMSimpleQueue
+- (void)dealloc
+{
+    free(_slots);
+    pthread_mutex_destroy(&_lock);
+    [super dealloc];
+}
+@end
+
+#define SQ(ref) ((FerryCMSimpleQueue *)(ref))
+static BOOL is_queue(CMSimpleQueueRef q) { return q && [(id)q isKindOfClass:[FerryCMSimpleQueue class]]; }
+
+CFTypeID CMSimpleQueueGetTypeID(void) { return (CFTypeID)[FerryCMSimpleQueue class]; }
+
+OSStatus CMSimpleQueueCreate(CFAllocatorRef allocator, int32_t capacity, CMSimpleQueueRef *out)
+{
+    (void)allocator;
+    if (!out)
+        return kCMSimpleQueueError_RequiredParameterMissing;
+    *out = NULL;
+    if (capacity <= 0)
+        return kCMSimpleQueueError_ParameterOutOfRange;
+    FerryCMSimpleQueue *q = [[FerryCMSimpleQueue alloc] init];
+    q->_slots = calloc((size_t)capacity, sizeof(void *));
+    if (!q->_slots) {
+        [q release];
+        return kCMSimpleQueueError_AllocationFailed;
+    }
+    q->_capacity = capacity;
+    pthread_mutex_init(&q->_lock, NULL);
+    *out = (CMSimpleQueueRef)q;
+    return noErr;
+}
+
+OSStatus CMSimpleQueueEnqueue(CMSimpleQueueRef queue, const void *element)
+{
+    if (!is_queue(queue) || !element)
+        return kCMSimpleQueueError_RequiredParameterMissing;
+    FerryCMSimpleQueue *q = SQ(queue);
+    pthread_mutex_lock(&q->_lock);
+    OSStatus r = noErr;
+    if (q->_count == q->_capacity)
+        r = kCMSimpleQueueError_QueueIsFull;
+    else
+        q->_slots[(q->_head + q->_count++) % q->_capacity] = element;
+    pthread_mutex_unlock(&q->_lock);
+    return r;
+}
+
+static const void *queue_head(CMSimpleQueueRef queue, BOOL take)
+{
+    if (!is_queue(queue))
+        return NULL;
+    FerryCMSimpleQueue *q = SQ(queue);
+    pthread_mutex_lock(&q->_lock);
+    const void *e = NULL;
+    if (q->_count) {
+        e = q->_slots[q->_head];
+        if (take) {
+            q->_head = (q->_head + 1) % q->_capacity;
+            q->_count--;
+        }
+    }
+    pthread_mutex_unlock(&q->_lock);
+    return e;
+}
+
+const void *CMSimpleQueueDequeue(CMSimpleQueueRef queue) { return queue_head(queue, YES); }
+const void *CMSimpleQueueGetHead(CMSimpleQueueRef queue) { return queue_head(queue, NO); }
+
+OSStatus CMSimpleQueueReset(CMSimpleQueueRef queue)
+{
+    if (!is_queue(queue))
+        return kCMSimpleQueueError_RequiredParameterMissing;
+    pthread_mutex_lock(&SQ(queue)->_lock);
+    SQ(queue)->_head = SQ(queue)->_count = 0;
+    pthread_mutex_unlock(&SQ(queue)->_lock);
+    return noErr;
+}
+
+int32_t CMSimpleQueueGetCapacity(CMSimpleQueueRef queue) { return is_queue(queue) ? SQ(queue)->_capacity : 0; }
+int32_t CMSimpleQueueGetCount(CMSimpleQueueRef queue)
+{
+    if (!is_queue(queue))
+        return 0;
+    pthread_mutex_lock(&SQ(queue)->_lock);
+    int32_t n = SQ(queue)->_count;
+    pthread_mutex_unlock(&SQ(queue)->_lock);
+    return n;
 }
