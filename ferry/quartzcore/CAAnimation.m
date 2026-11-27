@@ -216,8 +216,9 @@ CAValueFunctionName const kCAValueFunctionTranslateZ = @"translateZ";
 - (CAMediaTimingFillMode)fillMode { return _fillMode; }
 - (void)setFillMode:(CAMediaTimingFillMode)mode
 {
-    [_fillMode release];
+    id wasFillMode = _fillMode;
     _fillMode = [mode copy];
+    [wasFillMode release];
 }
 
 /* keys the class doesn't have */

@@ -130,8 +130,9 @@ static FUndoAction *new_group(void)
 - (NSArray *)runLoopModes { return _modes; }
 - (void)setRunLoopModes:(NSArray *)modes
 {
-    [_modes release];
+    id wasModes = _modes;
     _modes = [modes copy];
+    [wasModes release];
 }
 
 - (void)_trim

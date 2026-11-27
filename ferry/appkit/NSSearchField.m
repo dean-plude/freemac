@@ -189,8 +189,9 @@
 - (NSArray *)recentSearches { return _recents ?: @[]; }
 - (void)setRecentSearches:(NSArray *)recents
 {
-    [_recents release];
+    id wasRecents = _recents;
     _recents = [recents copy];
+    [wasRecents release];
     if (_autosave)
         [[NSUserDefaults standardUserDefaults] setObject:[self recentSearches] forKey:_autosave];
 }
@@ -202,8 +203,9 @@
     _autosave = [name length] ? [name copy] : nil;
     NSArray *saved = _autosave ? [[NSUserDefaults standardUserDefaults] arrayForKey:_autosave] : nil;
     if (saved) {
-        [_recents release];
+        id wasRecents = _recents;
         _recents = [saved copy];
+        [wasRecents release];
     }
 }
 /* A search just made goes first, once. */

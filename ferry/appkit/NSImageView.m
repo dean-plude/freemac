@@ -131,8 +131,9 @@
 - (NSColor *)contentTintColor { return _tint; }
 - (void)setContentTintColor:(NSColor *)c
 {
-    [_tint release];
+    id wasTint = _tint;
     _tint = [c retain];
+    [wasTint release];
     [self setNeedsDisplay:YES];
 }
 

@@ -130,6 +130,9 @@ run_one() {
         security_older)
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_DATA_HOME= "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
+        security_keepassxc_calls)
+            # no smart card service: a pcsc-lite that isn't there
+            FERRY_PCSC=/nonexistent/libpcsclite.so.1 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         security_code) FERRY_VERBOSE=1 "$top/ferry" "$exe" > "$build/$name.got" 2> "$build/$name.err" ;;
         foundation_streams)
             # an echo server of its own, and run.sh's TLS server with its certificate
@@ -268,6 +271,9 @@ run_one libsystem_apps "$here/libsystem_apps.c" "$here/libsystem_apps.out"
 # Mach semaphores, pathconf, getpwuid_r, sigwait, statvfs and the rest of
 # what VLC's core asks of libSystem (1.232).
 run_one libsystem_vlc "$here/libsystem_vlc.c" "$here/libsystem_vlc.out"
+# shm_open, the va_list _l printing calls and condition waits that don't
+# wake early, for darktable (freemac darktable work)
+run_one libsystem_darktable "$here/libsystem_darktable.c" "$here/libsystem_darktable.out"
 # uuid(3), the older task_info flavors and vm_page_size, for OBS's libobs
 run_one libsystem_obs "$here/libsystem_obs.c" "$here/libsystem_obs.out"
 run_one atomics "$here/atomics.c" "$here/atomics.out"
@@ -458,6 +464,11 @@ run_one foundation_corefoundation "$here/foundation/corefoundation.c" "$here/fou
 # Run loop sources and CFSockets on 127.0.0.1, from plain C.
 run_one corefoundation_socket "$here/foundation/cfsocket.c" "$here/foundation/cfsocket.out" -framework CoreFoundation
 run_one foundation_constant_literals "$here/foundation/constant_literals.m" "$here/foundation/constant_literals.out" -framework Foundation
+# What kitty's official download asks for before its window: the old dyld
+# symbol calls, literal dictionaries and float numbers, HIToolbox's bundle
+# and Menlo among the available fonts (freemac kitty work)
+run_one foundation_kitty_calls "$here/foundation/kitty_calls.m" "$here/foundation/kitty_calls.out" -framework AppKit \
+    -framework Foundation -framework CoreText -framework CoreGraphics
 run_one foundation_arc "$here/foundation/arc.m" "$here/foundation/arc.out" -fobjc-arc -framework Foundation
 run_one foundation_dispatch "$here/foundation/dispatch.m" "$here/foundation/dispatch.out" -fobjc-arc -framework Foundation
 # The macOS version, the same in the Mac's version file, uname, NSProcessInfo
@@ -472,6 +483,11 @@ run_one foundation_mac_fonts "$here/foundation/mac_fonts.m" "$here/foundation/ma
 # runs, and the code-signing answers (said once with FERRY_VERBOSE).
 run_one security_keychain "$here/security/keychain.m" "$here/security/keychain.out" -framework Foundation \
     -framework Security
+# KeePassXC's calls (freemac 1.NEXT): Local Authentication with no Touch
+# ID, kSecUseAuthenticationUIAllow, ptrace(PT_DENY_ATTACH) and PC/SC smart
+# cards in the Mac's layout, with no smart card service.
+run_one security_keepassxc_calls "$here/security/keepassxc_calls.m" "$here/security/keepassxc_calls.out" -fblocks \
+    -framework Foundation -framework Security -framework LocalAuthentication -framework PCSC
 run_one security_code "$here/security/code.m" "$here/security/code.out" -framework Foundation -framework Security
 # The older keychain calls Sequel Pro makes (freemac 1.226, Ferry 0.50.0):
 # items from attribute lists, searches and access lists, in a home of its
@@ -1915,6 +1931,10 @@ fi
 # FERRY_TEST_SHOTS, when set, is a folder for the tests' pictures.
 # A view drawn as Qt 6's Cocoa plugin draws one (OBS): its own setLayer:
 # and container layer, displayLayer:, and an IOSurface as the contents.
+# GTK 3's window view (darktable): a layer for a view that overrides
+# wantsLayer, drawn in updateLayer from a CVPixelBuffer; collation without a collator
+run_one appkit_darktable_calls "$here/appkit/darktable_calls.m" "$here/appkit/darktable_calls.out" -fobjc-arc \
+    -framework Cocoa -framework CoreVideo -framework CoreServices
 run_one appkit_qt_layers "$here/appkit/qt_layers.m" "$here/appkit/qt_layers.out" -fobjc-arc -framework Cocoa \
     -framework QuartzCore -framework IOSurface
 # Buttons drawn through their cells, as Qt 6's Mac style draws them (OBS).

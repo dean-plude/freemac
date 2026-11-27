@@ -281,8 +281,9 @@ static void refresh(BOOL ask_delegate)
     if (main)
         describe(main, NO, now);
     if (![now isEqualToString:shape ?: @""]) {
-        [shape release];
+        id wasShape = shape;
         shape = [now copy];
+        [wasShape release];
         rebuild(main);
         return;
     }

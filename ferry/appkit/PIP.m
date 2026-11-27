@@ -72,8 +72,9 @@
     if (!viewController)
         return;
     if (_shown != viewController) {
-        [_shown release];
+        id wasShown = _shown;
         _shown = [viewController retain];
+        [wasShown release];
     }
     NSSize s = [self fittedSize];
     NSRect screen = [[NSScreen mainScreen] visibleFrame];

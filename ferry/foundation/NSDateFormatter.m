@@ -407,8 +407,9 @@ static NSString *time_style(NSDateFormatterStyle s)
         f = [NSString stringWithFormat:_dateStyle >= NSDateFormatterLongStyle ? @"%@ 'at' %@" : @"%@, %@", d, t];
     else
         f = d ?: t ?: @"";
-    [_format release];
+    id wasFormat = _format;
     _format = [f copy];
+    [wasFormat release];
 }
 
 - (NSString *)dateFormat { return _format; }

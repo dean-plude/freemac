@@ -266,8 +266,9 @@ static NSString *base_language(NSString *tag)
 {
     if (_created)
         return;
-    [_path release];
+    id wasPath = _path;
     _path = [path copy];
+    [wasPath release];
     _overwrite = allowOverwrite;
 }
 - (void)_begin
@@ -293,8 +294,9 @@ static NSString *base_language(NSString *tag)
             NSString *p = [NSString stringWithFormat:@"%@-%d", base, n];
             if ([ext length])
                 p = [p stringByAppendingPathExtension:ext];
-            [_path release];
+            id wasPath = _path;
             _path = [p copy];
+            [wasPath release];
         }
     }
     if (![fm createFileAtPath:_path contents:nil attributes:nil])

@@ -87,8 +87,9 @@ static NSOperatingSystemVersion FSystemVersion(const char **build)
 }
 - (void)setProcessName:(NSString *)name
 {
-    [_name release];
+    id wasName = _name;
     _name = [name copy];
+    [wasName release];
 }
 - (int)processIdentifier { return getpid(); }
 - (NSString *)hostName
@@ -299,6 +300,59 @@ static NSArray *loaded_bundles(BOOL frameworks)
     }
     return out;
 }
+/* Frameworks a Mac has as their own, whose calls Ferry keeps inside another
+ * of its frameworks: HIToolbox (Carbon's keyboard layouts and the rest) is
+ * in AppKit. GLFW, in kitty, opens com.apple.HIToolbox for its keyboard
+ * calls. Such a bundle answers with the host's library. */
+static NSBundle *hosted_framework_bundle(NSString *identifier, NSString *name)
+{
+    static NSString *const hosted[][2] = {{@"HIToolbox", @"AppKit"}, {@"Carbon", @"AppKit"}};
+    NSString *host = nil;
+    for (size_t i = 0; i < sizeof hosted / sizeof hosted[0]; i++)
+        if ([name caseInsensitiveCompare:hosted[i][0]] == NSOrderedSame) {
+            name = hosted[i][0];
+            host = hosted[i][1];
+        }
+    if (!host)
+        return nil;
+    static NSMutableDictionary *made;
+    @synchronized([NSBundle class]) {
+        NSBundle *known = [made objectForKey:name];
+        if (known)
+            return known;
+    }
+    uint32_t n = _dyld_image_count();
+    for (uint32_t i = 0; i < n; i++) {
+        const char *image = _dyld_get_image_name(i);
+        if (!image)
+            continue;
+        NSString *exe = [NSString stringWithUTF8String:image];
+        NSString *dir = [exe stringByDeletingLastPathComponent];
+        if (![[dir pathExtension] isEqualToString:@"framework"] || ![[exe lastPathComponent] isEqualToString:host])
+            continue;
+        NSBundle *b = [NSBundle alloc];
+        b->_path = [[[dir stringByDeletingLastPathComponent]
+            stringByAppendingPathComponent:[name stringByAppendingPathExtension:@"framework"]] copy];
+        b->_executable = [exe copy];
+        b->_resources = [b->_path copy];
+        b->_plugins = [[b->_path stringByAppendingPathComponent:@"PlugIns"] copy];
+        b->_info = [@{@"CFBundleIdentifier" : identifier, @"CFBundleExecutable" : host, @"CFBundleName" : name} retain];
+        @synchronized([NSBundle class]) {
+            if (!made)
+                made = [[NSMutableDictionary alloc] init];
+            NSBundle *known = [made objectForKey:name];
+            if (known) {
+                [b release];
+                return known;
+            }
+            [made setObject:b forKey:name];
+            [b release];
+        }
+        return b;
+    }
+    return nil;
+}
+
 /* A system framework by its Mac identifier (com.apple.opengl,
  * com.apple.audio.CoreAudio...), whose last part names the framework:
  * Ferry's own frameworks carry no Info.plist, so the loaded one of that
@@ -335,7 +389,7 @@ static NSBundle *system_framework_bundle(NSString *identifier)
         }
         return b;
     }
-    return nil;
+    return hosted_framework_bundle(identifier, name);
 }
 + (NSArray *)allFrameworks { return loaded_bundles(YES); }
 + (NSArray *)allBundles { return [@[[self mainBundle]] arrayByAddingObjectsFromArray:loaded_bundles(NO)]; }

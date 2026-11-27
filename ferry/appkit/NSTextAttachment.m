@@ -63,30 +63,34 @@ NSAttributedStringKey const NSAttachmentAttributeName = @"NSAttachment";
 }
 - (void)setContents:(NSData *)contents
 {
-    [_contents release];
+    id wasContents = _contents;
     _contents = [contents retain];
+    [wasContents release];
     [_madeImage release];
     _madeImage = nil;
 }
 - (NSString *)fileType { return _fileType; }
 - (void)setFileType:(NSString *)type
 {
-    [_fileType release];
+    id wasFileType = _fileType;
     _fileType = [type copy];
+    [wasFileType release];
 }
 - (NSImage *)image { return _image; }
 - (void)setImage:(NSImage *)image
 {
-    [_image release];
+    id wasImage = _image;
     _image = [image retain];
+    [wasImage release];
 }
 - (CGRect)bounds { return _bounds; }
 - (void)setBounds:(CGRect)bounds { _bounds = bounds; }
 - (NSFileWrapper *)fileWrapper { return _fileWrapper; }
 - (void)setFileWrapper:(NSFileWrapper *)wrapper
 {
-    [_fileWrapper release];
+    id wasFileWrapper = _fileWrapper;
     _fileWrapper = [wrapper retain];
+    [wasFileWrapper release];
     [_madeImage release];
     _madeImage = nil;
 }

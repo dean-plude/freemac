@@ -524,8 +524,9 @@ NSNotificationName const NSSplitViewDidResizeSubviewsNotification = @"NSSplitVie
 {
     if (name == _autosaveName)
         return;
-    [_autosaveName release];
+    id wasAutosaveName = _autosaveName;
     _autosaveName = [name copy];
+    [wasAutosaveName release];
     if (![_autosaveName length])
         return;
     /* each subview as "x, y, width, height, hidden, NO" (the last says whether it was flipped) */

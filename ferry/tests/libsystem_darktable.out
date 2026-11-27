@@ -1,0 +1,12 @@
+shm_open created: yes
+ftruncate: 0
+seen through a second opening: shared
+O_EXCL again fails: yes
+shm_unlink: 0
+vsnprintf_l C: 3.25|7
+vsnprintf_l decimal comma: yes
+vasprintf_l: img-009
+sprintf_l: ff
+vsscanf_l: 2 2.5 11
+woke when signalled: yes
+exit=0

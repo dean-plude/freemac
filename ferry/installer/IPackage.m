@@ -972,8 +972,9 @@ static void find_installables(NSString *dir, int depth, NSMutableArray *pkgs, NS
 static BOOL (^disk_image_waiter)(void);
 + (void)setDiskImageWaiter:(BOOL (^)(void))waiter
 {
-    [disk_image_waiter release];
+    id wasDisk_image_waiter = disk_image_waiter;
     disk_image_waiter = [waiter copy];
+    [wasDisk_image_waiter release];
 }
 - (BOOL)_openDiskImage:(NSString **)error
 {

@@ -212,8 +212,9 @@ NSString *const NSLocalizedKeyDictionaryBinding = @"localizedKeyDictionary";
     if (!info && [_dict isKindOfClass:[NSMutableDictionary class]]) {
         [(NSMutableDictionary *)_dict setDictionary:d];
     } else if (d != _dict) {
-        [_dict release];
+        id wasDict = _dict;
         _dict = [d copy];
+        [wasDict release];
     }
 }
 - (NSMutableDictionary *)_editableDictionary

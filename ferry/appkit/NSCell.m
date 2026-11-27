@@ -82,8 +82,9 @@ static void cell_changed(NSCell *cell, NSView *view)
 - (instancetype)initImageCell:(NSImage *)image
 {
     if ((self = [self initTextCell:@""])) {
-        [_value release];
+        id wasValue = _value;
         _value = [image retain];
+        [wasValue release];
     }
     return self;
 }
@@ -624,8 +625,9 @@ static void cell_changed(NSCell *cell, NSView *view)
 }
 - (void)setAttributedTitle:(NSAttributedString *)t
 {
-    [_attributedTitle release];
+    id wasAttributedTitle = _attributedTitle;
     _attributedTitle = [t copy];
+    [wasAttributedTitle release];
     [self setTitle:[t string] ?: @""];
 }
 - (BOOL)_hasButtonType { return _typeKnown; }
@@ -701,8 +703,9 @@ static void cell_changed(NSCell *cell, NSView *view)
 }
 - (void)setPlaceholderString:(NSString *)s
 {
-    [_placeholder release];
+    id wasPlaceholder = _placeholder;
     _placeholder = [s copy];
+    [wasPlaceholder release];
 }
 - (NSAttributedString *)placeholderAttributedString
 {
@@ -710,8 +713,9 @@ static void cell_changed(NSCell *cell, NSView *view)
 }
 - (void)setPlaceholderAttributedString:(NSAttributedString *)s
 {
-    [_placeholder release];
+    id wasPlaceholder = _placeholder;
     _placeholder = [s copy];
+    [wasPlaceholder release];
 }
 - (BOOL)drawsBackground { return _drawsBackground; }
 - (void)setDrawsBackground:(BOOL)f { _drawsBackground = f; }

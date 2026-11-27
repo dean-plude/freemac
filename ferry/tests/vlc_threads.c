@@ -7,10 +7,11 @@
  * as VLC's main does, while CFRunLoopRunInMode still finishes at once with
  * nothing to do. Since freemac 1.237: nil is a null pointer in C too,
  * through CoreServices (VLC's sound out uses it so), and a cancellable wait
- * comes back now and then to look at its condition again, as POSIX lets a
- * wait do, so a wake taken at the end of one of its slices isn't lost:
- * threads handing work to each other through a condition, as FFmpeg's
- * decoding threads do, never hang. */
+ * wakes taken at the end of one of its slices aren't lost: threads handing
+ * work to each other through a condition, as FFmpeg's decoding threads do,
+ * never hang. Since the darktable work, a wait that nobody signals goes on
+ * waiting, as a Mac's does (some programs don't check their condition
+ * again), and a signal sent between two of its slices still ends it. */
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreServices/CoreServices.h>
 #include <dispatch/dispatch.h>
@@ -81,13 +82,14 @@ static void *taker(void *arg)
     return NULL;
 }
 
-static volatile int looked;
+static volatile int looked, woke;
 static void *looker(void *arg)
 {
     (void)arg;
     pthread_mutex_lock(&lock);
-    while (!looked)  /* nobody signals: the wait still comes back */
-        looked = 1, pthread_cond_wait(&turn_cond, &lock);
+    looked = 1;
+    pthread_cond_wait(&turn_cond, &lock);   /* once, without checking again */
+    woke = 1;
     pthread_mutex_unlock(&lock);
     return NULL;
 }
@@ -156,7 +158,15 @@ int main(void)
     pthread_join(b, NULL);
     printf("turns taken through a condition: %d\n", turns_done);
     pthread_create(&a, NULL, looker, NULL);
+    while (!looked)
+        sched_yield();
+    struct timespec quiet = { 0, 450000000 };   /* several of its slices */
+    nanosleep(&quiet, NULL);
+    pthread_mutex_lock(&lock);
+    int still = !woke;
+    pthread_cond_signal(&turn_cond);
+    pthread_mutex_unlock(&lock);
     pthread_join(a, NULL);
-    printf("an unsignalled wait came back to look again: %d\n", looked);
+    printf("an unsignalled wait goes on waiting: %d, then the signal ends it: %d\n", still, woke);
     return 0;
 }

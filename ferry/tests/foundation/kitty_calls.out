@@ -1,0 +1,14 @@
+_strlen is defined: 1, _no_such_call_here: 0
+bound to strlen: yes, named _strlen
+in a library: yes
+dictionary: NSConstantDictionary, 3 entries, is a dictionary: yes
+blend 0.5 (d), scale 0.25 (f), count 7
+missing key: nil
+keys in order: blend,scale,count
+equals a dictionary made at run time: yes
+0.5 equals @0.5: yes, 0.25 compares with @1: -1
+still there after release: 3 entries
+HIToolbox bundle: yes, identifier com.apple.HIToolbox, has an executable: yes
+Menlo-Bold opens, i as wide as M: yes, bold: yes
+Menlo listed: yes, every face monospaced: yes, Menlo-Bold among them: yes
+exit=0

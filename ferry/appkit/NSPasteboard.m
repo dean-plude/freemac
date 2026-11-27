@@ -274,8 +274,9 @@ static NSMutableDictionary *pasteboards;
         g_free(text);
     if ((!s && !_lastSystemText) || [s isEqualToString:_lastSystemText])
         return;
-    [_lastSystemText release];
+    id wasLastSystemText = _lastSystemText;
     _lastSystemText = [s copy];
+    [wasLastSystemText release];
     if (s && [self _ownString:s])
         return; /* our own text, as we wrote it */
     [self _takeFromSystem:cb text:s];
@@ -350,8 +351,9 @@ static NSMutableDictionary *pasteboards;
         return;
     }
     gtk_clipboard_set_text(cb, [s UTF8String], -1);
-    [_lastSystemText release];
+    id wasLastSystemText = _lastSystemText;
     _lastSystemText = [s copy];
+    [wasLastSystemText release];
 }
 
 - (NSInteger)changeCount
@@ -424,8 +426,9 @@ static NSMutableDictionary *pasteboards;
 {
     NSPasteboardItem *item = [self _firstItem];
     if (owner && owner != _owner) {
-        [_owner release];
+        id wasOwner = _owner;
         _owner = [owner retain];
+        [wasOwner release];
     }
     for (NSString *type in types)
         if (![[item types] containsObject:type])

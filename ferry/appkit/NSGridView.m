@@ -101,8 +101,9 @@ const CGFloat NSGridViewSizeForContent = 1.0e6;
     NSGridView *g = [self _grid];
     if ([_content superview] == g)
         [_content removeFromSuperview];
-    [_content release];
+    id wasContent = _content;
     _content = [view retain];
+    [wasContent release];
     if (g && view && view != [NSGridCell emptyContentView])
         [g addSubview:view];
     [g _relayout];
@@ -126,8 +127,9 @@ const CGFloat NSGridViewSizeForContent = 1.0e6;
 - (NSArray *)customPlacementConstraints { return _custom ?: @[]; }
 - (void)setCustomPlacementConstraints:(NSArray *)constraints
 {
-    [_custom release];
+    id wasCustom = _custom;
     _custom = [constraints copy];
+    [wasCustom release];
 }
 - (NSString *)description
 {

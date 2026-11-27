@@ -381,8 +381,9 @@ static void unlink_from(NSAnimation *self, NSAnimation *other, BOOL starts)
 {
     if (animations == _animations)
         return;
-    [_animations release];
+    id wasAnimations = _animations;
     _animations = [animations copy];
+    [wasAnimations release];
 }
 
 static NSRect frame_of(id target) { return [target frame]; }

@@ -165,8 +165,9 @@ static BOOL valid_url_chars(NSString *s)
         }
         _host = [authority copy];
     }
-    [_path release];
+    id wasPath = _path;
     _path = [s copy];
+    [wasPath release];
     return self;
 }
 - (void)dealloc
@@ -288,8 +289,9 @@ SETTER(setPercentEncodedFragment, _fragment)
 #undef SETTER
 - (void)setPercentEncodedPath:(NSString *)v
 {
-    [_path release];
+    id wasPath = _path;
     _path = [(v ? v : @"") copy];
+    [wasPath release];
 }
 - (NSString *)scheme { return _scheme; }
 - (void)setScheme:(NSString *)v
@@ -301,16 +303,18 @@ SETTER(setPercentEncodedFragment, _fragment)
         if (!ok)
             FRaise(NSInvalidArgumentException, @"-[NSURLComponents setScheme:]: invalid characters in scheme");
     }
-    [_scheme release];
+    id wasScheme = _scheme;
     _scheme = [v copy];
+    [wasScheme release];
 }
 - (NSNumber *)port { return _port; }
 - (void)setPort:(NSNumber *)v
 {
     if (v && [v integerValue] < 0)
         FRaise(NSInvalidArgumentException, @"-[NSURLComponents setPort:]: negative port");
-    [_port release];
+    id wasPort = _port;
     _port = [v copy];
+    [wasPort release];
 }
 - (NSString *)percentEncodedUser { return _user; }
 - (NSString *)percentEncodedPassword { return _password; }

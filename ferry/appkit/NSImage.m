@@ -651,8 +651,9 @@ static CGFloat file_scale(NSString *path)
         named_images = [[NSMutableDictionary alloc] init];
     if (_name && named_images[_name] == self)
         [named_images removeObjectForKey:_name];
-    [_name release];
+    id wasName = _name;
     _name = [name copy];
+    [wasName release];
     if (_name)
         named_images[_name] = self;
     return YES;
@@ -684,14 +685,16 @@ static CGFloat file_scale(NSString *path)
 - (NSString *)accessibilityDescription { return _description; }
 - (void)setAccessibilityDescription:(NSString *)d
 {
-    [_description release];
+    id wasDescription = _description;
     _description = [d copy];
+    [wasDescription release];
 }
 - (NSColor *)backgroundColor { return _background ?: [NSColor clearColor]; }
 - (void)setBackgroundColor:(NSColor *)c
 {
-    [_background release];
+    id wasBackground = _background;
     _background = [c copy];
+    [wasBackground release];
 }
 - (NSImageCacheMode)cacheMode { return _cacheMode; }
 - (void)setCacheMode:(NSImageCacheMode)m { _cacheMode = m; }

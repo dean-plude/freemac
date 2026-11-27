@@ -1206,8 +1206,9 @@ struct argslot { NSUInteger index, count, offset, size; MTLDataType type; };
 - (NSUInteger)alignment { return _align; }
 - (void)setArgumentBuffer:(id<MTLBuffer>)b offset:(NSUInteger)offset
 {
-    [_buffer release];
+    id wasBuffer = _buffer;
     _buffer = [b retain];
+    [wasBuffer release];
     _base = b ? (char *)[b contents] + offset : NULL;
 }
 - (void)setArgumentBuffer:(id<MTLBuffer>)b startOffset:(NSUInteger)start arrayElement:(NSUInteger)element

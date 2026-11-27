@@ -142,8 +142,9 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
         fprintf(stderr, "ferry: a window controller couldn't load its window nib \"%s\"\n", [name UTF8String]);
         return;
     }
-    [_topLevel release];
+    id wasTopLevel = _topLevel;
     _topLevel = [top retain];
+    [wasTopLevel release];
     if (!_window)
         fprintf(stderr, "ferry: the nib \"%s\" didn't connect a window to its window controller\n",
                 [name UTF8String]);
@@ -252,8 +253,9 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
 - (NSString *)windowFrameAutosaveName { return _autosaveName ?: @""; }
 - (void)setWindowFrameAutosaveName:(NSString *)name
 {
-    [_autosaveName release];
+    id wasAutosaveName = _autosaveName;
     _autosaveName = [name copy];
+    [wasAutosaveName release];
     if (_window)
         [_window setFrameAutosaveName:name];
 }
@@ -435,8 +437,9 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
         fprintf(stderr, "ferry: a %s couldn't load its nib \"%s\"\n", object_getClassName(self), [name UTF8String]);
         return;
     }
-    [_topLevel release];
+    id wasTopLevel = _topLevel;
     _topLevel = [top retain];
+    [wasTopLevel release];
     if (!_view)
         fprintf(stderr, "ferry: the nib \"%s\" didn't connect a view to its %s\n", [name UTF8String],
                 object_getClassName(self));
@@ -484,8 +487,9 @@ static NSArray *load_nib(NSString *name, NSString *path, NSBundle *bundle, id ow
 - (NSString *)title { return _title; }
 - (void)setTitle:(NSString *)t
 {
-    [_title release];
+    id wasTitle = _title;
     _title = [t copy];
+    [wasTitle release];
 }
 - (id)representedObject { return _represented; }
 - (void)setRepresentedObject:(id)o

@@ -1,0 +1,10 @@
+a view overriding wantsLayer has a layer: yes
+its layer's delegate is the view: yes
+updateLayer asked when drawn: yes
+CVPixelBuffer contents drawn: green
+a plain view still has no layer: yes
+title set to itself: darktable 5
+UCCompareTextDefault apple < Banana: yes (status 0)
+apple equals APPLE ignoring case: yes
+UCCompareTextNoLocale Banana > apple: yes
+exit=0

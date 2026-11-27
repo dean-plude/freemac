@@ -625,14 +625,16 @@ static void menu_will_open(NSMenu *menu)
     g_dbus_connection_emit_signal(bus, NULL, path, ITEM_IFACE, "NewIcon", NULL, NULL);
     NSString *tip = [_button toolTip] ?: @"";
     if (![tip isEqualToString:_shownTip ?: @""]) {
-        [_shownTip release];
+        id wasShownTip = _shownTip;
         _shownTip = [tip copy];
+        [wasShownTip release];
         g_dbus_connection_emit_signal(bus, NULL, path, ITEM_IFACE, "NewToolTip", NULL, NULL);
     }
     NSString *status = [self _status];
     if (![status isEqualToString:_shownStatus ?: @"Active"]) {
-        [_shownStatus release];
+        id wasShownStatus = _shownStatus;
         _shownStatus = [status copy];
+        [wasShownStatus release];
         GVariant *arg = g_variant_new_string([status UTF8String]);
         g_dbus_connection_emit_signal(bus, NULL, path, ITEM_IFACE, "NewStatus", g_variant_new_tuple(&arg, 1), NULL);
     }

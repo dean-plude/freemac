@@ -57,6 +57,12 @@ long double strtold_l(const char *, char **, locale_t);
 int snprintf_l(char *, size_t, locale_t, const char *, ...);
 int asprintf_l(char **, locale_t, const char *, ...);
 int sscanf_l(const char *, locale_t, const char *, ...);
+/* freemac darktable work: the va_list forms and sprintf_l */
+int vsnprintf_l(char *, size_t, locale_t, const char *, va_list);
+int vasprintf_l(char **, locale_t, const char *, va_list);
+int vsprintf_l(char *, locale_t, const char *, va_list);
+int sprintf_l(char *, locale_t, const char *, ...);
+int vsscanf_l(const char *, locale_t, const char *, va_list);
 wint_t btowc_l(int, locale_t);
 int wctob_l(wint_t, locale_t);
 size_t mbrtowc_l(wchar_t *, const char *, size_t, mbstate_t *, locale_t);

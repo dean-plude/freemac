@@ -122,9 +122,16 @@ static const struct twin {
     /* libffi (p11-kit, freemac 1.262): the same types and the same x86-64
      * calling conventions, numbered alike in libffi's own headers */
     {"/usr/lib/libffi.dylib", "libffi.so.8"},
+    /* CUPS, the printing system both use (darktable's print view, freemac
+     * Ferry test apps): Apple's libcups and Linux's are the same project */
+    {"/usr/lib/libcups.2.dylib", "libcups.so.2"},
+    {"/usr/lib/libcups.dylib", "libcups.so.2"},
     /* ICU's C calls (regular expressions, collation, breaking), which
      * Linux builds name with the version, as uregex_open_74 */
     {"/usr/lib/libicucore.A.dylib", "icu"},
+    /* PC/SC smart cards (KeePassXC): pcsc-lite, through src/pcsc.c, whose
+     * calls widen the Mac's 32-bit numbers; opened when a context is made */
+    {"/System/Library/Frameworks/PCSC.framework/Versions/A/PCSC", "pcsc"},
     {NULL, NULL},
 };
 static char icu_suffix[8];
@@ -150,7 +157,7 @@ static const char *const takes_a_file[] = {
     "BZ2_bzReadOpen", "BZ2_bzWriteOpen", "xmlDocDump", "xmlDocFormatDump", "xmlElemDump", "xmlBufferDump",
     "htmlDocDump", "xmlParserInputBufferCreateFile", "xmlOutputBufferCreateFile", "xmlCatalogDump",
     "xmlACatalogDump", "xmlLsOneNode", "xmlShell", "xmlPrintURI", "xmlMemDisplay", "xmlMemShow",
-    "xmlDebugDumpString", "xmlDebugDumpAttr", "xmlDebugDumpAttrList", "xmlDebugDumpOneNode", "xmlDebugDumpNode",
+    "xmlDebugDumpString", "ppdOpen", "xmlDebugDumpAttr", "xmlDebugDumpAttrList", "xmlDebugDumpOneNode", "xmlDebugDumpNode",
     "xmlDebugDumpNodeList", "xmlDebugDumpDocumentHead", "xmlDebugDumpDocument", "xmlDebugDumpDTD",
     "xmlDebugDumpEntities", "xmlDebugCheckDocument", "xmlRegexpPrint", "xmlNanoHTTPSave", NULL,
 };
@@ -159,6 +166,8 @@ int ferry_twin_library(const char *install_name)
 {
     for (int i = 0; twins[i].mac; i++)
         if (!strcmp(install_name, twins[i].mac)) {
+            if (!twin_linked[i] && !strcmp(twins[i].linux_name, "pcsc"))
+                twin_linked[i] = 1;   /* pcsc.c opens pcsc-lite itself, on first use */
             if (!twin_linked[i]) {
                 twin_linked[i] = 1;
                 int icu = !strcmp(twins[i].linux_name, "icu");
@@ -203,6 +212,9 @@ static void *twin_bzWriteOpen(int *err, void *file, int block_size, int verbosit
 
 void *ferry_twin_lookup(const char *name)
 {
+    void *pcsc = ferry_pcsc_lookup(name);
+    if (pcsc || !strncmp(name, "SCard", 5) || !strncmp(name, "g_rgSCard", 9))
+        return pcsc;
     if (!strcmp(name, "BZ2_bzReadOpen"))
         return bz2_call(name) ? (void *)twin_bzReadOpen : NULL;
     if (!strcmp(name, "BZ2_bzWriteOpen"))

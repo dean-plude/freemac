@@ -94,6 +94,7 @@ void *ferry_webkit_symbol(const char *name);        /* WebKitGTK, for Ferry's We
 void *ferry_jsc_symbol(const char *name);           /* JavaScriptCore, for Ferry's (javascriptcore/) */
 void *ferry_sound_symbol(const char *name);         /* libpulse, for Ferry's Core Audio (coreaudio/) */
 void *ferry_synth_symbol(const char *name);         /* FluidSynth, for Core Audio's synth units */
+void *ferry_pcsc_lookup(const char *name);          /* PCSC.framework over pcsc-lite (pcsc.c) */
 void *ferry_gl_symbol(const char *name);            /* EGL and OpenGL, for Ferry's OpenGL (opengl/) */
 void *ferry_capture_symbol(const char *name);       /* Xlib and its extensions, for screen capture (1.238) */
 void *ferry_camera_symbol(const char *name);        /* cameras, for AVFoundation's capture (camera.c, 1.257) */

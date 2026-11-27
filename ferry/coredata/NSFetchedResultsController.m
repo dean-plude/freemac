@@ -156,8 +156,9 @@
             *error = err;
         return NO;
     }
-    [_objects release];
+    id wasObjects = _objects;
     _objects = [objects copy];
+    [wasObjects release];
     [_sections release];
     _sections = [[self cd_sectionsFor:_objects] copy];
     if (!_observing) {
@@ -272,10 +273,12 @@ static NSIndexPath *find_in(NSArray *sections, id object)
 
     BOOL any = [sectionDeletes count] || [sectionInserts count] || [deletes count] || [inserts count] ||
                [moves count] || [updates count];
-    [_objects release];
+    id wasObjects = _objects;
     _objects = [now copy];
-    [_sections release];
+    [wasObjects release];
+    id wasSections = _sections;
     _sections = [newSections copy];
+    [wasSections release];
     if (any) {
         id<NSFetchedResultsControllerDelegate> d = _delegate;
         if ([d respondsToSelector:@selector(controllerWillChangeContent:)])

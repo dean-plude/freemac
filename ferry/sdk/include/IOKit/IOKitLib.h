@@ -31,6 +31,9 @@ kern_return_t IOServiceGetMatchingServices(mach_port_t mainPort, CFDictionaryRef
 io_object_t IOIteratorNext(io_iterator_t iterator);
 boolean_t IOIteratorIsValid(io_iterator_t iterator);
 kern_return_t IOObjectRelease(io_object_t object);
+/* Waiting for the registry to settle: Ferry's is always settled */
+kern_return_t IOKitWaitQuiet(mach_port_t mainPort, mach_timespec_t *waitTime);
+kern_return_t IOServiceWaitQuiet(io_service_t service, mach_timespec_t *waitTime);
 boolean_t IOObjectIsEqualTo(io_object_t object, io_object_t anObject);
 kern_return_t IORegistryEntryGetParentEntry(io_registry_entry_t entry, const io_name_t plane,
                                             io_registry_entry_t *parent);

@@ -2095,8 +2095,9 @@ static NSXMLDocument *parse_document(Class cls, NSData *data, NSString *url, con
         check_orphan(dtd);
     if (_DTD)
         _DTD->_parent = nil;
-    [_DTD release];
+    id wasDTD = _DTD;
     _DTD = [dtd retain];
+    [wasDTD release];
     if (dtd)
         dtd->_parent = self;
     CHANGED();
