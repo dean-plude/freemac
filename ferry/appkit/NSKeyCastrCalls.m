@@ -273,7 +273,6 @@ NSNotificationName const NSWorkspaceAccessibilityDisplayOptionsDidChangeNotifica
 @implementation NSView (FerryReuse)
 - (void)prepareForReuse {}
 - (void)viewDidChangeEffectiveAppearance {}
-- (BOOL)needsToDrawRect:(NSRect)rect { return NSIntersectsRect(rect, [self visibleRect]); }
 - (void)noteFocusRingMaskChanged {}
 - (NSString *)view:(NSView *)view stringForToolTip:(NSToolTipTag)tag point:(NSPoint)point userData:(void *)data
 {

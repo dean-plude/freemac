@@ -79,6 +79,7 @@ struct image {
     int initialized;
     int is_bundle;
     int complete;                       /* loaded, fixed up and protected */
+    int linking;                        /* its fixups are being applied */
     char *real;                         /* real path, to load each file once */
 };
 
@@ -492,6 +493,8 @@ static void *missing_string_constant(struct image *im, const char *raw)
     return cell;
 }
 
+static const char *short_name(const char *path);
+
 static void *resolve(struct image *im, const char *raw, int weak, int ordinal)
 {
     void *addr = lookup_symbol(im, raw, ordinal);
@@ -520,7 +523,7 @@ static void *resolve(struct image *im, const char *raw, int weak, int ordinal)
             return NULL;
         }
         addr = ferry_missing_stub(raw);
-        note("  missing %s", raw);
+        note("  missing %s (in %s, library %d)", raw, short_name(im->path), ordinal);
     }
     return addr;
 }
@@ -861,15 +864,13 @@ static void *trie_lookup(struct image *im, const char *raw, int depth)
         return NULL;
     const uint8_t *start = im->exports, *end = start + im->exports_size, *p = start;
     const char *s = raw;
-    for (;;) {
-        if (p >= end)
+    for (int steps = 0;; steps++) {
+        if (p >= end || steps > 4096)   /* a malformed trie that loops */
             return NULL;
         const uint8_t *node = p;
         uint64_t terminal = uleb(&p, end);
         const uint8_t *children = p + terminal;
-        if (!*s) {
-            if (!terminal)
-                return NULL;
+        if (!*s && terminal) {
             uint64_t flags = uleb(&p, end);
             if (flags & EXPORT_REEXPORT) {
                 uint64_t ordinal = uleb(&p, end);
@@ -897,17 +898,25 @@ static void *trie_lookup(struct image *im, const char *raw, int depth)
         if (p >= end)
             return NULL;
         uint8_t count = *p++;
-        const uint8_t *next = NULL;
+        const uint8_t *next = NULL, *empty = NULL;
         for (uint8_t c = 0; c < count && p < end; c++) {
             const char *edge = (const char *)p;
             size_t len = strnlen(edge, end - p);
             p += len + 1;
             uint64_t off = uleb(&p, end);
-            if (!next && !strncmp(s, edge, len)) {
+            if (!len)
+                empty = start + off;
+            else if (!next && !strncmp(s, edge, len)) {
                 next = start + off;
                 s += len;
             }
         }
+        /* Some linkers leave an empty edge to a node that goes on from
+         * here: conda-forge's zlib reaches "_uncompress" and "_inflate", and
+         * everything after "_inflate", through one. It is taken when no
+         * other edge fits (freemac 1.267). */
+        if (!next)
+            next = empty;
         if (!next)
             return NULL;
         p = next;
@@ -1057,6 +1066,7 @@ static int expand_path(struct image *loader, const char *name, char *out, size_t
 }
 
 static struct image *load_image(const char *path);
+static struct image *map_image(const char *path);
 
 /* "Sparkle" for ".../Sparkle.framework/Versions/A/Sparkle". */
 static const char *short_name(const char *path)
@@ -1104,7 +1114,7 @@ static struct image *load_library(struct image *loader, const char *install_name
         }
         die("%s needs %s, which Ferry doesn't provide yet", loader->path, install_name);
     }
-    return load_image(path);
+    return map_image(path);
 }
 
 /* ---- fixups in the old form ----------------------------------------------------
@@ -1226,7 +1236,42 @@ static void apply_fixups(struct image *im)
     }
 }
 
+/* As dyld does, every library a program (or a dlopen) brings in is mapped
+ * first, and only then are fixups applied, so a library that leaves its
+ * symbols to be found anywhere (built with -undefined dynamic_lookup, as
+ * Python extensions and libraries embedding Python are) finds them in a
+ * library loaded after it (freemac 1.267). */
+static struct image *map_image(const char *path);
+
+static void link_image(struct image *im)
+{
+    if (im->complete || im->linking)
+        return;
+    im->linking = 1;
+    for (int i = 0; i < im->ndylibs; i++)
+        if (im->deps[i])
+            link_image(im->deps[i]);
+    apply_fixups(im);
+    find_tlv(im);
+    ferry_cxx_image_loaded(im);   /* its unwind tables, once a program uses C++ */
+    im->has_objc = objc_find(im, &im->objc);
+    if (im->has_objc) {
+        note("setting up Objective-C in %s: %zu classes, %zu categories, %zu selectors", im->path,
+             im->objc.nclasses, im->objc.ncats, im->objc.nselrefs);
+        ferry_objc_map_image(&im->objc);
+    }
+    protect_segments(im);
+    im->complete = 1;
+}
+
 static struct image *load_image(const char *path)
+{
+    struct image *im = map_image(path);
+    link_image(im);
+    return im;
+}
+
+static struct image *map_image(const char *path)
 {
     char real[4096];
     if (!realpath(path, real))
@@ -1248,17 +1293,6 @@ static struct image *load_image(const char *path)
     map_segments(im);
     for (int i = 0; i < im->ndylibs; i++)
         im->deps[i] = load_library(im, im->dylibs[i], im->dep_weak[i]);
-    apply_fixups(im);
-    find_tlv(im);
-    ferry_cxx_image_loaded(im);   /* its unwind tables, once a program uses C++ */
-    im->has_objc = objc_find(im, &im->objc);
-    if (im->has_objc) {
-        note("setting up Objective-C in %s: %zu classes, %zu categories, %zu selectors", im->path,
-             im->objc.nclasses, im->objc.ncats, im->objc.nselrefs);
-        ferry_objc_map_image(&im->objc);
-    }
-    protect_segments(im);
-    im->complete = 1;
     return im;
 }
 

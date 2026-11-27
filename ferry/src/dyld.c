@@ -12,7 +12,8 @@
  *
  *   RTLD_DEFAULT    every image loaded globally: the program, then Ferry's
  *                   libSystem and libobjc, then the libraries in load order
- *   RTLD_NEXT       the images loaded after the caller's, then libSystem
+ *   RTLD_NEXT       the images loaded after the caller's, then libSystem, then
+ *                   the libraries the caller links (and theirs)
  *   RTLD_SELF       the caller's image, then as RTLD_NEXT
  *   RTLD_MAIN_ONLY  the program alone
  *
@@ -443,8 +444,19 @@ static void *mac_dlsym(void *h, const char *name)
         addr = ferry_main_image() ? in_image(ferry_main_image(), name) : NULL;
     } else if (h == MAC_RTLD_NEXT || h == MAC_RTLD_SELF) {
         which = h == MAC_RTLD_NEXT ? "RTLD_NEXT" : "RTLD_SELF";
-        int at = image_index(caller_image(__builtin_return_address(0)));
+        struct image *self = caller_image(__builtin_return_address(0));
+        int at = image_index(self);
         addr = from_image_on(at < 0 ? 0 : h == MAC_RTLD_NEXT ? at + 1 : at, name);
+        /* dyld also looks in the libraries the caller links, and theirs,
+         * whenever they were loaded: Qt's Mac plugin, loaded last, finds
+         * OpenGL's calls with RTLD_NEXT through QtGui although OpenGL came
+         * in before it (freemac 1.267). */
+        if (!addr && self) {
+            struct image *deps[64];
+            int b, nd = ferry_image_dependencies(self, deps, 64, &b);
+            for (int d = 0; !addr && d < nd; d++)
+                addr = in_image_tree(deps[d], name, 0);
+        }
     } else {
         struct handle *p = valid_handle(h);
         if (!p) {

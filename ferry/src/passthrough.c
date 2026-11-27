@@ -27,7 +27,9 @@ const char *const ferry_passthrough[] = {
     "strtoumax", "strtod", "strtof", "strtold", "abs", "labs", "llabs", "div", "ldiv", "lldiv",
     "rand", "srand", "rand_r", "random", "srandom", "drand48", "erand48", "lrand48", "mrand48",
     "srand48", "arc4random", "arc4random_buf", "arc4random_uniform", "getentropy",
-    "qsort", "qsort_r", "bsearch", "lsearch", "lfind",
+    "qsort", "bsearch", "lsearch", "lfind",
+    /* message catalogs (catopen(3)): the same calls and flags */
+    "catopen", "catgets", "catclose",
     /* formatted text that doesn't involve a FILE */
     "printf", "vprintf", "sprintf", "vsprintf", "snprintf", "vsnprintf", "asprintf",
     "vasprintf", "dprintf", "vdprintf", "sscanf", "vsscanf", "scanf", "vscanf",

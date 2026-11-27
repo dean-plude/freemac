@@ -258,6 +258,14 @@ CGImageSourceRef CGImageSourceCreateWithURL(CFURLRef url, CFDictionaryRef option
 }
 
 CFTypeID CGImageSourceGetTypeID(void) { return (CFTypeID)[GImageSource class]; }
+/* The kinds of picture a source reads, as type identifiers: the ones the
+ * system's picture loader (gdk-pixbuf) reads on every Linux system. Qt
+ * lists them as the image formats it can open (freemac 1.267). */
+CFArrayRef CGImageSourceCopyTypeIdentifiers(void)
+{
+    return (CFArrayRef)[@[ @"public.png", @"public.jpeg", @"public.tiff", @"com.compuserve.gif", @"com.microsoft.bmp",
+                           @"com.microsoft.ico" ] retain];
+}
 CFStringRef CGImageSourceGetType(CGImageSourceRef source)
 {
     return source ? (CFStringRef)((GImageSource *)source)->type : NULL;

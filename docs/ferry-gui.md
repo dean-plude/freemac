@@ -3396,6 +3396,38 @@ Not there yet: IINA's images from its asset catalog (some buttons are
 blank), gesture recognizers don't fire, and picture in picture's window has
 no play and pause buttons.
 
+## FreeCAD opens (freemac 1.267, Ferry 0.90.0)
+
+FreeCAD 1.0.2, from its official download, opens its Start page, opens the
+Part Design example, draws it in its 3D view and turns it with the
+navigation cube. FreeCAD is a Qt 5 app carrying Python, OpenCASCADE and
+Coin3D, and it took these:
+
+- **Loading as dyld does.** Every library a program or a `dlopen` brings in
+  is mapped first and linked after, so a library built to find its calls
+  wherever they are loaded (FreeCAD's Python modules) finds ones in
+  libraries loaded after it. Export tables with empty edges, as
+  conda-forge's zlib has, are read, and `RTLD_NEXT` falls back to the
+  libraries loaded before the caller, which is how Qt finds OpenGL.
+- **The C library.** Printing with a locale (`vsprintf_l` and kin),
+  `shm_open`, message catalogs (`catopen`), and `qsort_r`, which on a Mac
+  passes its context first.
+- **Qt's redraws reach the screen.** Qt paints a window into an IOSurface
+  and hands it to the window's layer. It paints the next frame into a
+  surface that isn't in use, and skips handing over a surface the layer
+  already shows. A surface a layer shows now counts as in use, as it does
+  on a Mac once Core Animation has it, so Qt swaps surfaces and every
+  redraw shows. Before, a click worked but nothing on screen changed.
+- **OpenGL in a Qt window.** When a window holds a 3D view, Qt composes the
+  whole window with OpenGL. Each frame now shows without the window being
+  asked to draw again, which Qt answered with another frame, round and round.
+- **AppKit bits Qt asks for.** Colour space names and pattern colours,
+  `needsToDrawRect:` and `getRectsBeingDrawn:count:`, and Image I/O's list
+  of image types.
+
+`FERRY_EVENT_TRACE=1` prints where each mouse click goes, which shows
+whether a click that seems lost reached the app.
+
 ## Obsidian opens (freemac 1.266, Ferry 0.89.0)
 
 Obsidian 1.8.10, from its official download, now opens a working window:

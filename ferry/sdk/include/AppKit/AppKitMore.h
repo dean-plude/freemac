@@ -430,6 +430,7 @@ APPKIT_EXTERN NSNotificationName const NSWorkspaceAccessibilityDisplayOptionsDid
 - (void)prepareForReuse;
 - (void)viewDidChangeEffectiveAppearance;
 - (BOOL)needsToDrawRect:(NSRect)rect;
+- (void)getRectsBeingDrawn:(const NSRect **)rects count:(NSInteger *)count;
 - (void)noteFocusRingMaskChanged;
 - (NSString *)view:(NSView *)view stringForToolTip:(NSToolTipTag)tag point:(NSPoint)point userData:(void *)data;
 @end

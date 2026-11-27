@@ -42,6 +42,7 @@ void CGImageDestinationAddImageFromSource(CGImageDestinationRef idst, CGImageSou
 bool CGImageDestinationFinalize(CGImageDestinationRef idst);
 
 CFTypeID CGImageSourceGetTypeID(void);
+CFArrayRef CGImageSourceCopyTypeIdentifiers(void);
 CGImageSourceRef CGImageSourceCreateWithData(CFDataRef data, CFDictionaryRef options);
 CGImageSourceRef CGImageSourceCreateWithDataProvider(CGDataProviderRef provider, CFDictionaryRef options);
 CGImageSourceRef CGImageSourceCreateWithURL(CFURLRef url, CFDictionaryRef options);
