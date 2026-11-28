@@ -1,0 +1,11 @@
+libSystem in the cache: 1, Foundation: 1, a file of its own: 0
+cache range: 1 0
+-43: fnfErr (File not found); -50: paramErr; unknown: ""
+resources: relative to the bundle 1, path Contents/Resources, full path right 1, resolved right 1
+relativePath: Contents/Frameworks; with no base: /tmp/x
+clean aperture: 0 0 1920 1080
+Times listed: Core Text 1, font manager 1
+Times members: 1, the first one's name Times-Regular, makes a font 1
+printer and screen forms: 1 1
+a Times face's format is known: 1
+exit=0

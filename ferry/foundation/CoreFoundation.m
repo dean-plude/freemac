@@ -247,10 +247,37 @@ CFBundleRef CFBundleGetBundleWithIdentifier(CFStringRef identifier)
 }
 CFURLRef CFBundleCopyBundleURL(CFBundleRef bundle) { return (CFURLRef)[[OBJ(bundle) bundleURL] retain]; }
 CFURLRef CFBundleCopyExecutableURL(CFBundleRef bundle) { return (CFURLRef)[[OBJ(bundle) executableURL] retain]; }
-CFURLRef CFBundleCopyResourcesDirectoryURL(CFBundleRef bundle) { return (CFURLRef)[[OBJ(bundle) resourceURL] retain]; }
+/* A folder of a bundle as a URL relative to the bundle's URL, as Core
+ * Foundation gives a bundle's resources, plug-ins, frameworks and shared
+ * support folders (freemac 1.NEXT): "Contents/Resources/" against an app's
+ * URL, "Resources/" against a framework's. Programs join the two (Qt
+ * WebEngine finds its resources so); one that isn't inside the bundle
+ * stays absolute. */
+CFURLRef FerryBundleRelativeURL(CFBundleRef bundle, NSURL *folder)
+{
+    if (!bundle || !folder)
+        return NULL;
+    NSURL *base = [OBJ(bundle) bundleURL];
+    NSString *b = [[base path] stringByStandardizingPath], *f = [[folder path] stringByStandardizingPath];
+    if (![b length] || ![f hasPrefix:[b stringByAppendingString:@"/"]])
+        return (CFURLRef)[folder retain];
+    NSString *rel = [f substringFromIndex:[b length] + 1];
+    NSMutableString *escaped = [NSMutableString string];
+    for (NSString *c in [rel pathComponents])
+        [escaped appendFormat:@"%@/", [c stringByAddingPercentEncodingWithAllowedCharacters:
+                                              [NSCharacterSet URLPathAllowedCharacterSet]]];
+    if (![[base absoluteString] hasSuffix:@"/"])
+        base = [NSURL fileURLWithPath:[base path] isDirectory:YES];
+    NSURL *u = [[NSURL alloc] initWithString:escaped relativeToURL:base];
+    return u ? (CFURLRef)u : (CFURLRef)[folder retain];
+}
+CFURLRef CFBundleCopyResourcesDirectoryURL(CFBundleRef bundle)
+{
+    return bundle ? FerryBundleRelativeURL(bundle, [OBJ(bundle) resourceURL]) : NULL;
+}
 CFURLRef CFBundleCopyBuiltInPlugInsURL(CFBundleRef bundle)
 {
-    return (CFURLRef)[[OBJ(bundle) builtInPlugInsURL] retain];
+    return bundle ? FerryBundleRelativeURL(bundle, [OBJ(bundle) builtInPlugInsURL]) : NULL;
 }
 CFDictionaryRef CFBundleGetInfoDictionary(CFBundleRef bundle) { return (CFDictionaryRef)[OBJ(bundle) infoDictionary]; }
 CFDictionaryRef CFBundleCopyInfoDictionaryInDirectory(CFURLRef bundleURL)

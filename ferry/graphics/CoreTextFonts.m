@@ -176,9 +176,39 @@ static NSString *display_name(GFace *f)
     return regular ? f->standsFor : [NSString stringWithFormat:@"%@ %@", f->standsFor, f->style];
 }
 
+/* A font file's format, from its first bytes (freemac 1.NEXT; Chromium asks
+ * it of every font it lists): an OpenType file holds CFF outlines ("OTTO")
+ * or TrueType ones; "true" is Apple's own TrueType tag; a collection is
+ * the format of its first font; Type 1 files are PostScript. */
+static int file_format(NSString *path)
+{
+    unsigned char b[16] = {0};
+    FILE *fp = fopen([path fileSystemRepresentation], "rb");
+    if (!fp)
+        return kCTFontFormatUnrecognized;
+    size_t n = fread(b, 1, sizeof b, fp);
+    if (n >= 16 && !memcmp(b, "ttcf", 4)) {
+        uint32_t first = (uint32_t)b[12] << 24 | (uint32_t)b[13] << 16 | (uint32_t)b[14] << 8 | b[15];
+        n = fseek(fp, (long)first, SEEK_SET) == 0 ? fread(b, 1, 4, fp) : 0;
+    }
+    fclose(fp);
+    if (n < 4)
+        return kCTFontFormatUnrecognized;
+    if (!memcmp(b, "OTTO", 4))
+        return kCTFontFormatOpenTypePostScript;
+    if (!memcmp(b, "\0\1\0\0", 4))
+        return kCTFontFormatOpenTypeTrueType;
+    if (!memcmp(b, "true", 4))
+        return kCTFontFormatTrueType;
+    if (!memcmp(b, "%!", 2) || b[0] == 0x80)
+        return kCTFontFormatPostScript;
+    return kCTFontFormatUnrecognized;
+}
+
 static NSDictionary *face_attributes(GFace *f)
 {
     return @{
+        (id)kCTFontFormatAttribute : @(file_format(f->path)),
         (id)kCTFontNameAttribute : f->postscript,
         (id)kCTFontDisplayNameAttribute : display_name(f),
         (id)kCTFontFamilyNameAttribute : f->family,
@@ -200,7 +230,30 @@ static NSDictionary *face_attributes(GFace *f)
 id GFontInstalledFaceAttribute(NSDictionary *attributes, NSString *attribute)
 {
     GFace *f = face_named(attributes[(id)kCTFontNameAttribute]);
+    /* a descriptor from a family's list of faces names its face by family and
+     * style ("DejaVuSerif-Book" for DejaVu Serif's Book, whose PostScript name
+     * is "DejaVuSerif"), freemac 1.NEXT */
+    NSString *family = attributes[(id)kCTFontFamilyNameAttribute], *style = attributes[(id)kCTFontStyleNameAttribute];
+    if (!f && [family isKindOfClass:[NSString class]] && [style isKindOfClass:[NSString class]])
+        for (GFace *g in installed_faces())
+            if (same(g->family, family) && same(g->style, style)) {
+                f = g;
+                break;
+            }
     return f ? face_attributes(f)[attribute] : nil;
+}
+
+/* The Mac families listed in the available fonts under a stand-in's faces
+ * (Times where only DejaVu Serif is installed), for the font manager's list
+ * of family names, freemac 1.NEXT. */
+NSArray *GFontStandInFamilyNames(void) __attribute__((visibility("default")));
+NSArray *GFontStandInFamilyNames(void)
+{
+    NSMutableArray *names = [NSMutableArray array];
+    for (GFace *f in stand_in_faces())
+        if (![names containsObject:f->family])
+            [names addObject:f->family];
+    return names;
 }
 
 /* ---- collections --------------------------------------------------------------------- */

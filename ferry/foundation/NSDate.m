@@ -338,6 +338,29 @@ static NSString *percent_encode_path(NSString *s)
         p = [p substringToIndex:[p length] - 1];
     return p;
 }
+/* The path as the URL was written, not resolved against its base (freemac
+ * 1.NEXT); the same as path for a URL with no base. */
+- (NSString *)relativePath
+{
+    if (!_base)
+        return [self path];
+    NSString *rest = _string;
+    NSRange r = [rest rangeOfString:@"#"];
+    if (r.location != NSNotFound)
+        rest = [rest substringToIndex:r.location];
+    r = [rest rangeOfString:@"?"];
+    if (r.location != NSNotFound)
+        rest = [rest substringToIndex:r.location];
+    NSRange colon = [rest rangeOfString:@":"], slash = [rest rangeOfString:@"/"];
+    if ((colon.location != NSNotFound && colon.location > 0 &&
+         (slash.location == NSNotFound || colon.location < slash.location)) ||
+        [rest hasPrefix:@"//"])
+        return [self path];
+    NSString *p = percent_decode(rest);
+    if ([p length] > 1 && [p hasSuffix:@"/"])
+        p = [p substringToIndex:[p length] - 1];
+    return p;
+}
 - (NSString *)lastPathComponent { return [[self path] lastPathComponent]; }
 - (NSString *)pathExtension { return [[self path] pathExtension]; }
 - (NSArray *)pathComponents { return [[self path] pathComponents]; }

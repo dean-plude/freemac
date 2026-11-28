@@ -366,3 +366,46 @@ OSStatus FSGetVolumeParms(FSVolumeRefNum volume, GetVolParmsInfoBuffer *buffer, 
     memset(buffer, 0, bufferSize < sizeof *buffer ? bufferSize : sizeof *buffer);
     return nsvErr;
 }
+
+/* Result codes by name, for programs that show them (freemac 1.NEXT): the
+ * names and meanings of MacErrors.h's codes that Ferry's own calls answer
+ * with, from Apple's public result code list. send2trash (Python, which
+ * Anki uses) looks the comment up when moving a file to the trash fails. */
+static const struct {
+    OSStatus code;
+    const char *name, *comment;
+} statuses[] = {
+    {0, "noErr", "No error"},
+    {-4, "unimpErr", "Unimplemented core routine"},
+    {-35, "nsvErr", "No such volume"},
+    {-36, "ioErr", "I/O error"},
+    {-37, "bdNamErr", "Bad file name"},
+    {-39, "eofErr", "End of file"},
+    {-43, "fnfErr", "File not found"},
+    {-48, "dupFNErr", "Duplicate file name"},
+    {-50, "paramErr", "Error in user parameter list"},
+    {-54, "permErr", "Permissions error"},
+    {-108, "memFullErr", "Not enough room in heap zone"},
+    {-120, "dirNFErr", "Directory not found"},
+    {-128, "userCanceledErr", "User cancelled"},
+    {-1401, "errFSBadFSRef", "FSRef parameter is bad"},
+    {-1420, "errFSRefsDifferent", "FSRefs are different"},
+    {-4960, "coreFoundationUnknownErr", "Unknown Core Foundation error"},
+    {-5000, "afpAccessDenied", "Insufficient access privileges for operation"},
+};
+
+const char *GetMacOSStatusErrorString(OSStatus err)
+{
+    for (size_t i = 0; i < sizeof statuses / sizeof *statuses; i++)
+        if (statuses[i].code == err)
+            return statuses[i].name;
+    return "";
+}
+
+const char *GetMacOSStatusCommentString(OSStatus err)
+{
+    for (size_t i = 0; i < sizeof statuses / sizeof *statuses; i++)
+        if (statuses[i].code == err)
+            return statuses[i].comment;
+    return "";
+}
