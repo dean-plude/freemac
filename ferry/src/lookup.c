@@ -38,6 +38,7 @@ int ferry_library_supported(const char *name)
         || !strncmp(name, "/usr/lib/system/", 16)
         || !strcmp(name, "/usr/lib/libobjc.A.dylib")
         || !strcmp(name, "/usr/lib/libiconv.2.dylib") /* libc_vlc.c */
+        || !strcmp(name, "/usr/lib/libcompression.dylib") /* compression.c */
         || !strcmp(name, FERRY_HOST_LIBRARY)
         || ferry_twin_library(name)
         || ferry_cxx_library(name);
@@ -390,7 +391,7 @@ static const struct ferry_symbol *const tables[] = {
     ferry_dispatch_symbols, ferry_dispatch_io_symbols, ferry_objc_symbols, ferry_commoncrypto_symbols, ferry_sysversion_symbols,
     ferry_sysctl_symbols, ferry_attrlist_symbols, ferry_dyld_symbols, ferry_wchar_symbols,
     ferry_tlv_symbols, ferry_socket_symbols, ferry_kqueue_symbols, ferry_libc_more_symbols, ferry_oslog_symbols,
-    ferry_swift_symbols, ferry_copyfile_symbols, ferry_libc_vlc_symbols,
+    ferry_swift_symbols, ferry_copyfile_symbols, ferry_libc_vlc_symbols, ferry_compression_symbols,
     ferry_libc_apps_symbols, ferry_libc_audacity_symbols, ferry_libc_blender_symbols,
     ferry_mach_symbols, ferry_notify_symbols, ferry_libc_electron_symbols,
 };

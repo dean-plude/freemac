@@ -33,6 +33,10 @@ Classes:
   SwiftBridge: Locale
 - Name: NSTimeZone
   SwiftBridge: TimeZone
+- Name: NSCalendar
+  SwiftBridge: Calendar
+- Name: NSDateComponents
+  SwiftBridge: DateComponents
 - Name: NSURLQueryItem
   SwiftBridge: URLQueryItem
 - Name: NSURLComponents

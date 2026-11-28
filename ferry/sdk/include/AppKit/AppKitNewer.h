@@ -56,6 +56,8 @@ typedef NS_ENUM(NSInteger, NSImageSymbolScale) {
 + (instancetype)configurationWithPointSize:(CGFloat)pointSize weight:(NSFontWeight)weight;
 + (instancetype)configurationWithPointSize:(CGFloat)pointSize weight:(NSFontWeight)weight scale:(NSImageSymbolScale)scale;
 + (instancetype)configurationWithScale:(NSImageSymbolScale)scale;
++ (instancetype)configurationWithTextStyle:(NSFontTextStyle)style scale:(NSImageSymbolScale)scale;
++ (instancetype)configurationWithTextStyle:(NSFontTextStyle)style;
 + (instancetype)configurationWithHierarchicalColor:(NSColor *)hierarchicalColor;
 + (instancetype)configurationWithPaletteColors:(NSArray<NSColor *> *)paletteColors;
 + (instancetype)configurationPreferringMulticolor;

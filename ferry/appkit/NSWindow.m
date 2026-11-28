@@ -361,7 +361,13 @@ static char subtitle_key;
 - (NSInteger)windowNumber { return _number; }
 - (BOOL)isVisible { return _visible; }
 /* visible while ordered in and not minimized (freemac 1.232) */
-- (NSWindowOcclusionState)occlusionState { return _visible && !_miniaturized ? NSWindowOcclusionStateVisible : 0; }
+/* A Mac's window server also sets bit 13 in every window's occlusion state,
+ * on screen or not, and apps compare the whole value: Stats opens a panel
+ * when its window's is exactly 8192, not visible (freemac 1.271) */
+- (NSWindowOcclusionState)occlusionState
+{
+    return (1UL << 13) | (_visible && !_miniaturized ? NSWindowOcclusionStateVisible : 0);
+}
 - (void)_occlusionChanged
 {
     [self _post:NSWindowDidChangeOcclusionStateNotification selector:@selector(windowDidChangeOcclusionState:)];

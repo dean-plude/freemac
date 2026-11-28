@@ -10,6 +10,8 @@ const CFStringRef kCGColorSpaceSRGB = (CFStringRef)@"kCGColorSpaceSRGB";
 const CFStringRef kCGColorSpaceGenericRGB = (CFStringRef)@"kCGColorSpaceGenericRGB";
 const CFStringRef kCGColorSpaceGenericGray = (CFStringRef)@"kCGColorSpaceGenericGray";
 const CFStringRef kCGColorSpaceGenericGrayGamma2_2 = (CFStringRef)@"kCGColorSpaceGenericGrayGamma2_2";
+const CFStringRef kCGColorSpaceExtendedGray = (CFStringRef)@"kCGColorSpaceExtendedGray"; /* Stats (1.271) */
+const CFStringRef kCGColorSpaceLinearGray = (CFStringRef)@"kCGColorSpaceLinearGray";
 const CFStringRef kCGColorSpaceLinearSRGB = (CFStringRef)@"kCGColorSpaceLinearSRGB";
 const CFStringRef kCGColorSpaceExtendedSRGB = (CFStringRef)@"kCGColorSpaceExtendedSRGB";
 const CFStringRef kCGColorSpaceDisplayP3 = (CFStringRef)@"kCGColorSpaceDisplayP3";
@@ -93,7 +95,8 @@ static GColorSpace *named_space(NSString *name)
 {
     if ([name isEqual:(id)kCGColorSpaceGenericLab])
         return make_space(kCGColorSpaceModelLab, 3, name);
-    if ([name isEqual:(id)kCGColorSpaceGenericGray] || [name isEqual:(id)kCGColorSpaceGenericGrayGamma2_2])
+    if ([name isEqual:(id)kCGColorSpaceGenericGray] || [name isEqual:(id)kCGColorSpaceGenericGrayGamma2_2] ||
+        [name isEqual:(id)kCGColorSpaceExtendedGray] || [name isEqual:(id)kCGColorSpaceLinearGray])
         return make_space(kCGColorSpaceModelMonochrome, 1, name);
     if ([name isEqual:(id)kCGColorSpaceGenericCMYK])
         return make_space(kCGColorSpaceModelCMYK, 4, name);

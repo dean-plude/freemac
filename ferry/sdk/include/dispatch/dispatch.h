@@ -44,7 +44,18 @@ typedef NSObject *dispatch_io_t;
 @end
 @interface OS_dispatch_semaphore : OS_dispatch_object
 @end
-@interface OS_dispatch_source : OS_dispatch_object
+/* On a Mac a source is also seen through Objective-C protocols, one for
+ * each kind (OS_dispatch_source_timer and the rest), which Swift's
+ * DispatchSourceTimer and its relatives are there; the Dispatch overlay
+ * adds their methods to the protocols (freemac 1.271). Swift calls the
+ * protocol of the class's name OS_dispatch_sourceProtocol. */
+@protocol OS_dispatch_source <NSObject>
+@end
+@protocol OS_dispatch_source_timer <OS_dispatch_source>
+@end
+@protocol OS_dispatch_source_memorypressure <OS_dispatch_source>
+@end
+@interface OS_dispatch_source : OS_dispatch_object <OS_dispatch_source_timer, OS_dispatch_source_memorypressure>
 @end
 #elif defined(__OBJC__)
 /* As a Mac's os/object.h does: dispatch objects are NSObjects, so anything

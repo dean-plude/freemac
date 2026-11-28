@@ -75,6 +75,7 @@ static const char *const MENU_XML =
 - (void)_activate;
 - (NSPoint)_clickedAt;
 - (void)_setClickedAt:(NSPoint)p;
+- (NSWindow *)_barWindow;
 - (GVariant *)_layoutFrom:(int)parent depth:(int)depth;
 - (BOOL)_aboutToShow:(int)ident;
 - (BOOL)_event:(int)ident;
@@ -363,6 +364,21 @@ static GVariant *picture(NSStatusItem *item, int height)
         }
         if (text)
             ADrawLine(text, x, floor((22 - (ascent + descent)) / 2 + descent));
+        /* Views an app put in the button itself (Stats' meters), drawn
+         * over its picture as the button would draw them (freemac 1.271) */
+        NSButton *button = [item button];
+        NSArray *subviews = [[[button subviews] copy] autorelease];
+        if ([subviews count]) {
+            NSRect b = [button bounds];
+            CGContextSaveGState(cg);
+            CGContextTranslateCTM(cg, 0, (22 - b.size.height) / 2);
+            if ([button isFlipped])
+                CGContextConcatCTM(cg, CGAffineTransformMake(1, 0, 0, -1, 0, b.size.height));
+            for (NSView *v in subviews)
+                if (![v isHidden])
+                    [v _drawInContext:cg dirty:b screen:NO];
+            CGContextRestoreGState(cg);
+        }
     }
     [NSGraphicsContext restoreGraphicsState];
     CGContextRelease(cg);
@@ -483,9 +499,16 @@ static void menu_will_open(NSMenu *menu)
     NSStatusItem *_item;
 }
 - (void)_setItem:(NSStatusItem *)item { _item = item; }
+/* A view inside the button asked to be drawn again: the menu bar is told */
+- (void)_subviewNeedsDisplay { [_item _changed]; }
 /* Where the menu bar last said the item was clicked, in the screen's
  * pixels from its top left; negative when it hasn't said. */
 - (NSPoint)_clickedAt { return _item ? [_item _clickedAt] : NSMakePoint(-1, -1); }
+/* On a Mac the button sits in a small window of the menu bar's, which
+ * apps read to put their own panels under the item (Stats). Here the menu
+ * bar is another program's, so the button answers with a window that is
+ * never shown, placed where the item was last clicked (freemac 1.271). */
+- (NSWindow *)window { return [super window] ?: [_item _barWindow]; }
 - (BOOL)appearsDisabled { return _appearsDisabled; }
 - (void)setAppearsDisabled:(BOOL)f { _appearsDisabled = f; [_item _changed]; }
 - (void)setImage:(NSImage *)image { [super setImage:image]; [_item _changed]; }
@@ -515,6 +538,7 @@ static void menu_will_open(NSMenu *menu)
     NSMutableArray *_ids;               /* menu item id - 1 -> NSMenuItem, from the last layout */
     NSString *_shownTip, *_shownStatus;
     NSMenu *(^_refresh)(void);          /* the Dock's menu (AMenuServe) */
+    NSWindow *_barWindow;               /* what the button says it is in */
 }
 
 - (instancetype)_initWithBar:(NSStatusBar *)bar length:(CGFloat)length
@@ -805,6 +829,27 @@ static void menu_will_open(NSMenu *menu)
 - (NSStatusBarButton *)button { return _button; }
 - (NSPoint)_clickedAt { return _clickedAt; }
 - (void)_setClickedAt:(NSPoint)p { _clickedAt = p; }
+
+- (NSWindow *)_barWindow
+{
+    NSScreen *screen = [NSScreen mainScreen];
+    NSRect full = screen ? [screen frame] : NSMakeRect(0, 0, 1440, 900);
+    CGFloat w = [_button frame].size.width;
+    if (w < 1)
+        w = 22;
+    /* Topline is 24 points tall, as a Mac's menu bar is */
+    CGFloat x = _clickedAt.x >= 0 ? NSMinX(full) + _clickedAt.x - w / 2 : NSMaxX(full) - w - 8;
+    NSRect frame = NSMakeRect(x, NSMaxY(full) - 24, w, 24);
+    if (!_barWindow) {
+        _barWindow = [[NSWindow alloc] initWithContentRect:frame styleMask:NSWindowStyleMaskBorderless
+                                                   backing:NSBackingStoreBuffered defer:YES];
+        [_barWindow setReleasedWhenClosed:NO];
+        [_barWindow setLevel:NSStatusWindowLevel];
+    } else {
+        [_barWindow setFrame:frame display:NO];
+    }
+    return _barWindow;
+}
 - (NSStatusItemBehavior)behavior { return _behavior; }
 - (void)setBehavior:(NSStatusItemBehavior)b { _behavior = b; }
 - (BOOL)isVisible { return _visible; }

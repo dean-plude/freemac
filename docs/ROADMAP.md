@@ -1183,6 +1183,21 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.271 "Stats in the menu bar" (done)
+
+Ferry 0.94.0: Stats 3.1.1, the system monitor, from its official download, starts in under a second and shows live CPU, memory, disk and network readings in the menu bar. Clicking an item opens its panel (Network: speeds, usage history, connectivity). Stats is a Swift app that reads the machine the way a Mac's monitors do, so this release adds those readings and fixes two places where Swift classes and Ferry's runtime disagreed.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | One shared empty dictionary, which Swift's runtime keeps for every error it bridges without taking a reference | Ferry Foundation | done |
+| 2 | Swift subclasses of Objective-C classes lay their fields out after the superclass's real size, kept in step with Ferry's own layout | Ferry runtime | done |
+| 3 | A status item's subviews draw in the menu bar, and redraw when they change; its button has a window under the item, from which an app places its panel | Ferry AppKit | done |
+| 4 | Window occlusion state as a Mac's window server reports it, so Stats opens its panel on a click | Ferry AppKit | done |
+| 5 | libcompression (LZFSE, LZVN, LZ4, zlib, LZMA) and compiled asset catalogues (Assets.car) for images and colours | Ferry | done |
+| 6 | Disk size and free space, DiskArbitration descriptions, the network interfaces (SystemConfiguration), CFHost, IOReport with no channels, sensors, the login session | Ferry Foundation / IOKit | done |
+| 7 | Units and measurements, language and region names, the background activity scheduler, Calendar and timer calls from Swift | Ferry Foundation / Swift | done |
+| 8 | Stats starts, shows its readings and opens a panel | Ferry / Stats | done |
+
 ## 1.270 "Hex Fiend edits bytes" (done)
 
 Ferry 0.93.0: Hex Fiend 2.18.1, the hex editor, from its official download, opens a file and shows its bytes in hex and as text, selects them, reads the selection in its data inspector, edits and saves. Hex Fiend draws its columns glyph by glyph with Core Graphics, so this release fills in that drawing and the font calls around it. Apps that ship broken links inside their bundle (Anki) now install with them.

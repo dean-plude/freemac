@@ -70,7 +70,13 @@ extension OS_dispatch_queue {
 
     public func sync(execute block: () -> Void) { _queue.sync(execute: block) }
 
-    public func sync<T>(execute work: () throws -> T) rethrows -> T { try _queue.sync(execute: work) }
+    // A Mac's sync(execute:) that gives back the work's result. Declared
+    // under another name, as Swift won't take it beside the one above in an
+    // extension of an Objective-C class, and given the Mac's symbol.
+    @_silgen_name("$sSo17OS_dispatch_queueC8DispatchE4sync7executexxyKXE_tKlF")
+    public func __syncReturning<T>(execute work: () throws -> T) rethrows -> T {
+        try _queue.sync(flags: [], execute: work)
+    }
 
     public func sync<T>(flags: DispatchWorkItemFlags, execute work: () throws -> T) rethrows -> T {
         try _queue.sync(flags: flags, execute: work)
@@ -94,4 +100,113 @@ extension OS_dispatch_semaphore {
         dispatch_semaphore_wait(self, timeout.rawValue) == 0 ? .success : .timedOut
     }
     public func signal() -> Int { dispatch_semaphore_signal(self) }
+}
+
+// ---- freemac 1.271, for Stats: sources as a Mac's Dispatch shows them.
+// There, makeTimerSource gives an OS_dispatch_source_timer (an Objective-C
+// protocol), and a source's methods are added to its protocols. The object
+// underneath is the same dispatch source Ferry's DispatchSource wraps.
+
+extension OS_dispatch_queue {
+    public static func getSpecific<T>(key: DispatchSpecificKey<T>) -> T? { DispatchQueue.getSpecific(key: key) }
+    public func setSpecific<T>(key: DispatchSpecificKey<T>, value: T?) { _queue.setSpecific(key: key, value: value) }
+    public func getSpecific<T>(key: DispatchSpecificKey<T>) -> T? { _queue.getSpecific(key: key) }
+}
+
+extension OS_dispatch_source {
+    public struct TimerFlags: OptionSet, Sendable {
+        public let rawValue: UInt
+        public init(rawValue: UInt) { self.rawValue = rawValue }
+        public static let strict = TimerFlags(rawValue: 1)
+    }
+
+    public struct MemoryPressureEvent: OptionSet, Sendable {
+        public let rawValue: UInt
+        public init(rawValue: UInt) { self.rawValue = rawValue }
+        public static let normal = MemoryPressureEvent(rawValue: 0x1)
+        public static let warning = MemoryPressureEvent(rawValue: 0x2)
+        public static let critical = MemoryPressureEvent(rawValue: 0x4)
+        public static let all: MemoryPressureEvent = [.normal, .warning, .critical]
+    }
+
+    public class func makeTimerSource(flags: TimerFlags = [], queue: OS_dispatch_queue? = nil) -> OS_dispatch_source_timer {
+        let q: NSObject = queue ?? unsafeBitCast(DispatchQueue.global().__object, to: OS_dispatch_queue.self)
+        let s = dispatch_source_create(_ferry_dispatch_source_type(0), 0, flags.rawValue, q)!
+        return unsafeBitCast(s, to: OS_dispatch_source_timer.self)
+    }
+
+    /// Ferry never feels memory pressure, so this source never fires.
+    public class func makeMemoryPressureSource(eventMask: MemoryPressureEvent,
+                                               queue: OS_dispatch_queue? = nil) -> OS_dispatch_source_memorypressure {
+        let q: NSObject = queue ?? unsafeBitCast(DispatchQueue.global().__object, to: OS_dispatch_queue.self)
+        let s = dispatch_source_create(_ferry_dispatch_source_type(1), 0, 0, q)!
+        return unsafeBitCast(s, to: OS_dispatch_source_memorypressure.self)
+    }
+}
+
+extension OS_dispatch_sourceProtocol {
+    @inline(__always) var _object: NSObject { unsafeBitCast(self, to: NSObject.self) }
+
+    public func setEventHandler(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [],
+                                handler: (@convention(block) () -> Void)?) {
+        dispatch_source_set_event_handler(_object, handler ?? {})
+    }
+    public func setEventHandler(handler: DispatchWorkItem) {
+        dispatch_source_set_event_handler(_object) { handler.perform() }
+    }
+    public func setCancelHandler(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [],
+                                 handler: (@convention(block) () -> Void)?) {
+        dispatch_source_set_cancel_handler(_object, handler ?? {})
+    }
+    public func setCancelHandler(handler: DispatchWorkItem) {
+        dispatch_source_set_cancel_handler(_object) { handler.perform() }
+    }
+    public func setRegistrationHandler(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [],
+                                       handler: (@convention(block) () -> Void)?) {
+        if let handler { dispatch_async(_ferry_dispatch_main_queue(), handler) }
+    }
+    public func activate() { dispatch_resume(_object) }
+    public func cancel() { dispatch_source_cancel(_object) }
+    public func resume() { dispatch_resume(_object) }
+    public func suspend() { dispatch_suspend(_object) }
+    public var handle: UInt { UInt(dispatch_source_get_handle(_object)) }
+    public var mask: UInt { dispatch_source_get_mask(_object) }
+    public var data: UInt { dispatch_source_get_data(_object) }
+    public var isCancelled: Bool { dispatch_source_testcancel(_object) != 0 }
+}
+
+extension OS_dispatch_source_timer {
+    private func _set(_ start: dispatch_time_t, _ interval: DispatchTimeInterval, _ leeway: DispatchTimeInterval) {
+        let every: UInt64 = interval == .never ? ~0 : UInt64(max(0, interval.nanoseconds))
+        let slack: UInt64 = leeway == .never ? 0 : UInt64(max(0, leeway.nanoseconds))
+        dispatch_source_set_timer(unsafeBitCast(self, to: NSObject.self), start, every, slack)
+    }
+    private static func _interval(_ seconds: Double) -> DispatchTimeInterval {
+        seconds.isInfinite ? .never : .nanoseconds(Int(seconds * 1e9))
+    }
+    public func schedule(deadline: DispatchTime, repeating interval: DispatchTimeInterval = .never,
+                         leeway: DispatchTimeInterval = .nanoseconds(0)) {
+        _set(deadline.rawValue, interval, leeway)
+    }
+    public func schedule(deadline: DispatchTime, repeating interval: Double,
+                         leeway: DispatchTimeInterval = .nanoseconds(0)) {
+        _set(deadline.rawValue, Self._interval(interval), leeway)
+    }
+    public func schedule(wallDeadline: DispatchWallTime, repeating interval: DispatchTimeInterval = .never,
+                         leeway: DispatchTimeInterval = .nanoseconds(0)) {
+        _set(wallDeadline.rawValue, interval, leeway)
+    }
+    public func schedule(wallDeadline: DispatchWallTime, repeating interval: Double,
+                         leeway: DispatchTimeInterval = .nanoseconds(0)) {
+        _set(wallDeadline.rawValue, Self._interval(interval), leeway)
+    }
+}
+
+extension OS_dispatch_source_memorypressure {
+    public var data: OS_dispatch_source.MemoryPressureEvent {
+        .init(rawValue: dispatch_source_get_data(unsafeBitCast(self, to: NSObject.self)))
+    }
+    public var mask: OS_dispatch_source.MemoryPressureEvent {
+        .init(rawValue: dispatch_source_get_mask(unsafeBitCast(self, to: NSObject.self)))
+    }
 }

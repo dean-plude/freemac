@@ -2118,6 +2118,7 @@ FOUNDATION_EXPORT NSString *const NSRegistrationDomain;
 - (NSArray<NSString *> *)stringArrayForKey:(NSString *)key;
 - (NSDictionary<NSString *, id> *)persistentDomainForName:(NSString *)name;
 - (void)removePersistentDomainForName:(NSString *)name;
+- (void)setPersistentDomain:(NSDictionary<NSString *, id> *)domain forName:(NSString *)domainName;
 - (NSDictionary<NSString *, id> *)volatileDomainForName:(NSString *)domainName;
 - (void)setVolatileDomain:(NSDictionary<NSString *, id> *)domain forName:(NSString *)domainName;
 - (void)removeVolatileDomainForName:(NSString *)domainName;
@@ -2261,6 +2262,18 @@ FOUNDATION_EXPORT NSZone *NSZoneFromPointer(void *ptr);
 FOUNDATION_EXPORT NSFileAttributeKey const NSFileCreationDate, NSFileOwnerAccountID, NSFileGroupOwnerAccountID,
     NSFileOwnerAccountName, NSFileReferenceCount, NSFileSystemNumber, NSFileSystemFileNumber, NSFileExtensionHidden,
     NSFileImmutable, NSFileAppendOnly, NSFileBusy;
+/* A disk's size and free space (freemac 1.271). */
+FOUNDATION_EXPORT NSFileAttributeKey const NSFileSystemSize, NSFileSystemFreeSize, NSFileSystemNodes,
+    NSFileSystemFreeNodes;
+@interface NSLocale (FerryLocalizedNames)
+- (NSString *)localizedStringForLanguageCode:(NSString *)languageCode;
+- (NSString *)localizedStringForCountryCode:(NSString *)countryCode;
+- (NSString *)localizedStringForCalendarIdentifier:(NSString *)calendarIdentifier;
+- (NSString *)localizedStringForLocaleIdentifier:(NSString *)localeIdentifier;
+@end
+@interface NSFileManager (FerryFileSystemAttributes)
+- (NSDictionary<NSFileAttributeKey, id> *)attributesOfFileSystemForPath:(NSString *)path error:(NSError **)error;
+@end
 FOUNDATION_EXPORT NSString *const NSFileTypeCharacterSpecial, *const NSFileTypeBlockSpecial, *const NSFileTypeSocket,
     *const NSFileTypeUnknown;
 
@@ -3151,6 +3164,8 @@ enum { NSFormattingError = 2048 };
 #include <Foundation/FoundationVLC.h>
 /* Handoff's user activities, which Qt's Mac plugin answers to. */
 #include <Foundation/NSUserActivity.h>
+/* Units, measurements and the background activity scheduler (freemac 1.271, Ferry 0.94.0). */
+#include <Foundation/NSMeasurement.h>
 
 __FERRY_END
 #endif

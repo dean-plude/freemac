@@ -26,6 +26,7 @@ module AppKit [system] {
     header "AppKit/AppKitNewer.h"
     header "AppKit/AppKitOlder.h"
     header "AppKit/AppKitQt.h"
+    header "AppKit/AppKitStats.h"
     header "AppKit/AppKitVLC.h"
     header "AppKit/AppKitZed.h"
     header "AppKit/NSAccessibility.h"
@@ -372,6 +373,7 @@ module Foundation [system] {
     header "Foundation/NSGarbageCollector.h"
     header "Foundation/NSHTTPCookie.h"
     header "Foundation/NSHTTPCookieStorage.h"
+    header "Foundation/NSMeasurement.h"
     header "Foundation/NSNetServices.h"
     header "Foundation/NSNotification.h"
     header "Foundation/NSNumber.h"
@@ -611,6 +613,7 @@ module ServiceManagement [system] {
 
 module SystemConfiguration [system] {
     header "SystemConfiguration/SystemConfiguration.h"
+    header "SystemConfiguration/SCNetworkConfiguration.h"
     header "SystemConfiguration/SCNetworkReachability.h"
     export *
     link framework "SystemConfiguration"

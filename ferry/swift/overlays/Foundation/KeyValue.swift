@@ -18,7 +18,7 @@ public struct NSKeyValueObservedChange<Value> {
 }
 
 /// Watches one property of one object until it is invalidated or let go.
-public final class NSKeyValueObservation: NSObject {
+public class NSKeyValueObservation: NSObject {
     private weak var object: NSObject?
     private let key: String
     private let callback: (NSObject, [AnyHashable: Any]) -> Void

@@ -312,7 +312,7 @@ public struct UUID: Hashable, Comparable, Sendable, Codable, CustomStringConvert
 
     public init(uuid: uuid_t) { self.uuid = uuid }
 
-    public init?(uuidString s: String) {
+    public init?(uuidString s: __shared String) {
         let hex = Array(s.utf8)
         guard hex.count == 36 else { return nil }
         var b: [UInt8] = []

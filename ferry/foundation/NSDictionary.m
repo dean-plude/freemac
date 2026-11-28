@@ -179,7 +179,16 @@ static unsigned long never_mutated;
 - (NSUInteger)count { return 0; }
 - (id)objectForKey:(id)key { return nil; }
 - (NSEnumerator *)keyEnumerator { return [[self allKeys] objectEnumerator]; }
-+ (instancetype)dictionary { return [[[self alloc] init] autorelease]; }
+/* The empty NSDictionary is one shared object that is never freed, as on a
+ * Mac: Swift's runtime keeps the one it is given for every error it bridges
+ * without taking a reference (freemac 1.271, Stats) */
+extern struct ferry_constant_dictionary __NSDictionary0__struct;
++ (instancetype)dictionary
+{
+    if (self == [NSDictionary class])
+        return (id)(void *)&__NSDictionary0__struct;
+    return [[[self alloc] init] autorelease];
+}
 + (instancetype)dictionaryWithObject:(id)object forKey:(id)key
 {
     return [[[self alloc] initWithObjects:&object forKeys:&key count:1] autorelease];
@@ -336,6 +345,8 @@ static id plist_at_url(NSURL *url, Class cls, NSError **error)
 - (id)copyWithZone:(NSZone *)zone { return [[NSDictionary allocWithZone:zone] initWithDictionary:self]; }
 - (id)mutableCopyWithZone:(NSZone *)zone { return [[NSMutableDictionary allocWithZone:zone] initWithDictionary:self]; }
 - (id)objectForKeyedSubscript:(id)key { return [self objectForKey:key]; }
+/* what Swift's bridged dictionaries call for a subscript (freemac 1.271) */
+- (id)__swift_objectForKeyedSubscript:(id)key { return [self objectForKey:key]; }
 /* A key starting with "@" is a key of the dictionary object itself (@count). */
 - (id)valueForKey:(NSString *)key
 {
@@ -584,12 +595,18 @@ struct ferry_constant_dictionary {
 }
 @end
 
+/* clang refers to these for the literal @{}: older clang reads the pointer
+ * __NSDictionary0__, newer clang uses __NSDictionary0__struct itself as the
+ * empty dictionary (freemac 1.271, Stats) */
 F_EXPORT id __NSDictionary0__;
 id __NSDictionary0__;
+F_EXPORT struct ferry_constant_dictionary __NSDictionary0__struct;
+struct ferry_constant_dictionary __NSDictionary0__struct;
 
 __attribute__((constructor)) static void empty_dictionary_init(void)
 {
     __NSDictionary0__ = [[NSDictionary alloc] init];
+    __NSDictionary0__struct.isa = [NSConstantDictionary class];
 }
 
 /* ---- NSMutableDictionary -------------------------------------------------------- */

@@ -16,6 +16,7 @@ SRC = src/main.c src/loader.c src/lookup.c src/errno.c src/stdio.c src/posix.c s
 SRC += src/objc/swift.c src/swiftsupport.c
 # Mach semaphores, for VLC (freemac 1.232)
 SRC += src/libc_vlc.c
+SRC += src/compression.c
 # posix_spawn, glob, fnmatch, termios and mach_wait_until, for OBS, VLC and FFmpeg (freemac 1.233)
 SRC += src/libc_apps.c
 # Mach ports and exception ports that fail as when exhausted, confstr and more, for Audacity (freemac 1.263)
@@ -31,7 +32,7 @@ SRC += src/camera.c
 # AAC and other sound codecs through this system's FFmpeg, for Core Audio (freemac 1.264)
 SRC += src/codec.c
 OBJ = $(SRC:.c=.o) src/objc/msgsend.o src/objc/unwind.o
-TBD = sdk/lib/libSystem.tbd sdk/lib/libobjc.tbd sdk/lib/libiconv.tbd
+TBD = sdk/lib/libSystem.tbd sdk/lib/libobjc.tbd sdk/lib/libiconv.tbd sdk/lib/libcompression.tbd
 # -lm, -ldl, -lpthread and -lc link libSystem, as with a Mac's SDK (freemac 1.249)
 TBD_ALIASES = sdk/lib/libm.tbd sdk/lib/libdl.tbd sdk/lib/libpthread.tbd sdk/lib/libc.tbd
 # Link stubs for the Mac libraries served by this system's copy (src/host.c).
@@ -90,7 +91,7 @@ SECURITY_HEADERS = security/SInternal.h $(wildcard sdk/include/Security/*.h) $(w
 APPKIT_SRC = $(wildcard appkit/*.m)
 APPKIT_OBJ = $(APPKIT_SRC:appkit/%.m=appkit/build/%.o)
 APPKIT = frameworks/AppKit.framework/AppKit
-APPKIT_HEADERS = appkit/AInternal.h appkit/gtk.h sdk/include/AppKit/AppKit.h $(QUARTZCORE_HEADERS) \
+APPKIT_HEADERS = appkit/AInternal.h appkit/AAssetCar.h appkit/gtk.h sdk/include/AppKit/AppKit.h $(QUARTZCORE_HEADERS) \
                  appkit/ANotify.h sdk/include/AppKit/NSDockTile.h sdk/include/UserNotifications/UserNotifications.h \
                  sdk/include/AppKit/NSCollectionView.h sdk/include/AppKit/NSRulerView.h \
                  appkit/AWayfire.h sdk/include/AppKit/NSEventMonitors.h sdk/include/HIServices/Accessibility.h \
@@ -221,6 +222,9 @@ $(TBD_ALIASES): sdk/lib/libSystem.tbd
 sdk/lib/libiconv.tbd: ferry sdk/gen-tbd.sh
 	@mkdir -p sdk/lib
 	sdk/gen-tbd.sh ./ferry libiconv > $@
+sdk/lib/libcompression.tbd: ferry sdk/gen-tbd.sh
+	@mkdir -p sdk/lib
+	sdk/gen-tbd.sh ./ferry libcompression > $@
 
 sdk/lib/libz.tbd: sdk/gen-twin-tbd.sh
 	@mkdir -p sdk/lib
@@ -373,7 +377,7 @@ $(APPKIT): $(APPKIT_OBJ) $(GRAPHICS) $(QUARTZCORE) $(OPENGL) $(COREVIDEO) $(IOSU
 	@mkdir -p frameworks/AppKit.framework frameworks/Cocoa.framework
 	sdk/ferry-cc -dynamiclib -install_name /System/Library/Frameworks/AppKit.framework/Versions/C/AppKit \
 	    -o $@ $(APPKIT_OBJ) -framework Foundation -framework CoreGraphics -framework QuartzCore -framework OpenGL \
-	    -framework CoreVideo -framework IOSurface $(HOST_TBD)
+	    -framework CoreVideo -framework IOSurface -lcompression $(HOST_TBD)
 	sdk/gen-alias-tbd.sh Cocoa $@ $(FOUNDATION) $(GRAPHICS) > frameworks/Cocoa.framework/Cocoa.tbd
 	@mkdir -p frameworks/Carbon.framework
 	sdk/gen-alias-tbd.sh Carbon $@ $(FOUNDATION) > frameworks/Carbon.framework/Carbon.tbd

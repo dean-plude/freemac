@@ -50,6 +50,12 @@ typedef void (*CGDisplayReconfigurationCallBack)(CGDirectDisplayID display, CGDi
 extern const CFStringRef kCGDisplayShowDuplicateLowResolutionModes;
 
 CGDirectDisplayID CGMainDisplayID(void);
+/* the login session at the screen (freemac 1.271) */
+CFDictionaryRef CGSessionCopyCurrentDictionary(void);
+#define kCGSessionUserIDKey CFSTR("kCGSSessionUserIDKey")
+#define kCGSessionUserNameKey CFSTR("kCGSSessionUserNameKey")
+#define kCGSessionOnConsoleKey CFSTR("kCGSSessionOnConsoleKey")
+#define kCGSessionLoginDoneKey CFSTR("kCGSessionLoginDoneKey")
 /* the main display, as older code names it (freemac 1.237, VLC) */
 #define kCGDirectMainDisplay CGMainDisplayID()
 CGError CGGetOnlineDisplayList(uint32_t maxDisplays, CGDirectDisplayID *onlineDisplays, uint32_t *displayCount);
