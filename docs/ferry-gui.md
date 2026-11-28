@@ -3396,6 +3396,51 @@ Not there yet: IINA's images from its asset catalog (some buttons are
 blank), gesture recognizers don't fire, and picture in picture's window has
 no play and pause buttons.
 
+## Zed edits code (freemac 1.268, Ferry 0.91.0)
+
+Zed 0.170.4, the code editor, from its official download, opens its editor
+window and takes typing, with each key showing in about a tenth of a
+second. Zed is written in Rust on its own toolkit, GPUI, which uses no
+AppKit controls: it draws every pixel with Metal shaders and lays out text
+with Core Text glyph runs. It took these:
+
+- **Precompiled shaders.** An app ships its shaders as a `.metallib`, built
+  for Apple's GPUs. `ferry-airc` reads the LLVM bitcode inside it and
+  builds it again as x86-64 code for Ferry's software renderer, with the
+  same reflection Ferry's source compiler gives. A rebuilt library is kept
+  in `~/.cache/ferry/metal/`, so it's done once.
+- **Faster software Metal.** A shader that takes no derivatives and waits
+  at no barrier, which is most of them, now runs its pixels and threads one
+  after another, without a small stack for each that lets it wait. Pixel
+  writes to ordinary 8-bit textures and the usual "over" blending skip the
+  general path. Together that's about twice as fast.
+- **Glyph runs.** `CTLineGetGlyphRuns` gives a line's runs, each with its
+  glyphs, positions, advances, string range and font.
+- **Typing into a view of its own.** As on a Mac, an app can make a view
+  first responder even when the view doesn't accept a click, and a view
+  that takes text only through `NSTextInputClient` gets it with
+  `insertText:replacementRange:`.
+- **Rust's event loops.** A kqueue user event that is triggered by adding
+  it again keeps the flags it was added with, so mio's waker clears once
+  read and an idle Zed sleeps. A copy of a kqueue's descriptor is the same
+  kqueue, as tokio expects. `FIOCLEX` and the terminal `ioctl`s are
+  passed on.
+- **Code made at run time.** Zed's WebAssembly engine registers the unwind
+  data of each function it makes (`__register_frame`) and points its
+  threads at exception ports of their own. Both are accepted; a fault still
+  goes to the program's signal handlers.
+- **Process lists.** `proc_listpids`, `proc_pidinfo` and `proc_name` read
+  Linux's `/proc`.
+
+For kitty, the terminal, which goes further on a computer with Mesa:
+`CTLineGetBoundsWithOptions`, `openpty` and `login_tty` with the Mac's
+terminal settings converted, and the private Spaces calls GLFW makes (one
+Space, which every window is on).
+
+`FERRY_METAL_TIMES=1` prints how long each Metal command buffer took.
+The tests for these found that threadgroup memory never reached a compute
+shader compiled from source; it does now.
+
 ## FreeCAD opens (freemac 1.267, Ferry 0.90.0)
 
 FreeCAD 1.0.2, from its official download, opens its Start page, opens the

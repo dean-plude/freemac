@@ -497,7 +497,13 @@ struct tile {
 static void frag_lane(void *arg, int lane)
 {
     struct tile *T = arg;
-    struct ferry_call *c = &T->c;
+    struct ferry_call *c = &T->c, own;
+    /* the quad's other pixels run while this one waits for them, so a
+     * function that waits keeps its own copy (as cs_lane does) */
+    if (T->S->p->fs->waits) {
+        memcpy(&own, c, sizeof own);
+        c = &own;
+    }
     memcpy(c->position, T->pos[lane], sizeof c->position);
     c->point_coord[0] = T->pcoord[lane][0];
     c->point_coord[1] = T->pcoord[lane][1];
@@ -602,6 +608,34 @@ static float blend_op(int op, float a, float b)
 }
 
 /* The depth and stencil tests and the color writes of one fragment. */
+/* The usual color targets, 8-bit BGRA or RGBA without sRGB, read and
+ * written here directly: this is every pixel of most windows, and the
+ * general conversions cost several times more (freemac 1.268). */
+static inline int px_fast(const struct mtl_fmt *f) { return f->kind == FK_UN8 && f->n == 4 && !f->srgb; }
+static inline void px_load(const struct mtl_fmt *f, const unsigned char *p, float d[4])
+{
+    if (!px_fast(f)) { mtl_texel_load(f, p, d); return; }
+    int r = f->bgr ? 2 : 0, b = f->bgr ? 0 : 2;
+    d[0] = p[r] * (1.0f / 255);
+    d[1] = p[1] * (1.0f / 255);
+    d[2] = p[b] * (1.0f / 255);
+    d[3] = p[3] * (1.0f / 255);
+}
+static inline unsigned char px_un8(float v)
+{
+    v = v != v ? 0 : v < 0 ? 0 : v > 1 ? 1 : v;
+    return (unsigned char)__builtin_lrintf(v * 255.0f);
+}
+static inline void px_store(const struct mtl_fmt *f, unsigned char *p, const float v[4])
+{
+    if (!px_fast(f)) { mtl_texel_store(f, p, v); return; }
+    int r = f->bgr ? 2 : 0, b = f->bgr ? 0 : 2;
+    p[r] = px_un8(v[0]);
+    p[1] = px_un8(v[1]);
+    p[b] = px_un8(v[2]);
+    p[3] = px_un8(v[3]);
+}
+
 static int fragment_out(struct tile *T, int lane, float z, int shaded)
 {
     const struct setup *S = T->S;
@@ -680,13 +714,21 @@ static int fragment_out(struct tile *T, int lane, float z, int shaded)
             continue;
         }
         int need_dst = b->enabled || b->write_mask != 15;
-        if (need_dst) mtl_texel_load(f, cp, d);
+        if (need_dst) px_load(f, cp, d);
         if (b->enabled) {
             const float *s1 = o + FERRY_FS_RESULTS;
             int clamp01 = !(f->kind == FK_F16 || f->kind == FK_F32 || f->kind == FK_RG11B10F || f->kind == FK_RGB9E5 ||
                             f->kind == FK_BGR10XR || f->kind == FK_BGRA10XR);
             if (clamp01)
                 for (int k = 0; k < 4; k++) s[k] = fminf(fmaxf(s[k], f->kind == FK_SN8 || f->kind == FK_SN16 ? -1 : 0), 1);
+            if (!b->op_rgb && !b->op_a && b->dst_rgb == 5 && b->dst_a == 5 && (b->src_rgb == 1 || b->src_rgb == 4) &&
+                (b->src_a == 1 || b->src_a == 4)) {
+                /* "over", with or without premultiplied colors: what nearly
+                 * every window draws with */
+                float sa = s[3], ia = 1 - sa, fr = b->src_rgb == 1 ? 1 : sa, fa = b->src_a == 1 ? 1 : sa;
+                for (int k = 0; k < 3; k++) r[k] = s[k] * fr + d[k] * ia;
+                r[3] = sa * fa + d[3] * ia;
+            } else
             for (int k = 0; k < 4; k++) {
                 int sfac = k < 3 ? b->src_rgb : b->src_a, dfac = k < 3 ? b->dst_rgb : b->dst_a;
                 int op = k < 3 ? b->op_rgb : b->op_a;
@@ -700,7 +742,7 @@ static int fragment_out(struct tile *T, int lane, float z, int shaded)
             static const int bit[4] = {8, 4, 2, 1};
             for (int k = 0; k < 4; k++) if (!(b->write_mask & bit[k])) r[k] = d[k];
         }
-        mtl_texel_store(f, cp, r);
+        px_store(f, cp, r);
     }
     return 1;
 }
@@ -826,7 +868,7 @@ static void raster_tile(void *arg, size_t ti)
                     if (!cover) continue;
                 }
                 int shaded = p->fs != NULL;
-                if (shaded) mtl_run_lanes(1, 4, frag_lane, T);
+                if (shaded) mtl_run_lanes(p->fs->waits ? 1 : 1 + MTL_LANES_NO_WAIT, 4, frag_lane, T);
                 for (int l = 0; l < 4; l++)
                     if (cover & (1 << l)) fragment_out(T, l, T->pos[l][2], shaded);
             }
@@ -1064,7 +1106,14 @@ struct cgroup {
 static void cs_lane(void *arg, int lane)
 {
     struct cgroup *G = arg;
-    struct ferry_call *c = G->c;
+    struct ferry_call *c = G->c, own;
+    /* A kernel that waits at a barrier may read its thread's position again
+     * after the wait, by when the other threads have run: each thread then
+     * keeps its own copy, on its own stack (freemac 1.268). */
+    if (G->d->fn->waits) {
+        memcpy(&own, c, sizeof own);
+        c = &own;
+    }
     unsigned tx = (unsigned)lane % G->tpg[0], ty = ((unsigned)lane / G->tpg[0]) % G->tpg[1],
              tz = (unsigned)lane / (G->tpg[0] * G->tpg[1]);
     const struct mtl_dispatch *d = G->d;
@@ -1122,7 +1171,7 @@ static void cs_group(void *arg, size_t gi)
         c->tgmem[i] = tgbuf[i];
     }
     mtl_tg_reset();
-    if (nthreads) mtl_run_lanes(2, (int)nthreads, cs_lane, &G);
+    if (nthreads) mtl_run_lanes(d->fn->waits ? 2 : 2 + MTL_LANES_NO_WAIT, (int)nthreads, cs_lane, &G);
     free(c);
 }
 

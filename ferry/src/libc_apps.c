@@ -43,6 +43,7 @@
 #include <string.h>
 #include <termios.h>
 #include <time.h>
+#include <sys/ioctl.h>
 #include <sys/random.h>
 #include <unistd.h>
 
@@ -797,6 +798,65 @@ static int mac_tcflow(int fd, int action)
 /* a pseudo-terminal's controlling side, opened with the Mac's O_ flags */
 static int mac_posix_openpt(int flags) { return posix_openpt(ferry_open_flags_to_linux(flags)); }
 
+/* A pseudo-terminal pair, as openpty(3) gives it on a Mac: the controlling
+ * side, the terminal side opened as the program's, its name, and the
+ * settings and size to start with. Terminal apps (kitty) make their shell's
+ * terminal this way (freemac 1.268). The name buffer must be big enough for
+ * any terminal's name, as on a Mac. */
+static int mac_openpty(int *amaster, int *aslave, char *name, const struct mac_termios *tio, const struct winsize *ws)
+{
+    int m = posix_openpt(O_RDWR | O_NOCTTY | O_CLOEXEC);
+    if (m < 0)
+        return -1;
+    char *path;
+    int s = -1;
+    if (grantpt(m) < 0 || unlockpt(m) < 0 || !(path = ptsname(m)) || (s = open(path, O_RDWR | O_NOCTTY)) < 0)
+        goto fail;
+    if (tio) {
+        struct termios l;
+        if (tcgetattr(s, &l) < 0)
+            goto fail;
+        if (termios_to_linux(tio, &l) < 0) {
+            errno = EINVAL;
+            goto fail;
+        }
+        if (tcsetattr(s, TCSAFLUSH, &l) < 0)
+            goto fail;
+    }
+    /* struct winsize is the same four shorts on both */
+    if (ws && ioctl(s, TIOCSWINSZ, ws) < 0)
+        goto fail;
+    if (name)
+        strcpy(name, path);
+    /* the descriptors a caller gets from openpty stay open across exec */
+    fcntl(m, F_SETFD, 0);
+    *amaster = m;
+    *aslave = s;
+    return 0;
+fail:;
+    int e = errno;
+    close(m);
+    if (s >= 0)
+        close(s);
+    errno = e;
+    return -1;
+}
+
+/* login_tty(3): make fd the calling process's controlling terminal and its
+ * standard input, output and error, in a new session. */
+static int mac_login_tty(int fd)
+{
+    setsid();
+    if (ioctl(fd, TIOCSCTTY, 0) < 0)
+        return -1;
+    dup2(fd, 0);
+    dup2(fd, 1);
+    dup2(fd, 2);
+    if (fd > 2)
+        close(fd);
+    return 0;
+}
+
 /* ---- uuid(3) ---------------------------------------------------------------- */
 static void mac_uuid_clear(unsigned char *uu) { memset(uu, 0, 16); }
 static int mac_uuid_compare(const unsigned char *a, const unsigned char *b) { return memcmp(a, b, 16); }
@@ -899,6 +959,8 @@ const struct ferry_symbol ferry_libc_apps_symbols[] = {
     {"uuid_unparse_upper", mac_uuid_unparse_upper},
     {"uuid_unparse_lower", mac_uuid_unparse_lower},
     {"posix_openpt", mac_posix_openpt},
+    {"openpty", mac_openpty},
+    {"login_tty", mac_login_tty},
     /* the same on both systems */
     {"grantpt", grantpt},
     {"unlockpt", unlockpt},

@@ -27,6 +27,7 @@ module AppKit [system] {
     header "AppKit/AppKitOlder.h"
     header "AppKit/AppKitQt.h"
     header "AppKit/AppKitVLC.h"
+    header "AppKit/AppKitZed.h"
     header "AppKit/NSAccessibility.h"
     module NSAccessibilityElement {
         header "AppKit/NSAccessibilityElement.h"

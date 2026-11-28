@@ -490,10 +490,16 @@ SEL AKeyBindingCommand(unichar c, NSEventModifierFlags f) { return command_for(c
         SEL sel = [chars length] == 1 ? command_for([chars characterAtIndex:0], f) : NULL;
         if (sel)
             [self doCommandBySelector:sel];
-        else if (!(f & NSEventModifierFlagCommand))
-            [self insertText:chars];
-        else
+        else if (f & NSEventModifierFlagCommand)
             [self doCommandBySelector:@selector(noop:)];
+        else if ([self respondsToSelector:@selector(insertText:replacementRange:)])
+            /* a view that takes text itself (NSTextInputClient) gets it the
+             * way the input context gives it, replacing its selection or
+             * marked text; it may have no plain insertText: of its own
+             * (GPUI, Zed's toolkit) (freemac 1.268) */
+            [(id<NSTextInputClient>)self insertText:chars replacementRange:NSMakeRange(NSNotFound, 0)];
+        else
+            [self insertText:chars];
     }
 }
 @end

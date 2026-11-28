@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  *
  * What a Mac program asks about the system: sysctl, sysctlbyname and
- * sysctlnametomib for the names apps read, proc_pidpath and proc_name, and
+ * sysctlnametomib for the names apps read, proc_pidpath, proc_name,
+ * proc_listpids, proc_listallpids and proc_pidinfo, and
  * the Mach calls for memory figures (host_statistics64, host_info,
  * host_page_size, task_info). Written from Apple's public documentation
  * (the sysctl(3) and sysctl(8) man pages, the Mach and libproc reference
@@ -849,6 +850,283 @@ static int mac_proc_name(int pid, void *buffer, uint32_t size)
     return (int)strlen(buffer);
 }
 
+/* What Linux's /proc says about one process: its parent, group, terminal,
+ * state, threads, times, sizes and owners (freemac 1.268). */
+struct proc_facts {
+    int pid, ppid, pgid, tty, tpgid, nice, threads;
+    char state, comm[64];
+    uint64_t utime_ns, stime_ns, start_s, start_us, vsize, rss, minflt, majflt;
+    unsigned uid, euid, suid, gid, egid, sgid;
+};
+
+static int proc_facts(int pid, struct proc_facts *f)
+{
+    char path[64], text[1024];
+    memset(f, 0, sizeof *f);
+    snprintf(path, sizeof path, "/proc/%d/stat", pid);
+    if (read_text(path, text, sizeof text) <= 0)
+        return -1;
+    char *open = strchr(text, '('), *close = strrchr(text, ')');
+    if (!open || !close)
+        return -1;
+    snprintf(f->comm, sizeof f->comm, "%.*s", (int)(close - open - 1), open + 1);
+    unsigned long long utime = 0, stime = 0, start = 0, vsize = 0, minflt = 0, majflt = 0;
+    long rss = 0, nice = 0, threads = 0;
+    if (sscanf(close + 2, "%c %d %d %*d %d %d %*u %llu %*u %llu %*u %llu %llu %*d %*d %*d %ld %ld %*d %llu %llu %ld",
+               &f->state, &f->ppid, &f->pgid, &f->tty, &f->tpgid, &minflt, &majflt, &utime, &stime, &nice, &threads,
+               &start, &vsize, &rss) < 14)
+        return -1;
+    long hz = sysconf(_SC_CLK_TCK);
+    if (hz <= 0)
+        hz = 100;
+    f->pid = pid;
+    f->nice = (int)nice;
+    f->threads = (int)threads;
+    f->minflt = minflt;
+    f->majflt = majflt;
+    f->utime_ns = utime * (1000000000ull / (uint64_t)hz);
+    f->stime_ns = stime * (1000000000ull / (uint64_t)hz);
+    f->vsize = vsize;
+    f->rss = (uint64_t)rss * (uint64_t)sysconf(_SC_PAGESIZE);
+    /* the start is counted in clock ticks since boot */
+    double up = 0;
+    char ut[64];
+    if (read_text("/proc/uptime", ut, sizeof ut) > 0)
+        up = strtod(ut, NULL);
+    double started = (double)time(NULL) - up + (double)start / (double)hz;
+    f->start_s = (uint64_t)started;
+    f->start_us = (uint64_t)((started - (double)f->start_s) * 1e6);
+    snprintf(path, sizeof path, "/proc/%d/status", pid);
+    char status[4096];
+    if (read_text(path, status, sizeof status) > 0) {
+        char *u = strstr(status, "\nUid:"), *g = strstr(status, "\nGid:");
+        if (u)
+            sscanf(u + 5, "%u %u %u", &f->uid, &f->euid, &f->suid);
+        if (g)
+            sscanf(g + 5, "%u %u %u", &f->gid, &f->egid, &f->sgid);
+    }
+    return 0;
+}
+
+#define MAC_PROC_ALL_PIDS 1
+#define MAC_PROC_PGRP_ONLY 2
+#define MAC_PROC_TTY_ONLY 3
+#define MAC_PROC_UID_ONLY 4
+#define MAC_PROC_RUID_ONLY 5
+#define MAC_PROC_PPID_ONLY 6
+
+/* The processes of one kind, as process ids: the room needed in bytes when
+ * buffer is NULL, else the bytes filled (libproc). */
+static int mac_proc_listpids(uint32_t type, uint32_t typeinfo, void *buffer, int size)
+{
+    DIR *d = opendir("/proc");
+    if (!d) {
+        errno = ENOENT;
+        return -1;
+    }
+    int n = 0, cap = buffer && size > 0 ? size / (int)sizeof(int) : 0;
+    for (struct dirent *e; (e = readdir(d));) {
+        if (!isdigit((unsigned char)e->d_name[0]))
+            continue;
+        int pid = atoi(e->d_name);
+        if (type != MAC_PROC_ALL_PIDS) {
+            struct proc_facts f;
+            if (proc_facts(pid, &f) < 0)
+                continue;
+            unsigned have = type == MAC_PROC_PGRP_ONLY ? (unsigned)f.pgid
+                          : type == MAC_PROC_TTY_ONLY  ? (unsigned)f.tty
+                          : type == MAC_PROC_UID_ONLY  ? f.euid
+                          : type == MAC_PROC_RUID_ONLY ? f.uid
+                          : type == MAC_PROC_PPID_ONLY ? (unsigned)f.ppid
+                                                       : ~typeinfo;
+            if (have != typeinfo)
+                continue;
+        }
+        if (buffer) {
+            if (n >= cap)
+                break;
+            ((int *)buffer)[n] = pid;
+        }
+        n++;
+    }
+    closedir(d);
+    /* with no buffer, room for a few more that may start meanwhile */
+    return buffer ? n * (int)sizeof(int) : (n + 20) * (int)sizeof(int);
+}
+
+static int mac_proc_listallpids(void *buffer, int size)
+{
+    int bytes = mac_proc_listpids(MAC_PROC_ALL_PIDS, 0, buffer, size);
+    return bytes < 0 ? -1 : bytes / (int)sizeof(int);
+}
+
+/* The structures of <sys/proc_info.h>, as published there. */
+struct mac_proc_bsdinfo {
+    uint32_t pbi_flags, pbi_status, pbi_xstatus, pbi_pid, pbi_ppid;
+    uint32_t pbi_uid, pbi_gid, pbi_ruid, pbi_rgid, pbi_svuid, pbi_svgid, rfu_1;
+    char pbi_comm[16], pbi_name[32];
+    uint32_t pbi_nfiles, pbi_pgid, pbi_pjobc, e_tdev, e_tpgid;
+    int32_t pbi_nice;
+    uint64_t pbi_start_tvsec, pbi_start_tvusec;
+};
+struct mac_proc_taskinfo {
+    uint64_t pti_virtual_size, pti_resident_size, pti_total_user, pti_total_system, pti_threads_user, pti_threads_system;
+    int32_t pti_policy, pti_faults, pti_pageins, pti_cow_faults, pti_messages_sent, pti_messages_received;
+    int32_t pti_syscalls_mach, pti_syscalls_unix, pti_csw, pti_threadnum, pti_numrunning, pti_priority;
+};
+struct mac_proc_bsdshortinfo {
+    uint32_t pbsi_pid, pbsi_ppid, pbsi_pgid, pbsi_status;
+    char pbsi_comm[16];
+    uint32_t pbsi_flags, pbsi_uid, pbsi_gid, pbsi_ruid, pbsi_rgid, pbsi_svuid, pbsi_svgid, pbsi_rfu;
+};
+struct mac_vnode_info_path {
+    char vip_vi[152]; /* struct vnode_info: left zero */
+    char vip_path[1024];
+};
+_Static_assert(sizeof(struct mac_proc_bsdinfo) == 136, "proc_bsdinfo");
+_Static_assert(sizeof(struct mac_proc_taskinfo) == 96, "proc_taskinfo");
+_Static_assert(sizeof(struct mac_proc_bsdshortinfo) == 64, "proc_bsdshortinfo");
+_Static_assert(sizeof(struct mac_vnode_info_path) == 1176, "vnode_info_path");
+
+#define MAC_PROC_PIDTASKALLINFO 2
+#define MAC_PROC_PIDTBSDINFO 3
+#define MAC_PROC_PIDTASKINFO 4
+#define MAC_PROC_PIDVNODEPATHINFO 9
+#define MAC_PROC_PIDT_SHORTBSDINFO 13
+
+static uint32_t mac_status(char state)
+{
+    switch (state) {
+    case 'R':
+        return 2; /* SRUN */
+    case 'T':
+    case 't':
+        return 4; /* SSTOP */
+    case 'Z':
+    case 'X':
+        return 5; /* SZOMB */
+    default:
+        return 3; /* SSLEEP */
+    }
+}
+
+static void fill_bsdinfo(const struct proc_facts *f, struct mac_proc_bsdinfo *b)
+{
+    memset(b, 0, sizeof *b);
+    b->pbi_status = mac_status(f->state);
+    b->pbi_pid = (uint32_t)f->pid;
+    b->pbi_ppid = (uint32_t)f->ppid;
+    b->pbi_uid = f->euid;
+    b->pbi_gid = f->egid;
+    b->pbi_ruid = f->uid;
+    b->pbi_rgid = f->gid;
+    b->pbi_svuid = f->suid;
+    b->pbi_svgid = f->sgid;
+    const char *name = f->comm;
+    if (f->pid == getpid() && ferry_program_path()[0]) {
+        const char *slash = strrchr(ferry_program_path(), '/');
+        name = slash ? slash + 1 : ferry_program_path();
+    }
+    snprintf(b->pbi_comm, sizeof b->pbi_comm, "%s", name);
+    snprintf(b->pbi_name, sizeof b->pbi_name, "%s", name);
+    b->pbi_pgid = (uint32_t)f->pgid;
+    b->e_tdev = (uint32_t)f->tty;
+    b->e_tpgid = (uint32_t)f->tpgid;
+    b->pbi_nice = f->nice;
+    b->pbi_start_tvsec = f->start_s;
+    b->pbi_start_tvusec = f->start_us;
+    char path[64];
+    snprintf(path, sizeof path, "/proc/%d/fd", f->pid);
+    DIR *d = opendir(path);
+    for (struct dirent *e; d && (e = readdir(d));)
+        b->pbi_nfiles += e->d_name[0] != '.';
+    if (d)
+        closedir(d);
+}
+
+static void fill_taskinfo(const struct proc_facts *f, struct mac_proc_taskinfo *t)
+{
+    memset(t, 0, sizeof *t);
+    t->pti_virtual_size = f->vsize;
+    t->pti_resident_size = f->rss;
+    t->pti_total_user = f->utime_ns;
+    t->pti_total_system = f->stime_ns;
+    t->pti_faults = (int32_t)(f->minflt + f->majflt);
+    t->pti_pageins = (int32_t)f->majflt;
+    t->pti_threadnum = f->threads;
+    t->pti_numrunning = f->state == 'R';
+    t->pti_priority = 31 - f->nice;
+}
+
+/* What libproc's proc_pidinfo reports about a process, for the flavours
+ * process lists ask for: the bytes filled, or 0 with errno set. */
+static int mac_proc_pidinfo(int pid, int flavor, uint64_t arg, void *buffer, int size)
+{
+    (void)arg;
+    struct proc_facts f;
+    int need = flavor == MAC_PROC_PIDTASKALLINFO    ? (int)(sizeof(struct mac_proc_bsdinfo) + sizeof(struct mac_proc_taskinfo))
+             : flavor == MAC_PROC_PIDTBSDINFO       ? (int)sizeof(struct mac_proc_bsdinfo)
+             : flavor == MAC_PROC_PIDTASKINFO       ? (int)sizeof(struct mac_proc_taskinfo)
+             : flavor == MAC_PROC_PIDVNODEPATHINFO  ? (int)(2 * sizeof(struct mac_vnode_info_path))
+             : flavor == MAC_PROC_PIDT_SHORTBSDINFO ? (int)sizeof(struct mac_proc_bsdshortinfo)
+                                                    : 0;
+    if (!need) {
+        errno = ENOTSUP;
+        return 0;
+    }
+    if (!buffer || size < need) {
+        errno = ENOMEM;
+        return 0;
+    }
+    if (proc_facts(pid, &f) < 0) {
+        errno = ESRCH;
+        return 0;
+    }
+    char *out = buffer;
+    switch (flavor) {
+    case MAC_PROC_PIDTASKALLINFO:
+        fill_bsdinfo(&f, (struct mac_proc_bsdinfo *)out);
+        fill_taskinfo(&f, (struct mac_proc_taskinfo *)(out + sizeof(struct mac_proc_bsdinfo)));
+        break;
+    case MAC_PROC_PIDTBSDINFO:
+        fill_bsdinfo(&f, (struct mac_proc_bsdinfo *)out);
+        break;
+    case MAC_PROC_PIDTASKINFO:
+        fill_taskinfo(&f, (struct mac_proc_taskinfo *)out);
+        break;
+    case MAC_PROC_PIDT_SHORTBSDINFO: {
+        struct mac_proc_bsdinfo b;
+        fill_bsdinfo(&f, &b);
+        struct mac_proc_bsdshortinfo *s = (struct mac_proc_bsdshortinfo *)out;
+        memset(s, 0, sizeof *s);
+        s->pbsi_pid = b.pbi_pid;
+        s->pbsi_ppid = b.pbi_ppid;
+        s->pbsi_pgid = b.pbi_pgid;
+        s->pbsi_status = b.pbi_status;
+        memcpy(s->pbsi_comm, b.pbi_comm, sizeof s->pbsi_comm);
+        s->pbsi_uid = b.pbi_uid;
+        s->pbsi_gid = b.pbi_gid;
+        s->pbsi_ruid = b.pbi_ruid;
+        s->pbsi_rgid = b.pbi_rgid;
+        s->pbsi_svuid = b.pbi_svuid;
+        s->pbsi_svgid = b.pbi_svgid;
+        break;
+    }
+    case MAC_PROC_PIDVNODEPATHINFO: {
+        struct mac_vnode_info_path *v = (struct mac_vnode_info_path *)out;
+        memset(v, 0, 2 * sizeof *v);
+        char link[64];
+        snprintf(link, sizeof link, "/proc/%d/cwd", pid);
+        ssize_t n = readlink(link, v[0].vip_path, sizeof v[0].vip_path - 1);
+        if (n > 0)
+            v[0].vip_path[n] = 0;
+        strcpy(v[1].vip_path, "/");
+        break;
+    }
+    }
+    return need;
+}
+
 /* ---- Mach: memory and processor figures ------------------------------------------------
  * Programs ask for the memory figures through the host port and their own
  * task port. Ferry hands out fixed numbers for those ports; only the
@@ -1538,6 +1816,9 @@ const struct ferry_symbol ferry_sysctl_symbols[] = {
     {"sysctlnametomib", mac_sysctlnametomib},
     {"proc_pidpath", mac_proc_pidpath},
     {"proc_name", mac_proc_name},
+    {"proc_listpids", mac_proc_listpids},
+    {"proc_listallpids", mac_proc_listallpids},
+    {"proc_pidinfo", mac_proc_pidinfo},
     {"mach_host_self", mac_mach_host_self},
     {"mach_task_self", mac_mach_task_self},
     {"mach_task_self_", &mach_task_self_},

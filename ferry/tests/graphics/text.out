@@ -15,6 +15,9 @@ offsets increase: yes, end is the width: yes, position maps back: yes
 ink drawn: yes, all of it inside the image bounds: yes
 image bounds start near the text position: yes, rise above the baseline: yes
 nothing below the descent: yes
+glyph runs: 1, a run: yes, its type: yes, glyphs as the line's: yes
+run covers the string: yes, glyphs found: yes, positions and indices rise: yes
+run's font: yes, run as wide as the line: yes, first glyph at the start: yes
 red text is red: yes
 truncated line fits: yes, keeps more than the ellipsis: yes
 suggested size fits the width: yes, several lines tall: yes, whole text fits: yes

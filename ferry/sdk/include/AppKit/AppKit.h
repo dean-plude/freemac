@@ -4772,6 +4772,7 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidUpdateNotification;
 #import <AppKit/AppKitIINA.h>
 /* ---- what the Godot engine calls besides (AppKitGodot.m), (freemac Godot work) */
 #import <AppKit/AppKitGodot.h>
+#import <AppKit/AppKitZed.h>
 
 /* ---- OpenGL: NSOpenGLPixelFormat, NSOpenGLContext, NSOpenGLView (NSOpenGL.m)
  * (freemac 1.235, Ferry 0.59.0) */

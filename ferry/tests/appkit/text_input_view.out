@@ -1,0 +1,4 @@
+made first responder though it doesn't accept: yes, is it: yes
+typed: "hi;(", through insertText:replacementRange: with no range: yes
+Command-S types nothing: yes, a command instead: yes
+exit=0

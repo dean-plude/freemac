@@ -1084,6 +1084,17 @@ static struct mac_passwd *mac_getpwnam(const char *name) { return to_mac_passwd(
 #define MAC_FIONBIO    0x8004667eul
 #define MAC_SIOCGIFMTU 0xc0206933ul /* a Mac's struct ifreq is 32 bytes, Linux's 40 */
 
+/* Requests whose argument is the same on both, by their Mac numbers
+ * (<sys/filio.h>, <sys/ttycom.h>). Rust's standard library marks its
+ * descriptors close-on-exec with FIOCLEX; terminals size and own their
+ * pseudo-terminals with the tty ones (freemac 1.268). */
+static const struct { unsigned long mac, linux_; } same_ioctls[] = {
+    {0x20006601ul, FIOCLEX},   {0x20006602ul, FIONCLEX},  {0x8004667dul, FIOASYNC},
+    {0x80087467ul, TIOCSWINSZ}, {0x40047477ul, TIOCGPGRP}, {0x80047476ul, TIOCSPGRP},
+    {0x20007461ul, TIOCSCTTY}, {0x20007471ul, TIOCNOTTY}, {0x40047473ul, TIOCOUTQ},
+    {0x2000740dul, TIOCEXCL},  {0x2000740eul, TIOCNXCL},  {0x80017472ul, TIOCSTI},
+};
+
 static int mac_ioctl(int fd, unsigned long req, ...)
 {
     va_list ap;
@@ -1096,6 +1107,9 @@ static int mac_ioctl(int fd, unsigned long req, ...)
         return ioctl(fd, FIONREAD, arg);
     if (req == MAC_FIONBIO) /* an int, nonzero for non-blocking */
         return ioctl(fd, FIONBIO, arg);
+    for (size_t i = 0; i < sizeof same_ioctls / sizeof *same_ioctls; i++)
+        if (req == same_ioctls[i].mac)
+            return ioctl(fd, same_ioctls[i].linux_, req == 0x20007461ul ? 0 : arg);
     if (req == MAC_SIOCGIFMTU && arg) { /* both put the name first and the MTU after it */
         struct ifreq lr;
         memset(&lr, 0, sizeof lr);
@@ -1106,6 +1120,8 @@ static int mac_ioctl(int fd, unsigned long req, ...)
         memcpy((char *)arg + IFNAMSIZ, &lr.ifr_mtu, sizeof(int));
         return 0;
     }
+    if (ferry_verbose)
+        fprintf(stderr, "ferry: ioctl %#lx on %d isn't translated yet\n", req, fd);
     errno = ENOTTY;
     return -1;
 }

@@ -59,6 +59,10 @@ static PangoContext *pango_context(void)
 
 - (id)copyWithZone:(NSZone *)zone { return [self retain]; }
 
+/* An NSFont is a CTFont (toll-free bridged): CFGetTypeID gives every font
+ * CTFontGetTypeID, whichever class made it. */
+- (CFTypeID)_ferryCFTypeID { return (CFTypeID)[GFont class]; }
+
 - (void)dealloc
 {
     if (hb)
@@ -498,6 +502,8 @@ CFTypeID CTFontGetTypeID(void) { return (CFTypeID)[GFont class]; }
 
 @implementation GParagraphStyle
 - (id)copyWithZone:(NSZone *)zone { return [self retain]; }
+/* likewise an NSParagraphStyle is a CTParagraphStyle */
+- (CFTypeID)_ferryCFTypeID { return (CFTypeID)[GParagraphStyle class]; }
 @end
 
 CTParagraphStyleRef CTParagraphStyleCreate(const CTParagraphStyleSetting *settings, size_t count)
@@ -718,6 +724,7 @@ static NSUInteger index_for_byte(GLayout *l, int byte)
 @public
     GLayout *layout;
     int index;          /* which of the layout's lines */
+    NSArray *runs;      /* its glyph runs, made when first asked for */
 }
 @end
 
@@ -725,6 +732,7 @@ static NSUInteger index_for_byte(GLayout *l, int byte)
 
 - (void)dealloc
 {
+    [runs release];
     [layout release];
     [super dealloc];
 }
@@ -800,6 +808,26 @@ CGRect CTLineGetImageBounds(CTLineRef line, CGContextRef context)
     if (context)
         r = CGRectOffset(r, ((GContext *)context)->textMatrix.tx, ((GContext *)context)->textMatrix.ty);
     return r;
+}
+
+/* A line's bounds, as CTLineGetBoundsWithOptions describes them: from the
+ * origin, down by the descent and up by the ascent, with the leading
+ * unless it's excluded; the glyphs' own bounds when asked for those
+ * (freemac 1.268, kitty). Hanging punctuation, optical bounds and language
+ * extents change nothing for the scripts Pango lays out here. */
+CGRect CTLineGetBoundsWithOptions(CTLineRef line, CTLineBoundsOptions options)
+{
+    if (!line)
+        return CGRectZero;
+    if (options & kCTLineBoundsUseGlyphPathBounds) {
+        CGRect r = CTLineGetImageBounds(line, NULL);
+        return CGRectIsNull(r) ? CGRectZero : r;
+    }
+    CGFloat ascent, descent, leading;
+    double width = CTLineGetTypographicBounds(line, &ascent, &descent, &leading);
+    if (options & kCTLineBoundsExcludeTypographicLeading)
+        leading = 0;
+    return CGRectMake(0, -descent, width, ascent + descent + leading);
 }
 
 static double x_at(GLine *line, NSUInteger i)
@@ -1182,4 +1210,262 @@ void CTFrameDraw(CTFrameRef frame, CGContextRef context)
         draw_line(FRAME->lines[i], c, FRAME->rect.origin.x + FRAME->origins[i].x,
                   FRAME->rect.origin.y + FRAME->origins[i].y);
     c->textMatrix = saved;
+}
+
+/* ---- glyph runs ------------------------------------------------------------------------ */
+
+/* A line's glyph runs (CTRun): each a stretch of glyphs in one font, with one
+ * set of attributes, in the order they show from left to right. A run is one
+ * of Pango's glyph items; its glyphs are the font's own glyph numbers, so
+ * they draw with CTFontDrawGlyphs and measure with the CTFont glyph calls,
+ * and its font is the one that actually has the characters (another font
+ * where the one asked for lacks them, as on a Mac). Positions are from the
+ * line's origin, y up (CTRun.h). */
+@interface GRun : NSObject {
+@public
+    GLine *line;
+    CFIndex count;
+    CGGlyph *glyphs;
+    CGPoint *positions;
+    CGSize *advances;
+    CFIndex *indices;
+    CFRange range;
+    NSDictionary *attributes;
+    double width, ascent, descent, leading;
+    BOOL rtl;
+}
+@end
+
+@implementation GRun
+- (void)dealloc
+{
+    free(glyphs);
+    free(positions);
+    free(advances);
+    free(indices);
+    [attributes release];
+    [super dealloc];
+}
+- (NSString *)description
+{
+    return [NSString stringWithFormat:@"<CTRun %p: %ld glyphs, string range %ld+%ld>", self, (long)count,
+                                      (long)range.location, (long)range.length];
+}
+@end
+
+/* The CTFont that a Pango font is: the one the text asked for when it is
+ * that font, else one loaded from the Pango font's own description. */
+static GFont *font_of_item(PangoFont *pf, GFont *asked)
+{
+    if (!pf)
+        return [asked retain];
+    if (asked && asked->font == pf)
+        return [asked retain];
+    PangoFontDescription *d = pango_font_describe(pf);
+    const char *family = pango_font_description_get_family(d);
+    double size = pango_font_description_get_size(d) / (double)PANGO_SCALE;
+    if (size <= 0 && asked)
+        size = asked->size;
+    GFont *f = load_font(family ? [NSString stringWithUTF8String:family] : @"sans-serif",
+                         (int)pango_font_description_get_weight(d), (int)pango_font_description_get_style(d),
+                         size > 0 ? size : 12, asked ? &asked->matrix : NULL);
+    pango_font_description_free(d);
+    return f;   /* load_font's fonts come retained */
+}
+
+static NSArray *line_runs(GLine *line)
+{
+    if (line->runs)
+        return line->runs;
+    GLayout *l = line->layout;
+    NSMutableArray *runs = [NSMutableArray array];
+    double pen = 0;
+    for (GSList *r = pline(line)->runs; r; r = r->next) {
+        PangoGlyphItem *gi = r->data;
+        PangoGlyphString *gs = gi->glyphs;
+        GRun *run = [[GRun alloc] init];
+        run->line = line;   /* not retained: the line holds its runs */
+        run->count = gs->num_glyphs;
+        size_t n = (size_t)(run->count ? run->count : 1);
+        run->glyphs = calloc(n, sizeof *run->glyphs);
+        run->positions = calloc(n, sizeof *run->positions);
+        run->advances = calloc(n, sizeof *run->advances);
+        run->indices = calloc(n, sizeof *run->indices);
+        run->rtl = gi->item->analysis.level & 1;
+
+        NSUInteger first = index_for_byte(l, gi->item->offset);
+        NSUInteger last = index_for_byte(l, gi->item->offset + gi->item->length);
+        if (gi->item->offset + gi->item->length >= (int)l->offsets[l->range.length])
+            last = l->range.length;
+        run->range = CFRangeMake((CFIndex)(l->range.location + first), (CFIndex)(last - first));
+
+        NSDictionary *attrs = l->source.length > (NSUInteger)run->range.location
+                                  ? [l->source attributesAtIndex:(NSUInteger)run->range.location effectiveRange:NULL]
+                                  : @{};
+        GFont *asked = attrs[(id)kCTFontAttributeName];
+        if (![asked isKindOfClass:[GFont class]])
+            asked = default_font();
+        GFont *font = font_of_item(gi->item->analysis.font, asked);
+        NSMutableDictionary *a = [attrs mutableCopy];
+        if (font)
+            a[(id)kCTFontAttributeName] = font;
+        run->attributes = a;
+
+        hb_codepoint_t space = 0;
+        if (font && font->hb)
+            hb_font_get_nominal_glyph(font->hb, ' ', &space);
+        double x = pen;
+        for (int i = 0; i < gs->num_glyphs; i++) {
+            PangoGlyphInfo *g = &gs->glyphs[i];
+            PangoGlyph glyph = g->glyph;
+            /* a character no font has, or one that draws nothing (a line
+             * break or a control character): no glyph of the font's own */
+            if (glyph == PANGO_GLYPH_EMPTY || glyph == PANGO_GLYPH_INVALID_INPUT)
+                glyph = space;
+            else if (glyph & PANGO_GLYPH_UNKNOWN_FLAG)
+                glyph = 0;
+            run->glyphs[i] = (CGGlyph)glyph;
+            double w = g->geometry.width / (double)PANGO_SCALE;
+            run->positions[i] = CGPointMake(x + g->geometry.x_offset / (double)PANGO_SCALE,
+                                            -g->geometry.y_offset / (double)PANGO_SCALE);
+            run->advances[i] = CGSizeMake(w, 0);
+            x += w;
+            NSUInteger ci = index_for_byte(l, gi->item->offset + gs->log_clusters[i]);
+            run->indices[i] = (CFIndex)(l->range.location + ci);
+        }
+        run->width = x - pen;
+        pen = x;
+        if (font) {
+            run->ascent = CTFontGetAscent((CTFontRef)font);
+            run->descent = CTFontGetDescent((CTFontRef)font);
+            run->leading = CTFontGetLeading((CTFontRef)font);
+        }
+        [font release];
+        [runs addObject:run];
+        [run release];
+    }
+    line->runs = [runs copy];
+    return line->runs;
+}
+
+CFArrayRef CTLineGetGlyphRuns(CTLineRef line) { return (CFArrayRef)line_runs(LINE); }
+
+#define RUN ((GRun *)run)
+
+/* A range of a run's glyphs: length 0 means to the end. */
+static CFRange glyph_range(GRun *r, CFRange range)
+{
+    if (range.location < 0 || range.location > r->count)
+        range.location = r->count;
+    if (range.length <= 0 || range.location + range.length > r->count)
+        range.length = r->count - range.location;
+    return range;
+}
+
+CFTypeID CTRunGetTypeID(void) { return (CFTypeID)[GRun class]; }
+CFIndex CTRunGetGlyphCount(CTRunRef run) { return run ? RUN->count : 0; }
+CFDictionaryRef CTRunGetAttributes(CTRunRef run) { return (CFDictionaryRef)RUN->attributes; }
+CTRunStatus CTRunGetStatus(CTRunRef run)
+{
+    CTRunStatus s = kCTRunStatusNoStatus;
+    if (RUN->rtl)
+        s |= kCTRunStatusRightToLeft;
+    for (CFIndex i = 1; i < RUN->count; i++)
+        if (RUN->rtl ? RUN->indices[i] > RUN->indices[i - 1] : RUN->indices[i] < RUN->indices[i - 1]) {
+            s |= kCTRunStatusNonMonotonic;
+            break;
+        }
+    return s;
+}
+CFRange CTRunGetStringRange(CTRunRef run) { return RUN->range; }
+CGAffineTransform CTRunGetTextMatrix(CTRunRef run) { return CGAffineTransformIdentity; }
+
+const CGGlyph *CTRunGetGlyphsPtr(CTRunRef run) { return RUN->glyphs; }
+const CGPoint *CTRunGetPositionsPtr(CTRunRef run) { return RUN->positions; }
+const CGSize *CTRunGetAdvancesPtr(CTRunRef run) { return RUN->advances; }
+const CFIndex *CTRunGetStringIndicesPtr(CTRunRef run) { return RUN->indices; }
+
+#define COPY_OUT(field)                                                    \
+    CFRange r = glyph_range(RUN, range);                                   \
+    if (buffer && r.length)                                                \
+        memcpy(buffer, RUN->field + r.location, (size_t)r.length * sizeof *buffer)
+
+void CTRunGetGlyphs(CTRunRef run, CFRange range, CGGlyph buffer[]) { COPY_OUT(glyphs); }
+void CTRunGetPositions(CTRunRef run, CFRange range, CGPoint buffer[]) { COPY_OUT(positions); }
+void CTRunGetAdvances(CTRunRef run, CFRange range, CGSize buffer[]) { COPY_OUT(advances); }
+void CTRunGetStringIndices(CTRunRef run, CFRange range, CFIndex buffer[]) { COPY_OUT(indices); }
+
+void CTRunGetBaseAdvancesAndOrigins(CTRunRef run, CFRange range, CGSize advancesBuffer[], CGPoint originsBuffer[])
+{
+    CFRange r = glyph_range(RUN, range);
+    for (CFIndex i = 0; i < r.length; i++) {
+        CFIndex k = r.location + i;
+        if (advancesBuffer)
+            advancesBuffer[i] = RUN->advances[k];
+        if (originsBuffer) {
+            /* where the glyph sits against where its advance starts */
+            double start = k ? RUN->positions[k - 1].x + RUN->advances[k - 1].width
+                             : (RUN->count ? RUN->positions[0].x : 0);
+            originsBuffer[i] = CGPointMake(RUN->positions[k].x - start, RUN->positions[k].y);
+        }
+    }
+}
+
+double CTRunGetTypographicBounds(CTRunRef run, CFRange range, CGFloat *ascent, CGFloat *descent, CGFloat *leading)
+{
+    if (ascent)
+        *ascent = RUN->ascent;
+    if (descent)
+        *descent = RUN->descent;
+    if (leading)
+        *leading = RUN->leading;
+    CFRange r = glyph_range(RUN, range);
+    double w = 0;
+    for (CFIndex i = 0; i < r.length; i++)
+        w += RUN->advances[r.location + i].width;
+    return w;
+}
+
+CGRect CTRunGetImageBounds(CTRunRef run, CGContextRef context, CFRange range)
+{
+    CFRange r = glyph_range(RUN, range);
+    GFont *font = RUN->attributes[(id)kCTFontAttributeName];
+    if (!r.length || ![font isKindOfClass:[GFont class]])
+        return CGRectNull;
+    CGRect *boxes = malloc((size_t)r.length * sizeof *boxes);
+    CTFontGetBoundingRectsForGlyphs((CTFontRef)font, kCTFontOrientationHorizontal, RUN->glyphs + r.location, boxes,
+                                    r.length);
+    CGRect u = CGRectNull;
+    for (CFIndex i = 0; i < r.length; i++)
+        if (!CGRectIsEmpty(boxes[i]))
+            u = CGRectUnion(u, CGRectOffset(boxes[i], RUN->positions[r.location + i].x,
+                                            RUN->positions[r.location + i].y));
+    free(boxes);
+    if (context && !CGRectIsNull(u))
+        u = CGRectOffset(u, ((GContext *)context)->textMatrix.tx, ((GContext *)context)->textMatrix.ty);
+    return u;
+}
+
+void CTRunDraw(CTRunRef run, CGContextRef context, CFRange range)
+{
+    CFRange r = glyph_range(RUN, range);
+    GFont *font = RUN->attributes[(id)kCTFontAttributeName];
+    if (!r.length || !context || ![font isKindOfClass:[GFont class]])
+        return;
+    GContext *c = (GContext *)context;
+    double rgba[4];
+    BOOL fromContext = [RUN->attributes[(id)kCTForegroundColorFromContextAttributeName] boolValue];
+    CGContextSaveGState(context);
+    if (!fromContext && (rgba_of(RUN->attributes[(id)kCTForegroundColorAttributeName], rgba) ||
+                         rgba_of(RUN->attributes[@"NSColor"], rgba)))
+        CGContextSetRGBFillColor(context, rgba[0], rgba[1], rgba[2], rgba[3]);
+    else if (!fromContext)
+        CGContextSetRGBFillColor(context, 0, 0, 0, 1);
+    CGPoint *at = malloc((size_t)r.length * sizeof *at);
+    for (CFIndex i = 0; i < r.length; i++)
+        at[i] = CGPointMake(RUN->positions[r.location + i].x + c->textMatrix.tx,
+                            RUN->positions[r.location + i].y + c->textMatrix.ty);
+    CTFontDrawGlyphs((CTFontRef)font, RUN->glyphs + r.location, at, (size_t)r.length, context);
+    free(at);
+    CGContextRestoreGState(context);
 }

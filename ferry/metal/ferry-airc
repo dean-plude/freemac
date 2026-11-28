@@ -1,0 +1,1288 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+#   ferry-airc build LIBRARY.metallib -o LIBRARY.dylib
+#   ferry-airc list LIBRARY.metallib
+#
+# Runs a precompiled Metal library on Ferry's software renderer. A
+# .metallib that an app ships holds its shaders as LLVM bitcode (one module
+# per function, each in LLVM's standard bitcode wrapper), compiled for
+# Apple's GPUs. LLVM's own tools read that bitcode, so this script has
+# clang turn each module into LLVM's text form, rewrites it for this
+# computer's processor, and builds it into the same kind of library
+# ferry-mslc makes from source (freemac 1.268):
+#
+#   - each built-in GPU function the shader calls (maths, conversions,
+#     derivatives, texture sampling) gets a body: an LLVM intrinsic, a C
+#     library call, or a call into Metal.framework (ferry_metal_abi.h)
+#   - each vertex, fragment and kernel function gets the wrapper and info
+#     function Metal.framework calls (__ferry_vs_NAME and so on), read from
+#     the description each module carries of its entry function: which
+#     arguments are buffers, textures, built-in values or stage inputs, and
+#     which results go where
+#
+# clang and ld64.lld (packages clang and lld) do the compiling, as for
+# ferry-mslc. A shader that calls a GPU function this script doesn't know
+# yet fails to build, and the message names the function.
+
+import json
+import os
+import re
+import struct
+import subprocess
+import sys
+import tempfile
+
+# ---- the library file ----------------------------------------------------------------
+BC_WRAPPER = b"\xde\xc0\x17\x0b"
+
+
+def modules(data):
+    """The bitcode modules in a .metallib: LLVM's bitcode wrapper header
+    (magic, version, offset, size, cpu type; llvm/Bitcode/BitcodeReader)
+    says where each one's bitcode is and how long it is."""
+    if data[:4] != b"MTLB":
+        raise SystemExit("ferry-airc: not a Metal library (no MTLB header)")
+    out, i = [], 0
+    while True:
+        j = data.find(BC_WRAPPER, i)
+        if j < 0:
+            break
+        _, _, off, size, _ = struct.unpack_from("<IIIII", data, j)
+        body = data[j + off:j + off + size]
+        if body[:4] == b"BC\xc0\xde" and size > 0:
+            out.append(body)
+            i = j + off + size
+        else:
+            i = j + 4
+    return out
+
+
+def find_tool(names):
+    for n in names:
+        for d in os.environ.get("PATH", "/usr/bin:/bin").split(":"):
+            p = os.path.join(d, n)
+            if os.access(p, os.X_OK):
+                return p
+    for v in range(30, 13, -1):
+        for n in names:
+            p = "/usr/lib/llvm-%d/bin/%s" % (v, n.split("-")[0])
+            if os.access(p, os.X_OK):
+                return p
+    return None
+
+
+TARGET = ["-target", "x86_64-apple-macosx11"]
+
+
+# ---- LLVM's text form: types and metadata --------------------------------------------
+def split_top(s, sep=","):
+    """Split at sep outside (), [], {}, <> and quotes."""
+    out, depth, cur, q = [], 0, [], False
+    for ch in s:
+        if q:
+            cur.append(ch)
+            if ch == '"':
+                q = False
+            continue
+        if ch == '"':
+            q = True
+        elif ch in "([{<":
+            depth += 1
+        elif ch in ")]}>":
+            depth -= 1
+        if ch == sep and depth == 0:
+            out.append("".join(cur).strip())
+            cur = []
+        else:
+            cur.append(ch)
+    if "".join(cur).strip():
+        out.append("".join(cur).strip())
+    return out
+
+
+def take_type(s):
+    """The type at the start of s, and the rest."""
+    s = s.lstrip()
+    if s[0] in "[{<":
+        close = {"[": "]", "{": "}", "<": ">"}
+        opener = s[0]
+        if s.startswith("<{"):
+            opener = "<{"
+        depth, i = 0, 0
+        while i < len(s):
+            if s[i] in "[{<":
+                depth += 1
+            elif s[i] in "]}>":
+                depth -= 1
+                if depth == 0:
+                    i += 1
+                    break
+            i += 1
+        t = s[:i]
+        rest = s[i:]
+    else:
+        m = re.match(r"(%[\w.\"$-]+|ptr(?:\s+addrspace\(\d+\))?|[a-z]+\d*)", s)
+        t, rest = m.group(1), s[m.end():]
+    # pointer to function etc. don't occur in shaders
+    return t.strip(), rest
+
+
+class Ty:
+    """A parsed LLVM type: kind is 'int', 'float', 'vec', 'arr', 'struct',
+    'ptr' or 'named'."""
+
+    def __init__(self, text, structs):
+        self.text = text.strip()
+        t = self.text
+        if t.startswith("<{") or t.startswith("{"):
+            self.kind = "struct"
+            inner = t[2:-2] if t.startswith("<{") else t[1:-1]
+            self.fields = [Ty(f, structs) for f in split_top(inner)]
+        elif t.startswith("<"):
+            m = re.match(r"<\s*(\d+)\s*x\s*(.*)>$", t)
+            self.kind, self.n, self.elem = "vec", int(m.group(1)), Ty(m.group(2), structs)
+        elif t.startswith("["):
+            m = re.match(r"\[\s*(\d+)\s*x\s*(.*)\]$", t)
+            self.kind, self.n, self.elem = "arr", int(m.group(1)), Ty(m.group(2), structs)
+        elif t.startswith("%"):
+            body = structs.get(t)
+            if body is None:
+                self.kind = "opaque"
+            else:
+                sub = Ty(body, structs)
+                self.kind, self.fields = "struct", sub.fields
+        elif t.startswith("ptr"):
+            self.kind = "ptr"
+        elif re.match(r"^i\d+$", t):
+            self.kind, self.bits = "int", int(t[1:])
+        elif t in ("half", "float", "double"):
+            self.kind = "float"
+        else:
+            self.kind = "other"
+
+    def scalars(self):
+        """The scalar leaves, as (path of indices, scalar type)."""
+        if self.kind in ("vec", "arr"):
+            return [((i,) + p, s) for i in range(self.n) for p, s in self.elem.scalars()]
+        if self.kind == "struct":
+            return [((i,) + p, s) for i, f in enumerate(self.fields) for p, s in f.scalars()]
+        return [((), self)]
+
+
+def parse_metadata(text):
+    """!N = !{...} lines, as lists of items: ('s', str), ('i', int),
+    ('ref', N), ('fn', name)."""
+    md = {}
+    for m in re.finditer(r"^!(\d+) = (?:distinct )?!\{(.*)\}\s*$", text, re.M):
+        items = []
+        for it in split_top(m.group(2)):
+            it = it.strip()
+            if it.startswith('!"'):
+                items.append(("s", it[2:-1]))
+            elif re.match(r"^!\d+$", it):
+                items.append(("ref", int(it[1:])))
+            elif re.match(r"^i\d+ -?\d+$", it):
+                items.append(("i", int(it.split()[1])))
+            elif "@" in it:
+                items.append(("fn", it.split("@", 1)[1].strip('"')))
+            else:
+                items.append(("?", it))
+        md[int(m.group(1))] = items
+    named = {}
+    for m in re.finditer(r"^!([A-Za-z][\w.]*) = !\{(.*)\}\s*$", text, re.M):
+        named[m.group(1)] = [int(x.strip()[1:]) for x in m.group(2).split(",") if x.strip()]
+    return md, named
+
+
+def strings(items):
+    return [v for k, v in items if k == "s"]
+
+
+def after(items, key):
+    """The item following string key (location index and the like)."""
+    for i, (k, v) in enumerate(items):
+        if k == "s" and v == key and i + 1 < len(items):
+            return items[i + 1][1]
+    return None
+
+
+def kind_of(type_name):
+    """FERRY_K_* from the argument's MSL type name."""
+    t = (type_name or "float").strip()
+    t = re.sub(r"^(packed_|metal::)", "", t)
+    if t.startswith(("uint", "ushort", "uchar", "bool", "ulong")):
+        return 3
+    if t.startswith(("int", "short", "char", "long")):
+        return 2
+    if t.startswith("half"):
+        return 1
+    return 0
+
+
+# ---- the bodies of the GPU built-in functions ----------------------------------------
+def suffix(t):
+    """LLVM intrinsic suffix of a type: f32, v2f32..."""
+    t = t.strip()
+    m = re.match(r"<\s*(\d+)\s*x\s*(\w+)\s*>", t)
+    base = {"float": "f32", "half": "f16", "double": "f64"}
+    if m:
+        e = m.group(2)
+        return "v%s%s" % (m.group(1), base.get(e, e))
+    return base.get(t, t)
+
+
+class Lower:
+    """Writes a definition for each air.* function a module declares."""
+
+    def __init__(self):
+        self.decls = set()     # extra declarations the bodies need
+        self.helpers = {}      # helper definitions by name
+        self.unknown = []
+        self.n = 0
+
+    def tmp(self):
+        self.n += 1
+        return "%%t%d" % self.n
+
+    def declare(self, line):
+        self.decls.add(line)
+
+    # a scalar libm function applied to each element
+    def per_elem(self, ret, args, cname, nargs):
+        L = []
+        rt = Ty(ret, {})
+        elem = rt.elem.text if rt.kind == "vec" else ret
+        fname = cname + ("f" if elem == "float" else "" if elem == "double" else "f")
+        conv = elem == "half"
+        self.declare("declare float @%s(%s)" % (cname + "f", ", ".join(["float"] * nargs)))
+        if rt.kind != "vec":
+            vals = []
+            for i in range(nargs):
+                if conv:
+                    v = self.tmp()
+                    L.append("  %s = fpext half %%a%d to float" % (v, i))
+                    vals.append("float " + v)
+                else:
+                    vals.append("float %%a%d" % i)
+            r = self.tmp()
+            L.append("  %s = call float @%sf(%s)" % (r, cname, ", ".join(vals)))
+            if conv:
+                r2 = self.tmp()
+                L.append("  %s = fptrunc float %s to half" % (r2, r))
+                r = r2
+            L.append("  ret %s %s" % (ret, r))
+            return L
+        acc = "undef"
+        for k in range(rt.n):
+            vals = []
+            for i in range(nargs):
+                e = self.tmp()
+                L.append("  %s = extractelement %s %%a%d, i32 %d" % (e, ret, i, k))
+                if conv:
+                    e2 = self.tmp()
+                    L.append("  %s = fpext half %s to float" % (e2, e))
+                    e = e2
+                vals.append("float " + e)
+            r = self.tmp()
+            L.append("  %s = call float @%sf(%s)" % (r, cname, ", ".join(vals)))
+            if conv:
+                r2 = self.tmp()
+                L.append("  %s = fptrunc float %s to half" % (r2, r))
+                r = r2
+            a2 = self.tmp()
+            L.append("  %s = insertelement %s %s, %s %s, i32 %d" % (a2, ret, acc, elem, r, k))
+            acc = a2
+        L.append("  ret %s %s" % (ret, acc))
+        return L
+
+    def splat(self, t, scalar):
+        tt = Ty(t, {})
+        if tt.kind != "vec":
+            return scalar
+        return "<%s>" % ", ".join(["%s %s" % (tt.elem.text, scalar)] * tt.n)
+
+    def intr(self, name, t, args):
+        sfx = suffix(t)
+        self.declare("declare %s @llvm.%s.%s(%s)" % (t, name, sfx, ", ".join([t] * len(args))))
+        r = self.tmp()
+        return r, "  %s = call %s @llvm.%s.%s(%s)" % (r, t, name, sfx, ", ".join("%s %s" % (t, a) for a in args))
+
+    def body(self, name, ret, params):
+        """Lines of the body, or None if unknown."""
+        op = name[len("air."):]
+        base = re.sub(r"\.(v\d+)?[fiu]\d+$", "", op)
+        base = re.sub(r"^fast_", "", base)
+        base = re.sub(r"^precise_", "", base)
+        P = params
+        t = ret
+        ft = Ty(ret, {})
+        one = "1.0" if (ft.elem.text if ft.kind == "vec" else ret) != "half" else "0xH3C00"
+        zero = "0.0" if (ft.elem.text if ft.kind == "vec" else ret) != "half" else "0xH0000"
+        L = []
+        simple = {"fabs": "fabs", "sqrt": "sqrt", "floor": "floor", "ceil": "ceil", "trunc": "trunc",
+                  "rint": "rint", "round": "round", "sin": "sin", "cos": "cos", "exp": "exp", "exp2": "exp2",
+                  "log": "log", "log2": "log2", "log10": "log10", "fmax": "maxnum", "fmin": "minnum",
+                  "pow": "pow", "powr": "pow", "fma": "fma", "copysign": "copysign", "max": "maxnum",
+                  "min": "minnum"}
+        libm = {"tan": 1, "asin": 1, "acos": 1, "atan": 1, "sinh": 1, "cosh": 1, "tanh": 1, "asinh": 1,
+                "acosh": 1, "atanh": 1, "atan2": 2, "cbrt": 1, "hypot": 2, "exp10": 1}
+        isint = (ft.elem if ft.kind == "vec" else ft).kind == "int"
+        if base in simple and not isint and len(P) == {"fma": 3}.get(base, 2 if base in
+                                                                     ("fmax", "fmin", "pow", "powr", "copysign", "max", "min") else 1):
+            r, line = self.intr(simple[base], t, ["%%a%d" % i for i in range(len(P))])
+            return [line, "  ret %s %s" % (t, r)]
+        if base in ("fmax3", "fmin3", "max3", "min3") and not isint:
+            n = "maxnum" if "max" in base else "minnum"
+            r1, l1 = self.intr(n, t, ["%a0", "%a1"])
+            r2, l2 = self.intr(n, t, [r1, "%a2"])
+            return [l1, l2, "  ret %s %s" % (t, r2)]
+        if base in ("max", "min", "clamp", "abs") and isint:
+            signed = op.split(".")[-1].startswith(("s", "v")) and ".u." not in op
+            u = op.startswith(("u_", "umax", "umin")) or ".u" in op.split(base, 1)[-1][:3]
+            # air.max.u.i32 / air.max.s.i32
+            u = ".u." in "." + op + "."
+            if base == "abs":
+                r, line = self.intr("abs", t, ["%a0"])
+                self.decls.discard("declare %s @llvm.abs.%s(%s)" % (t, suffix(t), t))
+                self.declare("declare %s @llvm.abs.%s(%s, i1)" % (t, suffix(t), t))
+                return ["  %s = call %s @llvm.abs.%s(%s %%a0, i1 false)" % (r, t, suffix(t), t), "  ret %s %s" % (t, r)]
+            nm = {"max": "umax" if u else "smax", "min": "umin" if u else "smin"}
+            if base == "clamp":
+                r1, l1 = self.intr(nm["max"] if False else ("umax" if u else "smax"), t, ["%a0", "%a1"])
+                r2, l2 = self.intr("umin" if u else "smin", t, [r1, "%a2"])
+                return [l1, l2, "  ret %s %s" % (t, r2)]
+            r, line = self.intr(nm[base], t, ["%a0", "%a1"])
+            return [line, "  ret %s %s" % (t, r)]
+        if base in libm and len(P) == libm[base]:
+            return self.per_elem(t, P, base, len(P))
+        if base == "rsqrt":
+            r, line = self.intr("sqrt", t, ["%a0"])
+            q = self.tmp()
+            return [line, "  %s = fdiv fast %s %s, %s" % (q, t, self.splat(t, one), r), "  ret %s %s" % (t, q)]
+        if base == "fmod":
+            r = self.tmp()
+            return ["  %s = frem %s %%a0, %%a1" % (r, t), "  ret %s %s" % (t, r)]
+        if base == "fract":
+            r, line = self.intr("floor", t, ["%a0"])
+            d = self.tmp()
+            return [line, "  %s = fsub %s %%a0, %s" % (d, t, r), "  ret %s %s" % (t, d)]
+        if base == "saturate":
+            r1, l1 = self.intr("maxnum", t, ["%a0", self.splat(t, zero)])
+            r2, l2 = self.intr("minnum", t, [r1, self.splat(t, one)])
+            return [l1, l2, "  ret %s %s" % (t, r2)]
+        if base == "clamp":
+            r1, l1 = self.intr("maxnum", t, ["%a0", "%a1"])
+            r2, l2 = self.intr("minnum", t, [r1, "%a2"])
+            return [l1, l2, "  ret %s %s" % (t, r2)]
+        if base == "mix":
+            d, m, s = self.tmp(), self.tmp(), self.tmp()
+            return ["  %s = fsub %s %%a1, %%a0" % (d, t), "  %s = fmul %s %s, %%a2" % (m, t, d),
+                    "  %s = fadd %s %%a0, %s" % (s, t, m), "  ret %s %s" % (t, s)]
+        if base == "step":
+            c, s = self.tmp(), self.tmp()
+            return ["  %s = fcmp olt %s %%a1, %%a0" % (c, t),
+                    "  %s = select %s %s, %s %s, %s %s" % (s, self.cmp_type(t), c, t, self.splat(t, zero), t,
+                                                         self.splat(t, one)),
+                    "  ret %s %s" % (t, s)]
+        if base == "smoothstep":
+            # t = saturate((x - e0) / (e1 - e0)); t * t * (3 - 2t)
+            a, b, q = self.tmp(), self.tmp(), self.tmp()
+            L = ["  %s = fsub %s %%a2, %%a0" % (a, t), "  %s = fsub %s %%a1, %%a0" % (b, t),
+                 "  %s = fdiv %s %s, %s" % (q, t, a, b)]
+            r1, l1 = self.intr("maxnum", t, [q, self.splat(t, zero)])
+            r2, l2 = self.intr("minnum", t, [r1, self.splat(t, one)])
+            two = "2.0" if one == "1.0" else "0xH4000"
+            three = "3.0" if one == "1.0" else "0xH4200"
+            m2, s3, sq, res = self.tmp(), self.tmp(), self.tmp(), self.tmp()
+            L += [l1, l2, "  %s = fmul %s %s, %s" % (m2, t, r2, self.splat(t, two)),
+                  "  %s = fsub %s %s, %s" % (s3, t, self.splat(t, three), m2),
+                  "  %s = fmul %s %s, %s" % (sq, t, r2, r2), "  %s = fmul %s %s, %s" % (res, t, sq, s3),
+                  "  ret %s %s" % (t, res)]
+            return L
+        if base == "sign":
+            c1, c2, s1, s2 = self.tmp(), self.tmp(), self.tmp(), self.tmp()
+            ct = self.cmp_type(t)
+            return ["  %s = fcmp ogt %s %%a0, %s" % (c1, t, self.splat(t, zero)),
+                    "  %s = fcmp olt %s %%a0, %s" % (c2, t, self.splat(t, zero)),
+                    "  %s = select %s %s, %s %s, %s %s" % (s1, ct, c2, t, self.splat(t, "-" + one if one == "1.0" else "0xHBC00"), t,
+                                                         self.splat(t, zero)),
+                    "  %s = select %s %s, %s %s, %s %s" % (s2, ct, c1, t, self.splat(t, one), t, s1),
+                    "  ret %s %s" % (t, s2)]
+        if base in ("dot", "length", "distance", "length_squared", "normalize"):
+            vt = P[0]
+            v = Ty(vt, {})
+            n, et = v.n, v.elem.text
+            L = []
+            src = "%a0"
+            if base == "distance":
+                d = self.tmp()
+                L.append("  %s = fsub %s %%a0, %%a1" % (d, vt))
+                src = d
+            other = "%a1" if base == "dot" else src
+            m = self.tmp()
+            L.append("  %s = fmul %s %s, %s" % (m, vt, src, other))
+            acc = None
+            for k in range(n):
+                e = self.tmp()
+                L.append("  %s = extractelement %s %s, i32 %d" % (e, vt, m, k))
+                if acc is None:
+                    acc = e
+                else:
+                    s = self.tmp()
+                    L.append("  %s = fadd %s %s, %s" % (s, et, acc, e))
+                    acc = s
+            if base in ("dot", "length_squared"):
+                return L + ["  ret %s %s" % (et, acc)]
+            r, line = self.intr("sqrt", et, [acc])
+            L.append(line)
+            if base != "normalize":
+                return L + ["  ret %s %s" % (et, r)]
+            ins = "undef"
+            for k in range(n):
+                i2 = self.tmp()
+                L.append("  %s = insertelement %s %s, %s %s, i32 %d" % (i2, vt, ins, et, r, k))
+                ins = i2
+            q = self.tmp()
+            L.append("  %s = fdiv %s %%a0, %s" % (q, vt, ins))
+            return L + ["  ret %s %s" % (vt, q)]
+        if base == "cross":
+            vt = P[0]
+            et = Ty(vt, {}).elem.text
+            L, e = [], {}
+            for a in (0, 1):
+                for k in range(3):
+                    x = self.tmp()
+                    L.append("  %s = extractelement %s %%a%d, i32 %d" % (x, vt, a, k))
+                    e[a, k] = x
+            ins = "undef"
+            for k, (i, j) in enumerate(((1, 2), (2, 0), (0, 1))):
+                m1, m2, d, i2 = self.tmp(), self.tmp(), self.tmp(), self.tmp()
+                L += ["  %s = fmul %s %s, %s" % (m1, et, e[0, i], e[1, j]),
+                      "  %s = fmul %s %s, %s" % (m2, et, e[0, j], e[1, i]),
+                      "  %s = fsub %s %s, %s" % (d, et, m1, m2),
+                      "  %s = insertelement %s %s, %s %s, i32 %d" % (i2, vt, ins, et, d, k)]
+                ins = i2
+            return L + ["  ret %s %s" % (vt, ins)]
+        if base.startswith("convert."):
+            return self.convert(op, ret, P)
+        if base in ("dfdx", "dfdy", "fwidth"):
+            return self.deriv(base, ret)
+        if base in ("sample_texture_2d", "sample_texture_2d_array"):
+            return self.sample(base, ret, P)
+        if base in ("get_width_texture_2d", "get_height_texture_2d"):
+            self.declare("declare i32 @__ferry_tex_size(ptr, i32, i32)")
+            r = self.tmp()
+            return ["  %s = call i32 @__ferry_tex_size(ptr %%a0, i32 %d, i32 %%a1)" % (r, 0 if "width" in base else 1),
+                    "  ret i32 %s" % r]
+        if base == "discard_fragment":
+            self.declare("declare void @__ferry_discard()")
+            return ["  call void @__ferry_discard()", "  ret void"]
+        if base in ("wg.barrier", "simdgroup.barrier", "mem.barrier"):
+            self.declare("declare void @__ferry_barrier(i32)")
+            return ["  call void @__ferry_barrier(i32 %a0)" if base == "wg.barrier" else "", "  ret void"]
+        return None
+
+    def cmp_type(self, t):
+        tt = Ty(t, {})
+        return "<%d x i1>" % tt.n if tt.kind == "vec" else "i1"
+
+    def convert(self, op, ret, P):
+        # air.convert.<to kind>.<to type>.<from kind>.<from type>; kinds f, s, u
+        parts = op.split(".")
+        try:
+            tk, fk = parts[1], parts[3]
+        except IndexError:
+            return None
+        src = P[0]
+        st, dt = Ty(src, {}), Ty(ret, {})
+        se = st.elem if st.kind == "vec" else st
+        de = dt.elem if dt.kind == "vec" else dt
+        r = self.tmp()
+        if tk == "f" and fk == "f":
+            sz = {"half": 16, "float": 32, "double": 64}
+            a, b = sz[se.text], sz[de.text]
+            ins = "fpext" if b > a else "fptrunc" if b < a else None
+            if not ins:
+                return ["  ret %s %%a0" % ret]
+            return ["  %s = %s %s %%a0 to %s" % (r, ins, src, ret), "  ret %s %s" % (ret, r)]
+        if tk == "f":
+            return ["  %s = %s %s %%a0 to %s" % (r, "uitofp" if fk == "u" else "sitofp", src, ret),
+                    "  ret %s %s" % (ret, r)]
+        if fk == "f":
+            nm = "fptoui.sat" if tk == "u" else "fptosi.sat"
+            self.declare("declare %s @llvm.%s.%s.%s(%s)" % (ret, nm, suffix(ret), suffix(src), src))
+            return ["  %s = call %s @llvm.%s.%s.%s(%s %%a0)" % (r, ret, nm, suffix(ret), suffix(src), src),
+                    "  ret %s %s" % (ret, r)]
+        a, b = se.bits, de.bits
+        if a == b:
+            return ["  ret %s %%a0" % ret]
+        ins = "trunc" if b < a else ("zext" if fk == "u" else "sext")
+        return ["  %s = %s %s %%a0 to %s" % (r, ins, src, ret), "  ret %s %s" % (ret, r)]
+
+    def deriv(self, base, t):
+        """A fragment's 2x2 quad shares each value (Metal.framework runs the
+        quad's four fragments together): dfdx is the right neighbour less the
+        left, dfdy the lower less the upper."""
+        self.declare("declare void @__ferry_quad_exchange(ptr, i32, ptr)")
+        self.declare("declare i32 @__ferry_quad_lane()")
+        v, all4, lane = self.tmp(), self.tmp(), self.tmp()
+        L = ["  %s = alloca %s, align 16" % (v, t), "  store %s %%a0, ptr %s" % (t, v),
+             "  %s = alloca [4 x %s], align 16" % (all4, t),
+             "  call void @__ferry_quad_exchange(ptr %s, i32 ptrtoint (ptr getelementptr (%s, ptr null, i32 1) to i32), ptr %s)"
+             % (v, t, all4),
+             "  %s = call i32 @__ferry_quad_lane()" % lane]
+
+        def at(idx):
+            p, x = self.tmp(), self.tmp()
+            L.extend(["  %s = getelementptr [4 x %s], ptr %s, i32 0, i32 %s" % (p, t, all4, idx),
+                      "  %s = load %s, ptr %s" % (x, t, p)])
+            return x
+
+        def diff(hi_mask, lo_mask):
+            hi, lo = self.tmp(), self.tmp()
+            L.extend(["  %s = or i32 %s, %d" % (hi, lane, hi_mask), "  %s = and i32 %s, %d" % (lo, lane, lo_mask)])
+            a, b = at(hi), at(lo)
+            d = self.tmp()
+            L.append("  %s = fsub %s %s, %s" % (d, t, a, b))
+            return d
+
+        if base == "dfdx":
+            return L + ["  ret %s %s" % (t, diff(1, 2))]
+        if base == "dfdy":
+            return L + ["  ret %s %s" % (t, diff(2, 1))]
+        dx = diff(1, 2)
+        dy = diff(2, 1)
+        r1, l1 = self.intr("fabs", t, [dx])
+        r2, l2 = self.intr("fabs", t, [dy])
+        s = self.tmp()
+        return L + [l1, l2, "  %s = fadd %s %s, %s" % (s, t, r1, r2), "  ret %s %s" % (t, s)]
+
+    def sample(self, base, ret, P):
+        """sample_texture_2d(texture, sampler, coordinate, has_offset?,
+        offset, has_lod?, lod, min_lod, ...), as the shaders' bitcode passes
+        it. Without a lod, the quad's derivatives of the coordinate pick it,
+        as on the GPU."""
+        self.declare("declare void @__ferry_tex_sample(ptr, ptr, ptr, i32, i32, i32, float, ptr, ptr, i32, ptr)")
+        rt = Ty(ret, {})
+        texel = rt.fields[0].text if rt.kind == "struct" else ret
+        is_int = 0 if Ty(texel, {}).elem.text in ("float", "half") else 1
+        arr = base.endswith("_array")
+        ci = 2
+        ct = P[ci]
+        L = []
+        cc, g, off, out = self.tmp(), self.tmp(), self.tmp(), self.tmp()
+        L += ["  %s = alloca [3 x float], align 4" % cc, "  store [3 x float] zeroinitializer, ptr %s" % cc,
+              "  %s = alloca [6 x float], align 4" % g, "  store [6 x float] zeroinitializer, ptr %s" % g,
+              "  %s = alloca [3 x i32], align 4" % off, "  store [3 x i32] zeroinitializer, ptr %s" % off,
+              "  %s = alloca [4 x float], align 16" % out]
+        for k in range(2):
+            e, p = self.tmp(), self.tmp()
+            L += ["  %s = extractelement %s %%a%d, i32 %d" % (e, ct, ci, k),
+                  "  %s = getelementptr [3 x float], ptr %s, i32 0, i32 %d" % (p, cc, k),
+                  "  store float %s, ptr %s" % (e, p)]
+        layer = "0"
+        rest = 3
+        if arr:
+            layer = "%%a%d" % rest
+            rest += 1
+        # offset
+        has_off, offv = rest, rest + 1
+        for k in range(2):
+            e, p = self.tmp(), self.tmp()
+            L += ["  %s = extractelement %s %%a%d, i32 %d" % (e, P[offv], offv, k),
+                  "  %s = getelementptr [3 x i32], ptr %s, i32 0, i32 %d" % (p, off, k),
+                  "  store i32 %s, ptr %s" % (e, p)]
+        has_lod, lodv = offv + 1, offv + 2
+        # gradients for an implicit lod
+        dname = "air.dfdx." + suffix(ct)
+        yname = "air.dfdy." + suffix(ct)
+        for nm, b in ((dname, "dfdx"), (yname, "dfdy")):
+            if nm not in self.helpers:
+                save = self.n
+                body = self.deriv(b, ct)
+                self.helpers[nm] = "define internal %s @%s(%s %%a0) #%s {\n%s\n}" % (
+                    ct, quote(nm), ct, ATTR, "\n".join(body))
+        dx, dy = self.tmp(), self.tmp()
+        L += ["  %s = call %s @%s(%s %%a%d)" % (dx, ct, quote(dname), ct, ci),
+              "  %s = call %s @%s(%s %%a%d)" % (dy, ct, quote(yname), ct, ci)]
+        for k in range(2):
+            for d, base_i in ((dx, 0), (dy, 3)):
+                e, p = self.tmp(), self.tmp()
+                L += ["  %s = extractelement %s %s, i32 %d" % (e, ct, d, k),
+                      "  %s = getelementptr [6 x float], ptr %s, i32 0, i32 %d" % (p, g, base_i + k),
+                      "  store float %s, ptr %s" % (e, p)]
+        mode, lay = self.tmp(), self.tmp()
+        L += ["  %s = select i1 %%a%d, i32 1, i32 0" % (mode, has_lod)]
+        if arr:
+            L.append("  %s = add i32 %s, 0" % (lay, layer))
+        else:
+            L.append("  %s = add i32 0, 0" % lay)
+        L.append("  call void @__ferry_tex_sample(ptr %%a0, ptr %%a1, ptr %s, i32 2, i32 %s, i32 %s, float %%a%d, ptr %s, "
+                 "ptr %s, i32 %d, ptr %s)" % (cc, lay, mode, lodv, g, off, is_int, out))
+        tv = self.tmp()
+        if is_int:
+            iv = self.tmp()
+            L += ["  %s = load <4 x i32>, ptr %s" % (iv, out)]
+            et = Ty(texel, {}).elem.text
+            if et == "i32":
+                tv = iv
+            else:
+                L.append("  %s = trunc <4 x i32> %s to %s" % (tv, iv, texel))
+        else:
+            fv = self.tmp()
+            L.append("  %s = load <4 x float>, ptr %s" % (fv, out))
+            if Ty(texel, {}).elem.text == "half":
+                L.append("  %s = fptrunc <4 x float> %s to %s" % (tv, fv, texel))
+            else:
+                tv = fv
+        if rt.kind == "struct":
+            r1, r2 = self.tmp(), self.tmp()
+            L += ["  %s = insertvalue %s undef, %s %s, 0" % (r1, ret, texel, tv),
+                  "  %s = insertvalue %s %s, %s 0, 1" % (r2, ret, r1, rt.fields[1].text), "  ret %s %s" % (ret, r2)]
+        else:
+            L.append("  ret %s %s" % (ret, tv))
+        return L
+
+
+ATTR = "9990"
+
+
+def quote(name):
+    return '"%s"' % name if re.search(r"[^\w.$]", name) else name
+
+
+# ---- one module ----------------------------------------------------------------------
+CALL = ("{ [31 x ptr], [128 x ptr], [16 x ptr], ptr, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, "
+        "[4 x float], [2 x float], [8 x [3 x i32]], [64 x i32], [16 x ptr] }")
+F = {"buffers": 0, "textures": 1, "samplers": 2, "fetch_ctx": 3, "vertex_id": 4, "instance_id": 5,
+     "base_vertex": 6, "base_instance": 7, "primitive_id": 8, "sample_id": 9, "sample_mask_in": 10,
+     "front_facing": 11, "render_target_array_index": 12, "viewport_array_index": 13, "amplification_id": 14,
+     "position": 15, "point_coord": 16, "grid": 17, "stage_in_map": 18, "tgmem": 19}
+SLOT = "{ ptr, i32, i32, i32, i32, i32, i32 }"
+W = {"varying": 0, "position": 1, "point_size": 2, "clip": 3, "color": 4, "depth": 5, "sample_mask": 6,
+     "stencil": 7, "attribute": 8, "input": 9, "layer": 11, "viewport": 12}
+VS_POSITION, VS_POINT_SIZE, VS_CLIP, VS_LAYER, VS_VIEWPORT, VS_VARYINGS = 0, 4, 5, 13, 14, 16
+FS_DEPTH, FS_SAMPLE_MASK, FS_STENCIL, FS_RESULTS = 32, 33, 34, 36
+GRID = {"air.thread_position_in_grid": 0, "air.threadgroup_position_in_grid": 1,
+        "air.thread_position_in_threadgroup": 2, "air.threads_per_threadgroup": 3, "air.threads_per_grid": 4,
+        "air.threadgroups_per_grid": 5, "air.dispatch_threads_per_threadgroup": 3}
+ONE = {"air.vertex_id": "vertex_id", "air.instance_id": "instance_id", "air.base_vertex": "base_vertex",
+       "air.base_instance": "base_instance", "air.primitive_id": "primitive_id", "air.sample_id": "sample_id",
+       "air.sample_mask_in": "sample_mask_in", "air.front_facing": "front_facing",
+       "air.render_target_array_index": "render_target_array_index",
+       "air.viewport_array_index": "viewport_array_index", "air.amplification_id": "amplification_id"}
+
+
+class Module:
+    def __init__(self, text, idx):
+        self.idx = idx
+        self.text = text
+        self.structs = dict(re.findall(r"^(%[\w.\"$-]+) = type (.*)$", text, re.M))
+        self.md, self.named = parse_metadata(text)
+        self.lines = []      # the wrapper code
+        self.globals = []
+        self.n = 0
+        self.entries = []
+
+    def tmp(self):
+        self.n += 1
+        return "%%w%d" % self.n
+
+    def signature(self, fname):
+        m = re.search(r"^define [^@]*?(\S.*?) @%s\((.*)\)[^)]*\{\s*$" % re.escape(quote(fname)), self.text, re.M)
+        if not m:
+            m = re.search(r"^define (.*) @%s\((.*?)\)(?: [^(){}]*)?\{\s*$" % re.escape(quote(fname)), self.text, re.M)
+        head = m.group(1)
+        # the return type is the last type of the head (after linkage and attributes)
+        ret = None
+        words = head
+        # strip leading keywords
+        while True:
+            w = re.match(r"^(internal|dso_local|local_unnamed_addr|noundef|nonnull|zeroext|signext|"
+                         r"fastcc|ccc|hidden|protected|default|weak|linkonce_odr|weak_odr|external)\s+", words)
+            if not w:
+                break
+            words = words[w.end():]
+        ret, _ = take_type(words)
+        params = []
+        for p in split_top(m.group(2)):
+            t, _ = take_type(p)
+            params.append(re.sub(r"\s*addrspace\(\d+\)", "", t))
+        return re.sub(r"\s*addrspace\(\d+\)", "", ret), params
+
+    # loads from the call record
+    def call_field(self, field, idx=None, ty="i32"):
+        p, v = self.tmp(), self.tmp()
+        if idx is None:
+            self.lines.append("  %s = getelementptr %s, ptr %%c, i32 0, i32 %d" % (p, CALL, F[field]))
+        elif isinstance(idx, tuple):
+            self.lines.append("  %s = getelementptr %s, ptr %%c, i32 0, i32 %d, i32 %d, i32 %d" % (p, CALL, F[field], idx[0], idx[1]))
+        else:
+            self.lines.append("  %s = getelementptr %s, ptr %%c, i32 0, i32 %d, i32 %s" % (p, CALL, F[field], idx))
+        self.lines.append("  %s = load %s, ptr %s" % (v, ty, p))
+        return v
+
+    def from_u32(self, v, ty):
+        """A 32-bit unsigned built-in value as the parameter's type."""
+        t = Ty(ty, self.structs)
+        if t.kind == "int":
+            if t.bits == 32:
+                return v
+            r = self.tmp()
+            if t.bits == 1:
+                self.lines.append("  %s = icmp ne i32 %s, 0" % (r, v))
+            else:
+                self.lines.append("  %s = trunc i32 %s to %s" % (r, v, ty) if t.bits < 32 else
+                                  "  %s = zext i32 %s to %s" % (r, v, ty))
+            return r
+        if t.kind == "float":
+            r = self.tmp()
+            self.lines.append("  %s = uitofp i32 %s to %s" % (r, v, ty))
+            return r
+        return v
+
+    def grid(self, which, ty):
+        t = Ty(ty, self.structs)
+        n = t.n if t.kind == "vec" else 1
+        et = t.elem.text if t.kind == "vec" else ty
+        if n == 1:
+            return self.from_u32(self.call_field("grid", (which, 0)), ty)
+        acc = "undef"
+        for k in range(n):
+            v = self.from_u32(self.call_field("grid", (which, k)), et)
+            r = self.tmp()
+            self.lines.append("  %s = insertelement %s %s, %s %s, i32 %d" % (r, ty, acc, et, v, k))
+            acc = r
+        return acc
+
+    def scalar_to_float(self, v, st, kind):
+        """A scalar as the float that carries it (integers keep their bits)."""
+        if st.kind == "float":
+            if st.text == "float":
+                return v
+            r = self.tmp()
+            self.lines.append("  %s = %s %s %s to float" % (r, "fpext" if st.text == "half" else "fptrunc", st.text, v))
+            return r
+        if st.kind == "int":
+            w = v
+            if st.bits != 32:
+                w = self.tmp()
+                ext = "trunc" if st.bits > 32 else ("sext" if kind == 2 else "zext")
+                self.lines.append("  %s = %s %s %s to i32" % (w, ext, st.text, v))
+            r = self.tmp()
+            self.lines.append("  %s = bitcast i32 %s to float" % (r, w))
+            return r
+        return "0.0"
+
+    def float_to_scalar(self, f, st):
+        if st.kind == "float":
+            if st.text == "float":
+                return f
+            r = self.tmp()
+            self.lines.append("  %s = %s float %s to %s" % (r, "fptrunc" if st.text == "half" else "fpext", f, st.text))
+            return r
+        if st.kind == "int":
+            w = self.tmp()
+            self.lines.append("  %s = bitcast float %s to i32" % (w, f))
+            if st.bits == 32:
+                return w
+            r = self.tmp()
+            self.lines.append("  %s = %s i32 %s to %s" % (r, "trunc" if st.bits < 32 else "zext", w, st.text))
+            return r
+        return "undef"
+
+    def get_path(self, val, ty, path):
+        """Extract the scalar at path from an aggregate or vector value."""
+        cur, ct = val, ty
+        for i in path:
+            r = self.tmp()
+            if ct.kind == "vec":
+                self.lines.append("  %s = extractelement %s %s, i32 %d" % (r, ct.text, cur, i))
+                ct = ct.elem
+            elif ct.kind == "arr":
+                self.lines.append("  %s = extractvalue %s %s, %d" % (r, ct.text, cur, i))
+                ct = ct.elem
+            else:
+                self.lines.append("  %s = extractvalue %s %s, %d" % (r, ct.text, cur, i))
+                ct = ct.fields[i]
+            cur = r
+        return cur
+
+    def store_out(self, out, offset, val, ty, kind):
+        """Write each component of a value to out[offset...] as floats; the
+        count written."""
+        t = Ty(ty, self.structs)
+        sc = t.scalars()
+        for k, (path, st) in enumerate(sc):
+            v = self.get_path(val, t, path)
+            f = self.scalar_to_float(v, st, kind)
+            p = self.tmp()
+            self.lines.append("  %s = getelementptr float, ptr %s, i32 %d" % (p, out, offset + k))
+            self.lines.append("  store float %s, ptr %s" % (f, p))
+        return len(sc)
+
+    def build_value(self, ty, loads):
+        """A value of type ty from one loaded float per scalar (loads(k))."""
+        t = Ty(ty, self.structs)
+        sc = t.scalars()
+        if t.kind in ("int", "float"):
+            return self.float_to_scalar(loads(0), t)
+        acc = "undef"
+        for k, (path, st) in enumerate(sc):
+            v = self.float_to_scalar(loads(k), st)
+            acc = self.put_path(acc, t, path, v, st)
+        return acc
+
+    def put_path(self, acc, t, path, v, st):
+        if len(path) == 1:
+            r = self.tmp()
+            if t.kind == "vec":
+                self.lines.append("  %s = insertelement %s %s, %s %s, i32 %d" % (r, t.text, acc, st.text, v, path[0]))
+            else:
+                self.lines.append("  %s = insertvalue %s %s, %s %s, %d" % (r, t.text, acc, st.text, v, path[0]))
+            return r
+        # nested: extract, insert, put back
+        sub_t = t.elem if t.kind in ("vec", "arr") else t.fields[path[0]]
+        cur = self.tmp()
+        self.lines.append("  %s = extractvalue %s %s, %d" % (cur, t.text, acc, path[0]))
+        new = self.put_path(cur, sub_t, path[1:], v, st)
+        r = self.tmp()
+        self.lines.append("  %s = insertvalue %s %s, %s %s, %d" % (r, t.text, acc, sub_t.text, new, path[0]))
+        return r
+
+    def ncomp(self, ty):
+        return len(Ty(ty, self.structs).scalars())
+
+    # the arguments every stage can take
+    def resource(self, items, ty, refl):
+        role = items[1][1] if len(items) > 1 else ""
+        loc = after(items, "air.location_index")
+        name = after(items, "air.arg_name")
+        if role == "air.buffer":
+            v = self.call_field("buffers", str(loc), "ptr")
+            refl["buffers"].append({"index": loc, "name": name})
+            return self.byval(v, ty)
+        if role == "air.texture":
+            refl["textures"].append({"index": loc, "name": name})
+            return self.call_field("textures", str(loc), "ptr")
+        if role == "air.sampler":
+            refl["samplers"].append({"index": loc, "name": name})
+            v = self.call_field("samplers", str(loc), "ptr")
+            c, r = self.tmp(), self.tmp()
+            self.lines += ["  %s = icmp eq ptr %s, null" % (c, v),
+                           "  %s = select i1 %s, ptr @__ferry_air_default_sampler, ptr %s" % (r, c, v)]
+            self.need_default_sampler = True
+            return r
+        if role == "air.threadgroup":
+            refl["threadgroup"].append({"index": loc, "name": name})
+            return self.call_field("tgmem", str(loc), "ptr")
+        if role in ONE:
+            return self.from_u32(self.call_field(ONE[role]), ty)
+        if role in GRID:
+            return self.grid(GRID[role], ty)
+        if role == "air.thread_index_in_threadgroup":
+            return self.from_u32(self.call_field("grid", (6, 0)), ty)
+        if role in ("air.thread_index_in_simdgroup", "air.thread_index_in_quadgroup"):
+            return self.from_u32("0", ty)
+        if role in ("air.threads_per_simdgroup", "air.thread_execution_width"):
+            return self.from_u32("1", ty)
+        if role in ("air.simdgroup_index_in_threadgroup", "air.quadgroup_index_in_threadgroup"):
+            return self.from_u32(self.call_field("grid", (6, 0)), ty)
+        if role in ("air.simdgroups_per_threadgroup", "air.quadgroups_per_threadgroup",
+                    "air.dispatch_simdgroups_per_threadgroup"):
+            return self.from_u32(self.call_field("grid", (6, 1)), ty)
+        return None
+
+    def byval(self, p, ty):
+        """A buffer argument that the function takes by value (a struct
+        passed in a buffer) is loaded from it."""
+        if Ty(ty, self.structs).kind == "ptr":
+            return p
+        r = self.tmp()
+        self.lines.append("  %s = load %s, ptr %s" % (r, ty, p))
+        return r
+
+    def entry(self, stage, node):
+        items = self.md[node]
+        fname = items[0][1]
+        if stage == "kernel":
+            outs, args = [], self.md.get(items[1][1], []) if len(items) > 1 and items[1][0] == "ref" else []
+            # a kernel's node is {fn, !{}, !args}
+            if len(items) > 2 and items[2][0] == "ref":
+                args = self.md[items[2][1]]
+        else:
+            outs = self.md[items[1][1]] if items[1][0] == "ref" else []
+            args = self.md[items[2][1]] if len(items) > 2 and items[2][0] == "ref" else []
+        outs = [self.md[r] for k, r in outs if k == "ref"]
+        args = [self.md[r] for k, r in args if k == "ref"]
+        ret, params = self.signature(fname)
+        self.need_default_sampler = getattr(self, "need_default_sampler", False)
+        refl = {"buffers": [], "textures": [], "samplers": [], "threadgroup": [], "stage_in": []}
+        slots = []
+        if stage == "vertex":
+            sym = "__ferry_vs_" + fname
+            self.lines.append("define void @%s(ptr %%c, ptr %%out) {" % quote(sym))
+        elif stage == "fragment":
+            sym = "__ferry_fs_" + fname
+            self.lines.append("define void @%s(ptr %%c, ptr %%in, ptr %%out) {" % quote(sym))
+        else:
+            sym = "__ferry_cs_" + fname
+            self.lines.append("define void @%s(ptr %%c) {" % quote(sym))
+        vals = ["undef"] * len(params)
+        nin = 0
+        for a in args:
+            i = a[0][1]
+            ty = params[i]
+            role = a[1][1]
+            if role == "air.fragment_input":
+                tag = a[2][1]
+                interp = 1 if "air.flat" in strings(a) else 2 if "air.no_perspective" in strings(a) else 0
+                kind = kind_of(after(a, "air.arg_type_name"))
+                k = nin
+                nin += 1
+                base = self.call_field("stage_in_map", str(k))
+
+                def ld(j, base=base):
+                    ix, p, f = self.tmp(), self.tmp(), self.tmp()
+                    self.lines += ["  %s = add i32 %s, %d" % (ix, base, j),
+                                   "  %s = getelementptr float, ptr %%in, i32 %s" % (p, ix),
+                                   "  %s = load float, ptr %s" % (f, p)]
+                    return f
+                vals[i] = self.build_value(ty, ld)
+                slots.append((tag, W["input"], k, 0, self.ncomp(ty), kind, interp))
+                refl["stage_in"].append({"name": after(a, "air.arg_name"), "field": k, "tag": tag})
+            elif role == "air.position" and stage == "fragment":
+                pp = self.tmp()
+                self.lines.append("  %s = getelementptr %s, ptr %%c, i32 0, i32 %d" % (pp, CALL, F["position"]))
+                vals[i] = self.build_value(ty, lambda j, pp=pp: self.load_float(pp, j))
+            elif role == "air.point_coord":
+                pp = self.tmp()
+                self.lines.append("  %s = getelementptr %s, ptr %%c, i32 0, i32 %d" % (pp, CALL, F["point_coord"]))
+                vals[i] = self.build_value(ty, lambda j, pp=pp: self.load_float(pp, j))
+            elif role == "air.vertex_input":
+                attr = after(a, "air.location_index")
+                kind = kind_of(after(a, "air.arg_type_name"))
+                tmp4 = self.tmp()
+                self.lines.append("  %s = alloca [4 x float], align 16" % tmp4)
+                fc, vid, iid = self.call_field("fetch_ctx", None, "ptr"), self.call_field("vertex_id"), self.call_field("instance_id")
+                self.lines.append("  call void @ferry_fetch_attr(ptr %s, i32 %d, i32 %s, i32 %s, i32 %d, ptr %s)"
+                                  % (fc, attr, vid, iid, 1 if kind >= 2 else 0, tmp4))
+                self.need_fetch = True
+                t = Ty(ty, self.structs)
+                st = t.scalars()
+
+                def ld4(j, tmp4=tmp4, st=st, kind=kind):
+                    if j >= 4:
+                        return "0.0"
+                    f = self.load_float(tmp4, j)
+                    s = st[j][1]
+                    if kind >= 2 or s.kind != "int":
+                        return f
+                    return f
+                if kind >= 2:
+                    vals[i] = self.build_value(ty, ld4)
+                else:
+                    vals[i] = self.build_value(ty, ld4)
+                slots.append((after(a, "air.arg_name") or "", W["attribute"], attr, 0, self.ncomp(ty), kind, 0))
+                refl["stage_in"].append({"name": after(a, "air.arg_name"), "attribute": attr})
+            else:
+                v = self.resource(a, ty, refl)
+                if v is None:
+                    raise SystemExit("ferry-airc: %s: argument %d (%s) isn't supported yet" % (fname, i, role))
+                vals[i] = v
+        callargs = ", ".join("%s %s" % (t, v) for t, v in zip(params, vals))
+        if ret == "void":
+            self.lines.append("  call void @%s(%s)" % (quote(fname), callargs))
+        else:
+            r = self.tmp()
+            self.lines.append("  %s = call %s @%s(%s)" % (r, ret, quote(fname), callargs))
+            rt = Ty(ret, self.structs)
+            parts = []
+            if len(outs) == 1 and not (rt.kind == "struct" and len(rt.fields) == 1 and len(outs) == 1 and False):
+                parts = [(outs[0], r, ret)]
+                if rt.kind == "struct" and len(rt.fields) == 1:
+                    e = self.tmp()
+                    self.lines.append("  %s = extractvalue %s %s, 0" % (e, ret, r))
+                    parts = [(outs[0], e, rt.fields[0].text)]
+            else:
+                for k, o in enumerate(outs):
+                    e = self.tmp()
+                    self.lines.append("  %s = extractvalue %s %s, %d" % (e, ret, r, k))
+                    parts.append((o, e, rt.fields[k].text))
+            off = VS_VARYINGS
+            for o, v, t in parts:
+                role = o[0][1]
+                kind = kind_of(after(o, "air.arg_type_name"))
+                if stage == "vertex":
+                    if role == "air.position":
+                        self.store_out("%out", VS_POSITION, v, t, 0)
+                        slots.append(("position", W["position"], 0, 0, 4, 0, 0))
+                    elif role == "air.point_size":
+                        self.store_out("%out", VS_POINT_SIZE, v, t, 0)
+                        slots.append(("point_size", W["point_size"], 0, VS_POINT_SIZE, 1, 0, 0))
+                    elif role == "air.clip_distance":
+                        n = self.store_out("%out", VS_CLIP, v, t, 0)
+                        slots.append(("clip_distance", W["clip"], 0, VS_CLIP, n, 0, 0))
+                    elif role == "air.render_target_array_index":
+                        self.store_out("%out", VS_LAYER, v, t, 3)
+                        slots.append(("render_target_array_index", W["layer"], 0, VS_LAYER, 1, 3, 0))
+                    elif role == "air.viewport_array_index":
+                        self.store_out("%out", VS_VIEWPORT, v, t, 3)
+                        slots.append(("viewport_array_index", W["viewport"], 0, VS_VIEWPORT, 1, 3, 0))
+                    elif role == "air.vertex_output":
+                        tag = o[1][1]
+                        n = self.store_out("%out", off, v, t, kind)
+                        slots.append((tag, W["varying"], 0, off, n, kind, 0))
+                        off += n
+                    # (invariant and others carry nothing)
+                elif stage == "fragment":
+                    if role == "air.render_target":
+                        n, idx = o[1][1], o[2][1]
+                        if idx:
+                            self.store_out("%out", FS_RESULTS + 4 * n, v, t, kind)
+                            slots.append(("color", W["color"], n + 8, FS_RESULTS + 4 * n, self.ncomp(t), kind, 0))
+                        else:
+                            self.store_out("%out", 4 * n, v, t, kind)
+                            slots.append(("color", W["color"], n, 4 * n, self.ncomp(t), kind, 0))
+                    elif role == "air.depth":
+                        self.store_out("%out", FS_DEPTH, v, t, 0)
+                        slots.append(("depth", W["depth"], 0, FS_DEPTH, 1, 0, 0))
+                    elif role == "air.sample_mask":
+                        self.store_out("%out", FS_SAMPLE_MASK, v, t, 3)
+                        slots.append(("sample_mask", W["sample_mask"], 0, FS_SAMPLE_MASK, 1, 3, 0))
+                    elif role == "air.stencil":
+                        self.store_out("%out", FS_STENCIL, v, t, 3)
+                        slots.append(("stencil", W["stencil"], 0, FS_STENCIL, 1, 3, 0))
+        self.lines.append("  ret void")
+        self.lines.append("}")
+        info = None
+        if stage != "kernel":
+            info = sym.replace("__ferry_", "__ferry_info_", 1)
+            self.info(info, slots)
+        e = {"name": fname, "stage": stage, "symbol": sym, "info": info}
+        e.update(refl)
+        self.entries.append(e)
+
+    def load_float(self, base, j):
+        p, f = self.tmp(), self.tmp()
+        self.lines += ["  %s = getelementptr float, ptr %s, i32 %d" % (p, base, j), "  %s = load float, ptr %s" % (f, p)]
+        return f
+
+    def info(self, sym, slots):
+        """The info function copies a table of slot records."""
+        recs = []
+        for tag, what, index, offset, n, kind, interp in slots:
+            g = "@__ferry_air_tag_%d_%d" % (self.idx, len(self.globals))
+            b = tag.encode() + b"\0"
+            self.globals.append('%s = private unnamed_addr constant [%d x i8] c"%s"' % (
+                g, len(b), "".join(chr(c) if 32 <= c < 127 and chr(c) not in '"\\' else "\\%02X" % c for c in b)))
+            recs.append("%s { ptr %s, i32 %d, i32 %d, i32 %d, i32 %d, i32 %d, i32 %d }" % (
+                SLOT, g, what, index, offset, n, kind, interp))
+        tab = "@%s.table" % sym
+        self.globals.append("%s = private unnamed_addr constant [%d x %s] [%s]" % (tab, len(recs), SLOT, ", ".join(recs)))
+        n = len(recs)
+        self.lines += ["define i32 @%s(ptr %%s, i32 %%max) {" % sym,
+                       "  %%lt = icmp slt i32 %%max, %d" % n,
+                       "  %%k = select i1 %%lt, i32 %%max, i32 %d" % n,
+                       "  %pos = icmp sgt i32 %k, 0",
+                       "  %k0 = select i1 %pos, i32 %k, i32 0",
+                       "  %k64 = zext i32 %k0 to i64",
+                       "  %bytes = mul i64 %k64, 32",
+                       "  call void @llvm.memcpy.p0.p0.i64(ptr %%s, ptr %s, i64 %%bytes, i1 false)" % tab,
+                       "  ret i32 %d" % n, "}"]
+        self.need_memcpy = True
+
+
+def rewrite(text, lower, mod):
+    """The module's own code for this processor, with bodies for the GPU
+    built-ins it declares."""
+    out = []
+    unknown = []
+    for line in text.split("\n"):
+        if line.startswith("target datalayout") or line.startswith("target triple"):
+            continue
+        m = re.match(r"^declare (.*?) @(\"?air\.[^\"(]+\"?)\((.*)\)(.*)$", line)
+        if m:
+            ret, name, ps = m.group(1), m.group(2).strip('"'), m.group(3)
+            ret = re.sub(r"\b(local_unnamed_addr|noundef|zeroext|signext)\b", "", ret).strip()
+            ret = re.sub(r"\s*addrspace\(\d+\)", "", ret)
+            params = [re.sub(r"\s*addrspace\(\d+\)", "", take_type(p)[0]) for p in split_top(ps)]
+            body = lower.body(name, ret, params)
+            if body is None:
+                unknown.append(name)
+                out.append(line)
+                continue
+            out.append("define internal %s @%s(%s) #%s {" % (
+                ret, quote(name), ", ".join("%s %%a%d" % (t, i) for i, t in enumerate(params)), ATTR))
+            out.extend(l for l in body if l)
+            out.append("}")
+            continue
+        # constant samplers: Ferry's sampler record in place of the GPU's
+        # encoded state (linear filtering, clamped, normalized coordinates)
+        m = re.match(r"^(@[\w.\"$-]+) = (internal |private )?(unnamed_addr )?addrspace\(2\) constant i64 (-?\d+)(.*)$", line)
+        if m and "__air_sampler_state" in m.group(1):
+            out.append("%s = internal constant %s, align 8" % (m.group(1), SAMPLER_LINEAR))
+            continue
+        out.append(line)
+    text = "\n".join(out)
+    text = re.sub(r"\s*addrspace\(\d+\)", "", text)
+    # the built-ins' bodies read and write memory now
+    text = re.sub(r"^(attributes #\d+ = \{.*?)\bmemory\([^)]*\)", r"\1", text, flags=re.M)
+    text = re.sub(r"\b(readnone|readonly)\b(?=[^\n]*#\d+\s*$)", "", text) if False else text
+    return text, unknown
+
+
+# struct ferry_sampler {normalized, s/t/r address, mag, min, mip, compare, border, aniso, pad[2], lod min/max}
+SAMPLER_T = "{ i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, [2 x i8], float, float }"
+SAMPLER_LINEAR = "%s { i8 1, i8 0, i8 0, i8 0, i8 1, i8 1, i8 0, i8 8, i8 0, i8 1, [2 x i8] zeroinitializer, float 0.0, float 1000.0 }" % SAMPLER_T
+SAMPLER_NEAREST = "%s { i8 1, i8 0, i8 0, i8 0, i8 0, i8 0, i8 0, i8 8, i8 0, i8 1, [2 x i8] zeroinitializer, float 0.0, float 1000.0 }" % SAMPLER_T
+
+
+def translate(bc, idx, clang, tmp):
+    src = os.path.join(tmp, "m%d.bc" % idx)
+    ll = os.path.join(tmp, "m%d.ll" % idx)
+    with open(src, "wb") as fh:
+        fh.write(bc)
+    r = subprocess.run([clang] + TARGET + ["-Wno-override-module", "-O0", "-Xclang", "-disable-llvm-passes",
+                                           "-S", "-emit-llvm", src, "-o", ll], capture_output=True, text=True)
+    if r.returncode:
+        raise SystemExit("ferry-airc: clang couldn't read shader %d: %s" % (idx, r.stderr.strip()[:2000]))
+    text = open(ll).read()
+    mod = Module(text, idx)
+    lower = Lower()
+    body, unknown = rewrite(text, lower, mod)
+    if unknown:
+        raise SystemExit("ferry-airc: shader %d calls GPU functions Ferry can't run yet: %s"
+                         % (idx, ", ".join(sorted(set(unknown)))))
+    for stage in ("vertex", "fragment", "kernel"):
+        for node in mod.named.get("air." + stage, []):
+            mod.entry(stage, node)
+    extra = sorted(lower.decls)
+    # declarations the module itself already has stay single
+    have = set(re.findall(r"^(?:declare|define)[^@\n]*@([\w.$]+)\(", body, re.M))
+    extra = [d for d in extra if d.split("@", 1)[1].split("(", 1)[0] not in have]
+    tail = []
+    tail += extra
+    tail += list(lower.helpers.values())
+    tail += mod.globals
+    if getattr(mod, "need_default_sampler", False):
+        tail.append("@__ferry_air_default_sampler = internal constant %s, align 8" % SAMPLER_NEAREST)
+    if getattr(mod, "need_fetch", False):
+        tail.append("declare void @ferry_fetch_attr(ptr, i32, i32, i32, i32, ptr)")
+    if getattr(mod, "need_memcpy", False) and "llvm.memcpy.p0.p0.i64" not in have:
+        tail.append("declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)")
+    tail += mod.lines
+    tail.append("attributes #%s = { alwaysinline nounwind }" % ATTR)
+    final = body + "\n" + "\n".join(tail) + "\n"
+    with open(ll, "w") as fh:
+        fh.write(final)
+    return ll, mod.entries
+
+
+def waiting_entries(lls, entries):
+    """The entry points whose code reaches a quad exchange (derivatives, quad
+    functions) or a threadgroup barrier, read from the translated modules'
+    call graph. Metal.framework runs the others' lanes one after another,
+    without fibers, which is much quicker (freemac 1.268)."""
+    ref = re.compile(r'@("(?:[^"\\]|\\.)*"|[-\w.$]+)')
+    bodies = {}
+    for ll in lls:
+        name, body = None, []
+        for line in open(ll):
+            if name is None:
+                if line.startswith("define "):
+                    m = ref.search(line[:line.index("(")] if "(" in line else line)
+                    if m:
+                        name, body = m.group(1).strip('"'), []
+            elif line.startswith("}"):
+                bodies[name] = {r.strip('"') for r in ref.findall("".join(body))}
+                name = None
+            else:
+                body.append(line)
+    waits = {"__ferry_quad_exchange", "__ferry_barrier"}
+    out = set()
+    for e in entries:
+        seen, todo, hit = set(), [e["symbol"]], False
+        while todo and not hit:
+            f = todo.pop()
+            if f in seen:
+                continue
+            seen.add(f)
+            if f in waits:
+                hit = True
+            elif f not in bodies and not f.startswith("__ferry_") and not f.startswith("llvm."):
+                hit = f.startswith("air.")  # (an intrinsic left undefined: be safe)
+            else:
+                todo.extend(bodies.get(f, ()))
+        if hit:
+            out.add(e["symbol"])
+    return out
+
+
+def main(argv):
+    if len(argv) < 3 or argv[1] not in ("build", "list"):
+        sys.exit("usage: ferry-airc build|list LIBRARY.metallib [-o LIBRARY.dylib]")
+    mode, path = argv[1], argv[2]
+    out = None
+    if "-o" in argv:
+        out = argv[argv.index("-o") + 1]
+    data = open(path, "rb").read()
+    mods = modules(data)
+    clang = find_tool(["clang", "clang-18", "clang-19", "clang-17", "clang-16", "clang-15"])
+    if not clang:
+        sys.exit("ferry-airc: clang isn't installed; precompiled Metal shaders need it (package clang)")
+    keep = os.environ.get("FERRY_AIRC_KEEP")
+    with tempfile.TemporaryDirectory(prefix="ferry-airc-") as tmp:
+        lls, entries = [], []
+        for i, bc in enumerate(mods):
+            ll, es = translate(bc, i, clang, tmp)
+            lls.append(ll)
+            entries += es
+        if mode == "list":
+            for e in entries:
+                print(e["stage"], e["name"])
+            return 0
+        if not out:
+            sys.exit("ferry-airc: build needs -o LIBRARY.dylib")
+        if keep:
+            os.makedirs(keep, exist_ok=True)
+            for ll in lls:
+                with open(ll) as a, open(os.path.join(keep, os.path.basename(ll)), "w") as b:
+                    b.write(a.read())
+        waiting = waiting_entries(lls, entries)
+        objs = []
+        opt = os.environ.get("FERRY_AIRC_OPT", "-O2")
+        for ll in lls:
+            obj = ll[:-3] + ".o"
+            r = subprocess.run([clang] + TARGET + ["-Wno-override-module", opt, "-c", ll, "-o", obj],
+                               capture_output=True, text=True)
+            if r.returncode:
+                sys.stderr.write(r.stderr[:8000])
+                return 1
+            objs.append(obj)
+        lld = find_tool(["ld64.lld", "ld64.lld-18", "ld64.lld-19", "ld64.lld-17"])
+        if not lld:
+            sys.exit("ferry-airc: LLVM's Mach-O linker (ld64.lld, package lld) isn't installed")
+        r = subprocess.run([lld, "-dylib", "-arch", "x86_64", "-platform_version", "macos", "11.0", "11.0",
+                            "-undefined", "dynamic_lookup", "-install_name", "@rpath/ferry-metal-shader.dylib",
+                            "-o", out] + objs, capture_output=True, text=True)
+        if r.returncode:
+            sys.stderr.write(r.stderr[:8000])
+            return 1
+    refl = {"functions": [], "function_constants": [], "precompiled": True}
+    for e in entries:
+        f = {"name": e["name"], "stage": e["stage"], "symbol": e["symbol"], "info": e["info"],
+             "buffers": e["buffers"], "textures": e["textures"], "samplers": e["samplers"],
+             "threadgroup": e["threadgroup"],
+             "stage_in": [{k: v for k, v in s.items() if k in ("name", "attribute")} for s in e["stage_in"]
+                          if "attribute" in s],
+             "max_threads": None, "waits": e["symbol"] in waiting}
+        refl["functions"].append(f)
+    with open(out + ".json", "w") as fh:
+        json.dump(refl, fh, indent=1)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

@@ -35,6 +35,9 @@ const CFStringRef kCTFontCharacterSetAttribute = (CFStringRef)@"NSCTFontCharacte
 const CFStringRef kCTFontLanguagesAttribute = (CFStringRef)@"NSCTFontLanguagesAttribute";
 const CFStringRef kCTFontFixedAdvanceAttribute = (CFStringRef)@"NSCTFontFixedAdvanceAttribute";
 const CFStringRef kCTFontFeatureSettingsAttribute = (CFStringRef)@"NSCTFontFeatureSettingsAttribute";
+const CFStringRef kCTFontOpenTypeFeatureTag = (CFStringRef)@"CTFeatureOpenTypeTag";
+const CFStringRef kCTFontOpenTypeFeatureValue = (CFStringRef)@"CTFeatureOpenTypeValue";
+const CFStringRef kCTFontCollectionRemoveDuplicatesOption = (CFStringRef)@"NSFontCollectionRemoveDuplicatesOption";
 
 const CFStringRef kCTFontSymbolicTrait = (CFStringRef)@"NSCTFontSymbolicTrait";
 const CFStringRef kCTFontWeightTrait = (CFStringRef)@"NSCTFontWeightTrait";

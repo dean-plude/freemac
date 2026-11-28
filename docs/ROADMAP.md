@@ -1183,6 +1183,24 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.268 "Zed edits code" (done)
+
+Ferry 0.91.0: Zed 0.170.4, the code editor, from its official download, opens its editor and takes typing. Zed draws its whole window with its own Metal shaders, which ship precompiled for Apple's GPUs; Ferry now rebuilds them for the PC's processor. Ferry's software Metal is about twice as fast, so a keystroke shows in about a tenth of a second and an idle Zed uses no processor time.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `ferry-airc` rebuilds a precompiled `.metallib` (an app's shaders for Apple's GPUs) as x86-64 code, kept in Ferry's shader cache | Ferry Metal | done |
+| 2 | Shaders that use no derivatives or barriers run their pixels and threads straight through, without the small stacks that let them wait; faster pixel writes and blending | Ferry Metal | done |
+| 3 | Threadgroup memory reaches compute shaders compiled from source (it was always empty) | Ferry Metal | done |
+| 4 | Core Text glyph runs (`CTRun`): glyphs, positions, string ranges and fonts | Ferry Core Text | done |
+| 5 | A view can be made first responder even when it doesn't accept clicks, and typed text reaches a view that takes text through `NSTextInputClient` only | Ferry AppKit | done |
+| 6 | Rust's event loops: a re-added kqueue user event keeps its flags, a copied kqueue is the same kqueue, `FIOCLEX` and the tty requests | Ferry | done |
+| 7 | Code made as a program runs: `__register_frame`, thread exception ports (accepted; faults still go to signal handlers) | Ferry | done |
+| 8 | Process lists (`proc_listpids`, `proc_pidinfo`, `proc_name`) read from Linux's `/proc` | Ferry | done |
+| 9 | Zed opens, draws its editor and takes typing | Ferry / Zed | done |
+| 10 | `FERRY_METAL_TIMES=1` prints how long each Metal command buffer took | Ferry Metal | done |
+| 11 | For kitty, the terminal: a line's bounds with options, `openpty` and `login_tty`, and which Space a window is on (there is one) | Ferry Core Text / AppKit | done |
+
 ## 1.267 "FreeCAD opens" (done)
 
 Ferry 0.90.0: FreeCAD 1.0.2, the 3D CAD program, from its official download, opens its Start page, opens a Part Design model and draws it in its 3D view, which turns with the navigation cube. FreeCAD is a big Qt 5 app with Python, OpenCASCADE and Coin3D on OpenGL inside. The biggest fix helps every Qt app: Qt's redraws now reach the screen, where before a click did its work but the window never showed it.

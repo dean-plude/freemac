@@ -112,6 +112,34 @@ int main(void)
         printf("nothing below the descent: %s\n", yes(ink(c, 0, 0, 300, (int)floor(20 - ld - 1)) == 0));
         CGContextRelease(c);
 
+        /* The line's glyph runs (freemac 1.268, for Zed): one run here, its
+         * glyphs, positions, string indices and font. */
+        CFArrayRef runs = CTLineGetGlyphRuns(line);
+        CTRunRef run = CFArrayGetCount(runs) ? CFArrayGetValueAtIndex(runs, 0) : NULL;
+        CFIndex rn = run ? CTRunGetGlyphCount(run) : 0;
+        printf("glyph runs: %ld, a run: %s, its type: %s, glyphs as the line's: %s\n", (long)CFArrayGetCount(runs),
+               yes(run != NULL), yes(run && CFGetTypeID(run) == CTRunGetTypeID()),
+               yes(rn == CTLineGetGlyphCount(line)));
+        if (run) {
+            CGGlyph gl[64];
+            CGPoint pos[64];
+            CFIndex idx[64];
+            CTRunGetGlyphs(run, CFRangeMake(0, 0), gl);
+            CTRunGetPositions(run, CFRangeMake(0, 0), pos);
+            CTRunGetStringIndices(run, CFRangeMake(0, 0), idx);
+            CFRange rr = CTRunGetStringRange(run);
+            int rising = 1, glyphs = 1;
+            for (CFIndex i = 1; i < rn && i < 64; i++) rising &= pos[i].x > pos[i - 1].x && idx[i] > idx[i - 1];
+            for (CFIndex i = 0; i < rn && i < 64; i++) glyphs &= gl[i] != 0;
+            CTFontRef rf = CFDictionaryGetValue(CTRunGetAttributes(run), kCTFontAttributeName);
+            double rw = CTRunGetTypographicBounds(run, CFRangeMake(0, 0), NULL, NULL, NULL);
+            printf("run covers the string: %s, glyphs found: %s, positions and indices rise: %s\n",
+                   yes(rr.location == 0 && rr.length == 12), yes(glyphs), yes(rising));
+            printf("run's font: %s, run as wide as the line: %s, first glyph at the start: %s\n",
+                   yes(rf && CFGetTypeID(rf) == CTFontGetTypeID() && fabs(CTFontGetSize(rf) - CTFontGetSize(helvetica)) < 0.01),
+                   yes(fabs(rw - width) < 0.5), yes(fabs(pos[0].x) < 0.01 && idx[0] == 0));
+        }
+
         /* Colour from the attributes, or from the context when asked. */
         CGColorRef red = CGColorCreateGenericRGB(1, 0, 0, 1);
         NSAttributedString *rs = [[NSAttributedString alloc]

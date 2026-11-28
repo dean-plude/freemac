@@ -23,6 +23,7 @@ frameworks/Metal.framework/Metal: $(METAL_FW_OBJ) $(FOUNDATION) $(GRAPHICS)
 # The shader compiler and its headers, next to the frameworks.
 install-metal:
 	install -Dm755 metal/ferry-mslc $(DESTDIR)$(PREFIX)/lib/ferry/metal/ferry-mslc
+	install -Dm755 metal/ferry-airc $(DESTDIR)$(PREFIX)/lib/ferry/metal/ferry-airc
 	install -d $(DESTDIR)$(PREFIX)/lib/ferry/metal/msl
 	install -m644 $(filter-out metal/msl/simd,$(wildcard metal/msl/*)) $(DESTDIR)$(PREFIX)/lib/ferry/metal/msl/
 	install -Dm644 metal/msl/simd/simd.h $(DESTDIR)$(PREFIX)/lib/ferry/metal/msl/simd/simd.h

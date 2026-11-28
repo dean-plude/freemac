@@ -298,6 +298,11 @@ typedef void (^ferry_cmd)(void);
             @autoreleasepool { c(); }
         }
         _end = now();
+        /* FERRY_METAL_TIMES=1: how long each command buffer took to draw */
+        static int times = -1;
+        if (times < 0) times = getenv("FERRY_METAL_TIMES") && *getenv("FERRY_METAL_TIMES") == '1';
+        if (times) mtl_log("a command buffer of %lu commands took %.1f ms", (unsigned long)[_commands count],
+                           (_end - _start) * 1e3);
         [_commands removeAllObjects];
         for (id d in _drawables) [d present];
         [self ferrySetStatus:MTLCommandBufferStatusCompleted];

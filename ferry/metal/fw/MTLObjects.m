@@ -8,6 +8,7 @@
  * FERRY_METAL=0 hides it. Built without ARC. */
 #import "MTLObjC.h"
 #import <objc/runtime.h>
+#include <dispatch/dispatch.h>
 #include <dlfcn.h>
 #include <mach-o/dyld.h>
 #include <mach-o/loader.h>
@@ -377,30 +378,40 @@ static FerryMTLBuffer *new_buffer(NSUInteger length, MTLResourceOptions options)
     return s;
 }
 
-/* Libraries: compiled from source by ferry-mslc (MTLLibrary.m). A Mac's
- * precompiled .metallib holds Apple's own GPU code, which Ferry can't run. */
+/* Libraries: compiled from source by ferry-mslc, or rebuilt from a
+ * precompiled .metallib's bitcode by ferry-airc (MTLLibrary.m). */
 id<MTLLibrary> FerryMTLNewLibraryWithSource(NSString *source, MTLCompileOptions *options, NSError **error);
+id<MTLLibrary> FerryMTLNewLibraryWithMetallib(NSData *bytes, NSString *what, NSError **error);
+static NSString *default_metallib(NSBundle *bundle)
+{
+    NSString *p = [bundle pathForResource:@"default" ofType:@"metallib"];
+    if (!p) p = [[bundle resourcePath] stringByAppendingPathComponent:@"default.metallib"];
+    return [[NSFileManager defaultManager] fileExistsAtPath:p] ? p : nil;
+}
 - (id<MTLLibrary>)newDefaultLibrary
 {
-    mtl_log("the program's default.metallib holds precompiled GPU code, which Ferry can't run yet; "
-            "only shaders compiled from source work");
-    return nil;
+    return [self newDefaultLibraryWithBundle:[NSBundle mainBundle] error:NULL];
 }
 - (id<MTLLibrary>)newDefaultLibraryWithBundle:(NSBundle *)bundle error:(NSError **)error
 {
-    [self newDefaultLibrary];
-    if (error)
-        *error = FerryMTLError(MTLLibraryErrorDomain, MTLLibraryErrorUnsupported,
-                               @"precompiled Metal libraries aren't supported by the Ferry Software Renderer");
-    return nil;
+    NSString *p = default_metallib(bundle ? bundle : [NSBundle mainBundle]);
+    if (!p) {
+        mtl_log("the program has no default.metallib");
+        if (error)
+            *error = FerryMTLError(MTLLibraryErrorDomain, MTLLibraryErrorFileNotFound, @"no default library was found");
+        return nil;
+    }
+    return [self newLibraryWithFile:p error:error];
 }
 - (id<MTLLibrary>)newLibraryWithFile:(NSString *)path error:(NSError **)error
 {
-    mtl_log("%s: a precompiled .metallib, which Ferry can't run yet", [path fileSystemRepresentation]);
-    if (error)
-        *error = FerryMTLError(MTLLibraryErrorDomain, MTLLibraryErrorUnsupported,
-                               @"precompiled Metal libraries aren't supported by the Ferry Software Renderer");
-    return nil;
+    NSData *d = path ? [NSData dataWithContentsOfFile:path] : nil;
+    if (!d) {
+        if (error)
+            *error = FerryMTLError(MTLLibraryErrorDomain, MTLLibraryErrorFileNotFound, @"%@ couldn't be read", path);
+        return nil;
+    }
+    return FerryMTLNewLibraryWithMetallib(d, [path lastPathComponent], error);
 }
 - (id<MTLLibrary>)newLibraryWithURL:(NSURL *)url error:(NSError **)error
 {
@@ -408,7 +419,18 @@ id<MTLLibrary> FerryMTLNewLibraryWithSource(NSString *source, MTLCompileOptions 
 }
 - (id<MTLLibrary>)newLibraryWithData:(id)data error:(NSError **)error
 {
-    return [self newLibraryWithFile:@"(data)" error:error];
+    /* dispatch data, or an NSData */
+    NSData *d = nil;
+    if ([data isKindOfClass:[NSData class]]) {
+        d = data;
+    } else if (data) {
+        const void *buf = NULL;
+        size_t size = 0;
+        dispatch_data_t map = dispatch_data_create_map((dispatch_data_t)data, &buf, &size);
+        d = [NSData dataWithBytes:buf length:size];
+        dispatch_release(map);
+    }
+    return FerryMTLNewLibraryWithMetallib(d, @"the program's Metal library", error);
 }
 - (id<MTLLibrary>)newLibraryWithSource:(NSString *)source options:(MTLCompileOptions *)options error:(NSError **)error
 {

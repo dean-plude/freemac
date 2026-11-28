@@ -161,7 +161,22 @@ typedef struct { const void *klass; unsigned start_index, end_index; } PangoAttr
 typedef struct { void *layout; int start_index; int length; GSList *runs; unsigned flags; } PangoLayoutLine;
 typedef struct { unsigned glyph; struct { int width, x_offset, y_offset; } geometry; unsigned attr; } PangoGlyphInfo;
 typedef struct { int num_glyphs; PangoGlyphInfo *glyphs; int *log_clusters; } PangoGlyphString;
-typedef struct { void *item; PangoGlyphString *glyphs; } PangoGlyphItem;
+/* a stretch of text in one font and direction (Pango's PangoItem and
+ * PangoAnalysis, whose layout Pango keeps stable) */
+typedef struct {
+    void *shape_engine, *lang_engine;
+    PangoFont *font;
+    uint8_t level, gravity, flags, script;
+    void *language;
+    GSList *extra_attrs;
+} PangoAnalysis;
+typedef struct { int offset, length, num_chars; PangoAnalysis analysis; } PangoItem;
+typedef struct { PangoItem *item; PangoGlyphString *glyphs; } PangoGlyphItem;
+/* glyph numbers that aren't the font's own */
+#define PANGO_GLYPH_EMPTY 0x0FFFFFFFu
+#define PANGO_GLYPH_INVALID_INPUT 0xFFFFFFFFu
+#define PANGO_GLYPH_UNKNOWN_FLAG 0x10000000u
+typedef unsigned PangoGlyph;
 
 enum { PANGO_STYLE_NORMAL = 0, PANGO_STYLE_OBLIQUE = 1, PANGO_STYLE_ITALIC = 2 };
 enum { PANGO_WEIGHT_THIN = 100, PANGO_WEIGHT_LIGHT = 300, PANGO_WEIGHT_NORMAL = 400, PANGO_WEIGHT_MEDIUM = 500,
@@ -181,6 +196,7 @@ void pango_font_description_set_absolute_size(PangoFontDescription *desc, double
 const char *pango_font_description_get_family(const PangoFontDescription *desc);
 int pango_font_description_get_weight(const PangoFontDescription *desc);
 int pango_font_description_get_style(const PangoFontDescription *desc);
+int pango_font_description_get_size(const PangoFontDescription *desc);
 PangoFontDescription *pango_font_describe(PangoFont *font);
 void *pango_font_get_hb_font(PangoFont *font);
 

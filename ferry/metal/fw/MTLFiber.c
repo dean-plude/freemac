@@ -47,6 +47,7 @@ enum { L_NEW, L_READY, L_WAIT, L_DONE };
 struct stack { struct stack *next; size_t size; };
 struct group {
     int kind, n, finished;
+    int direct;                   /* lanes run in turn on the worker's stack */
     mtl_lane_fn fn;
     void *arg;
     void *sched_sp;
@@ -137,10 +138,13 @@ void mtl_run_lanes(int kind, int n, mtl_lane_fn fn, void *arg)
     struct worker *w = worker();
     if (n <= 0) return;
     if (n > MAX_LANES) n = MAX_LANES;
+    int direct = (kind & MTL_LANES_NO_WAIT) != 0;
+    kind &= ~MTL_LANES_NO_WAIT;
     if (!w->gbuf) w->gbuf = malloc(sizeof(struct group));
     struct group *g = w->gbuf, *outer = w->g;
     if (outer) g = malloc(sizeof *g); /* (not expected: lanes inside lanes) */
     g->kind = kind;
+    g->direct = direct;
     g->n = n;
     g->finished = 0;
     g->fn = fn;
@@ -149,6 +153,14 @@ void mtl_run_lanes(int kind, int n, mtl_lane_fn fn, void *arg)
     memset(g->discarded, 0, (size_t)n);
     memset(g->round, 0, sizeof g->round);
     w->g = g;
+    if (direct) {
+        for (int i = 0; i < n; i++) {
+            g->cur = i;
+            fn(arg, i);
+            g->state[i] = L_DONE;
+        }
+        g->finished = n;
+    }
     while (g->finished < g->n) {
         int waiting = 0;
         for (int i = 0; i < n; i++) {
@@ -207,7 +219,7 @@ void __ferry_quad_exchange(const void *val, int bytes, void *all4)
     struct group *g = w ? w->g : NULL;
     if (bytes > EX_BYTES) bytes = EX_BYTES;
     if (bytes < 0) bytes = 0;
-    if (!g || g->kind != 1) {
+    if (!g || g->kind != 1 || g->direct) {
         for (int i = 0; i < 4; i++) memcpy((char *)all4 + (size_t)i * (size_t)bytes, val, (size_t)bytes);
         return;
     }
@@ -238,7 +250,7 @@ void __ferry_barrier(int flags)
     struct group *g = me ? me->g : NULL;
     (void)flags;
     __atomic_thread_fence(__ATOMIC_SEQ_CST);
-    if (!g || g->kind != 2 || g->n == 1) return;
+    if (!g || g->kind != 2 || g->n == 1 || g->direct) return;
     wait_here(g);
 }
 
