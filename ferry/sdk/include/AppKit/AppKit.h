@@ -256,6 +256,7 @@ typedef NS_ENUM(NSInteger, NSColorType) {
 @property (readonly) NSString *colorSpaceName;
 @property (readonly) CGFloat hueComponent, saturationComponent, brightnessComponent;
 @property (readonly) NSInteger numberOfComponents;
+- (void)getComponents:(CGFloat *)components;
 @property (readonly) CGColorRef CGColor;
 - (void)getRed:(CGFloat *)r green:(CGFloat *)g blue:(CGFloat *)b alpha:(CGFloat *)a;
 - (void)getWhite:(CGFloat *)w alpha:(CGFloat *)a;
@@ -590,7 +591,8 @@ APPKIT_EXTERN NSImageName const NSImageNameAddTemplate, NSImageNameRemoveTemplat
     NSImageNameGoForwardTemplate, NSImageNameMenuOnStateTemplate, NSImageNameMenuMixedStateTemplate,
     NSImageNameRefreshTemplate, NSImageNameActionTemplate, NSImageNameApplicationIcon, NSImageNameCaution,
     NSImageNameInfo, NSImageNameStatusAvailable, NSImageNameStatusUnavailable, NSImageNameStatusPartiallyAvailable,
-    NSImageNameStatusNone, NSImageNameFolder, NSImageNameTouchBarAddTemplate;
+    NSImageNameStatusNone, NSImageNameFolder, NSImageNameTouchBarAddTemplate, NSImageNameColorPanel,
+    NSImageNameFontPanel;
 typedef NS_ENUM(NSUInteger, NSImageCacheMode) {
     NSImageCacheDefault, NSImageCacheAlways, NSImageCacheBySize, NSImageCacheNever,
 };
@@ -1355,6 +1357,7 @@ APPKIT_EXTERN NSDeviceDescriptionKey const NSDeviceSize;
 @property NSControlStateValue state;
 @property (getter=isEnabled) BOOL enabled;
 @property (getter=isHidden) BOOL hidden;
+@property (getter=isAlternate) BOOL alternate;   /* (freemac 1.NEXT) */
 @property (retain) NSMenu *submenu;
 @property (readonly) BOOL hasSubmenu;
 @property (readonly, assign) NSMenu *menu;

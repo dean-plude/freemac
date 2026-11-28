@@ -58,14 +58,24 @@
 @end
 
 /* ---- connections (Distributed Objects) ----------------------------------------------------
- * Within the one program: a connection registered under a name serves its
- * root object to rootProxyForConnectionWithRegisteredName:host:, which
- * answers that object itself. There is no name server between programs,
- * so a name registered in another program is not found (nil). */
-@class NSPortNameServer;
+ * A connection registered under a name serves its root object. Within the
+ * one program rootProxyForConnectionWithRegisteredName:host: answers that
+ * object itself. Another program on the same computer reaches it over a
+ * local socket named after it (since freemac 1.NEXT): its root proxy is an
+ * NSDistantObject, messages to it are sent across and answered, and the
+ * objects they carry go by copy (strings, numbers, data, dates, and
+ * collections of them, or any object a bycopy argument names) or by
+ * reference, as a proxy the other side sends messages back through. There
+ * are no other hosts. */
+@class NSPortNameServer, NSConnection;
 FOUNDATION_EXPORT NSString *const NSConnectionReplyMode;
 FOUNDATION_EXPORT NSNotificationName const NSConnectionDidDieNotification;
 FOUNDATION_EXPORT NSNotificationName const NSConnectionDidInitializeNotification;
+@protocol NSConnectionDelegate <NSObject>
+@optional
+- (BOOL)connection:(NSConnection *)parentConnection shouldMakeNewConnection:(NSConnection *)newConnection;
+- (BOOL)makeNewConnection:(NSConnection *)conn sender:(NSConnection *)ancestor;
+@end
 @interface NSConnection : NSObject
 + (instancetype)defaultConnection;
 + (NSArray<NSConnection *> *)allConnections;
@@ -101,6 +111,24 @@ FOUNDATION_EXPORT NSNotificationName const NSConnectionDidInitializeNotification
 @property (readonly) BOOL multipleThreadsEnabled;
 - (void)invalidate;
 - (NSDictionary<NSString *, NSNumber *> *)statistics;
+@end
+
+/* A stand-in for an object in another program (or for one of ours, there). */
+@interface NSDistantObject : NSProxy
++ (id)proxyWithTarget:(id)target connection:(NSConnection *)connection;
++ (id)proxyWithLocal:(id)target connection:(NSConnection *)connection;
+- (instancetype)initWithTarget:(id)target connection:(NSConnection *)connection;
+- (instancetype)initWithLocal:(id)target connection:(NSConnection *)connection;
+- (void)setProtocolForProxy:(Protocol *)proto;
+@property (readonly, retain) NSConnection *connectionForProxy;
+@end
+
+/* Passes on to its target only the messages its protocol names. */
+@interface NSProtocolChecker : NSProxy
++ (instancetype)protocolCheckerWithTarget:(NSObject *)target protocol:(Protocol *)protocol;
+- (instancetype)initWithTarget:(NSObject *)target protocol:(Protocol *)protocol;
+@property (readonly) Protocol *protocol;
+@property (readonly, retain) NSObject *target;
 @end
 
 #endif
