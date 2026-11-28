@@ -79,6 +79,10 @@ NSAppearanceName const NSAppearanceNameVibrantDark = @"NSAppearanceNameVibrantDa
 NSAppearanceName const NSAppearanceNameAccessibilityHighContrastAqua = @"NSAppearanceNameAccessibilityHighContrastAqua";
 NSAppearanceName const NSAppearanceNameAccessibilityHighContrastDarkAqua =
     @"NSAppearanceNameAccessibilityHighContrastDarkAqua";
+NSAppearanceName const NSAppearanceNameAccessibilityHighContrastVibrantLight =
+    @"NSAppearanceNameAccessibilityHighContrastVibrantLight";
+NSAppearanceName const NSAppearanceNameAccessibilityHighContrastVibrantDark =
+    @"NSAppearanceNameAccessibilityHighContrastVibrantDark";
 
 /* An appearance is a name, light (Aqua) or dark (DarkAqua), and a Mac app
  * is in freemac's own (freemac 1.245, Ferry 0.68.0): dark when Dials >
@@ -103,7 +107,8 @@ static NSAppearance *current_appearance;
     if (!names)
         names = [@[
             NSAppearanceNameAqua, NSAppearanceNameDarkAqua, NSAppearanceNameVibrantLight, NSAppearanceNameVibrantDark,
-            NSAppearanceNameAccessibilityHighContrastAqua, NSAppearanceNameAccessibilityHighContrastDarkAqua
+            NSAppearanceNameAccessibilityHighContrastAqua, NSAppearanceNameAccessibilityHighContrastDarkAqua,
+            NSAppearanceNameAccessibilityHighContrastVibrantLight, NSAppearanceNameAccessibilityHighContrastVibrantDark
         ] retain];
     if (![names containsObject:name])
         return nil;

@@ -1,8 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Disk Arbitration's sessions and disks, from Apple's public documentation.
- * Ferry gives no disk descriptions: DADiskCreateFromBSDName and
- * DADiskCreateFromVolumePath answer NULL, and callbacks registered with a
- * session are never called, as on a Mac with no disks to report. */
+ * Disks are this system's own, by their names in /sys/class/block (freemac
+ * 1.271); callbacks registered with a session are never called. */
 #ifndef FERRY_DISKARBITRATION_H
 #define FERRY_DISKARBITRATION_H
 #include <CoreFoundation/CoreFoundation.h>
@@ -26,6 +25,10 @@ extern const CFStringRef kDADiskDescriptionMediaUUIDKey;
 extern const CFStringRef kDADiskDescriptionDeviceInternalKey;
 extern const CFStringRef kDADiskDescriptionDevicePathKey;
 extern const CFStringRef kDADiskDescriptionMediaBSDNameKey;
+extern const CFStringRef kDADiskDescriptionVolumeMountableKey, kDADiskDescriptionVolumeNetworkKey,
+    kDADiskDescriptionMediaWritableKey, kDADiskDescriptionMediaEncryptedKey, kDADiskDescriptionMediaSizeKey,
+    kDADiskDescriptionMediaWholeKey, kDADiskDescriptionMediaLeafKey, kDADiskDescriptionMediaKindKey,
+    kDADiskDescriptionDeviceModelKey, kDADiskDescriptionDeviceVendorKey, kDADiskDescriptionDeviceProtocolKey;
 
 CFTypeID DASessionGetTypeID(void);
 DASessionRef DASessionCreate(CFAllocatorRef allocator);
@@ -38,6 +41,8 @@ DADiskRef DADiskCreateFromVolumePath(CFAllocatorRef allocator, DASessionRef sess
 const char *DADiskGetBSDName(DADiskRef disk);
 CFDictionaryRef DADiskCopyDescription(DADiskRef disk);
 DADiskRef DADiskCopyWholeDisk(DADiskRef disk);
+/* the drive's IOKit registry entry: none here (an io_service_t of 0) */
+unsigned int DADiskCopyIOMedia(DADiskRef disk);
 void DARegisterDiskAppearedCallback(DASessionRef session, CFDictionaryRef match, DADiskAppearedCallback callback, void *context);
 void DARegisterDiskDisappearedCallback(DASessionRef session, CFDictionaryRef match, DADiskDisappearedCallback callback, void *context);
 void DARegisterDiskDescriptionChangedCallback(DASessionRef session, CFDictionaryRef match, CFArrayRef watch,

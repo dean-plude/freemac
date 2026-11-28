@@ -757,3 +757,28 @@ HRESULT FFEffectStart(FFEffectObjectReference effectReference, UInt32 iterations
 }
 HRESULT FFEffectStop(FFEffectObjectReference effectReference) { return FFERR_INVALIDPARAM; }
 HRESULT FFEffectUnload(FFEffectObjectReference effectReference) { return FFERR_INVALIDPARAM; }
+
+/* ---- what Stats reads besides (freemac 1.271) -------------------------------------- *
+ * The System Management Controller, which Stats asks for fan speeds and
+ * temperatures through IOConnectCallStructMethod, can't be opened here
+ * (IOServiceOpen finds no service). The HID event system is the private
+ * route to temperature sensors on newer Macs; Stats' own code declares
+ * its calls, and here it has no sensors. A PC's power adapter isn't
+ * described, as on a Mac running on battery. */
+
+kern_return_t IOConnectCallStructMethod(io_connect_t connection, uint32_t selector, const void *inputStruct,
+                                        size_t inputStructCnt, void *outputStruct, size_t *outputStructCnt)
+{
+    if (outputStructCnt)
+        *outputStructCnt = 0;
+    return kIOReturnUnsupported;
+}
+
+CFDictionaryRef IOPSCopyExternalPowerAdapterDetails(void) { return NULL; }
+
+void *IOHIDEventSystemClientCreate(CFAllocatorRef allocator) { return NULL; }
+int IOHIDEventSystemClientSetMatching(void *client, CFDictionaryRef matching) { return 0; }
+CFArrayRef IOHIDEventSystemClientCopyServices(void *client) { return NULL; }
+CFTypeRef IOHIDServiceClientCopyProperty(void *service, CFStringRef key) { return NULL; }
+void *IOHIDServiceClientCopyEvent(void *service, int64_t type, int32_t options, int64_t timestamp) { return NULL; }
+double IOHIDEventGetFloatValue(void *event, int32_t field) { return 0; }

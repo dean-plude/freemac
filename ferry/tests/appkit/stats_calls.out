@@ -1,0 +1,7 @@
+hidden window: 8192, visible bit clear
+minimized: 8192
+button window: yes, same again: yes
+height 24, level status, top of screen: yes
+released when closed: no
+subview in button: yes
+exit=0

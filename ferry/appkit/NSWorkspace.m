@@ -121,6 +121,26 @@ static BOOL launch(NSString *address)
     return ok;
 }
 
+/* Runs "gio mount -e <path>" (eject, which unmounts first) and waits for
+ * it; one argument, no shell. */
+static BOOL eject(NSString *path, NSError **error)
+{
+    char *gio = g_find_program_in_path("gio");
+    BOOL ok = NO;
+    if (gio && [path length] && ![path hasPrefix:@"-"]) {
+        char *argv[] = {gio, (char *)"mount", (char *)"-e", (char *)[path fileSystemRepresentation], NULL};
+        int status = -1;
+        ok = g_spawn_sync(NULL, argv, NULL, G_SPAWN_STDOUT_TO_DEV_NULL | G_SPAWN_STDERR_TO_DEV_NULL, NULL, NULL,
+                          NULL, NULL, &status, NULL) && g_spawn_check_wait_status(status, NULL);
+    } else if (!gio)
+        AWarnOnce("ejecting disks (gio is not installed)");
+    g_free(gio);
+    if (!ok && error)
+        *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileWriteUnknownError
+                                 userInfo:path ? [NSDictionary dictionaryWithObject:path forKey:NSFilePathErrorKey] : nil];
+    return ok;
+}
+
 static NSString *file_address(NSString *path)
 {
     if (![path length])
@@ -320,6 +340,12 @@ static NSString *uti_for_extension(NSString *ext)
         [error release];
     });
 }
+
+- (BOOL)unmountAndEjectDeviceAtURL:(NSURL *)url error:(NSError **)error
+{
+    return eject([url isFileURL] ? [url path] : nil, error);
+}
+- (BOOL)unmountAndEjectDeviceAtPath:(NSString *)path { return eject(path, NULL); }
 
 - (BOOL)openFile:(NSString *)path
 {

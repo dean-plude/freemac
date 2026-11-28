@@ -264,6 +264,8 @@ APPKIT_EXTERN NSAppearanceName const NSAppearanceNameAqua, NSAppearanceNameDarkA
 APPKIT_EXTERN NSAppearanceName const NSAppearanceNameVibrantLight, NSAppearanceNameVibrantDark;
 APPKIT_EXTERN NSAppearanceName const NSAppearanceNameAccessibilityHighContrastAqua;
 APPKIT_EXTERN NSAppearanceName const NSAppearanceNameAccessibilityHighContrastDarkAqua;
+APPKIT_EXTERN NSAppearanceName const NSAppearanceNameAccessibilityHighContrastVibrantLight;
+APPKIT_EXTERN NSAppearanceName const NSAppearanceNameAccessibilityHighContrastVibrantDark;
 @interface NSAppearance : NSObject <NSCoding>
 + (NSAppearance *)appearanceNamed:(NSAppearanceName)name;
 @property (class, retain) NSAppearance * FERRY_SWIFT_NONNULL currentAppearance;

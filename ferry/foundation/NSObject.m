@@ -1086,8 +1086,11 @@ static NSComparisonResult compare_objects(id a, id b)
 /* ---- NSError ----------------------------------------------------------------------- */
 
 @implementation NSError {
-    NSString *_domain;
+    /* in a Mac's order (its public header has them), which Swift relies on:
+     * its own errors are NSErrors that fill these in (freemac 1.271) */
+    void *_reserved;
     NSInteger _code;
+    NSString *_domain;
     NSDictionary *_userInfo;
 }
 + (instancetype)errorWithDomain:(NSErrorDomain)domain code:(NSInteger)code userInfo:(NSDictionary *)dict
@@ -1113,14 +1116,18 @@ static NSComparisonResult compare_objects(id a, id b)
 - (NSDictionary *)userInfo { return _userInfo ?: [NSDictionary dictionary]; }
 - (NSString *)localizedDescription
 {
-    NSString *d = [_userInfo objectForKey:NSLocalizedDescriptionKey];
+    /* through the accessors: Swift's errors answer them themselves */
+    NSDictionary *info = [self userInfo];
+    NSString *domain = [self domain];
+    NSInteger code = [self code];
+    NSString *d = [info objectForKey:NSLocalizedDescriptionKey];
     if (d)
         return d;
-    NSString *file = [[_userInfo objectForKey:NSFilePathErrorKey] lastPathComponent];
-    if ([_domain isEqualToString:NSPOSIXErrorDomain])
-        return [NSString stringWithFormat:@"The operation couldn’t be completed. %s", strerror((int)_code)];
-    if ([_domain isEqualToString:NSCocoaErrorDomain] && file) {
-        switch (_code) {
+    NSString *file = [[info objectForKey:NSFilePathErrorKey] lastPathComponent];
+    if ([domain isEqualToString:NSPOSIXErrorDomain])
+        return [NSString stringWithFormat:@"The operation couldn’t be completed. %s", strerror((int)code)];
+    if ([domain isEqualToString:NSCocoaErrorDomain] && file) {
+        switch (code) {
         case NSFileReadNoSuchFileError:
             return [NSString stringWithFormat:@"The file “%@” couldn’t be opened because there is no "
                                               @"such file.",
@@ -1135,23 +1142,26 @@ static NSComparisonResult compare_objects(id a, id b)
                                               file];
         }
     }
-    return [NSString stringWithFormat:@"The operation couldn’t be completed. (%@ error %ld.)", _domain, (long)_code];
+    return [NSString stringWithFormat:@"The operation couldn’t be completed. (%@ error %ld.)", domain, (long)code];
 }
-- (NSString *)localizedFailureReason { return [_userInfo objectForKey:NSLocalizedFailureReasonErrorKey]; }
-- (NSString *)localizedRecoverySuggestion { return [_userInfo objectForKey:NSLocalizedRecoverySuggestionErrorKey]; }
-- (NSArray *)localizedRecoveryOptions { return [_userInfo objectForKey:NSLocalizedRecoveryOptionsErrorKey]; }
-- (id)recoveryAttempter { return [_userInfo objectForKey:NSRecoveryAttempterErrorKey]; }
-- (NSString *)helpAnchor { return [_userInfo objectForKey:NSHelpAnchorErrorKey]; }
+- (NSString *)localizedFailureReason { return [[self userInfo] objectForKey:NSLocalizedFailureReasonErrorKey]; }
+- (NSString *)localizedRecoverySuggestion { return [[self userInfo] objectForKey:NSLocalizedRecoverySuggestionErrorKey]; }
+- (NSArray *)localizedRecoveryOptions { return [[self userInfo] objectForKey:NSLocalizedRecoveryOptionsErrorKey]; }
+- (id)recoveryAttempter { return [[self userInfo] objectForKey:NSRecoveryAttempterErrorKey]; }
+- (NSString *)helpAnchor { return [[self userInfo] objectForKey:NSHelpAnchorErrorKey]; }
 - (NSString *)description
 {
-    NSMutableString *s = [NSMutableString stringWithFormat:@"Error Domain=%@ Code=%ld \"%@\"", _domain, (long)_code,
+    NSDictionary *info = [self userInfo];
+    NSString *domain = [self domain];
+    NSInteger code = [self code];
+    NSMutableString *s = [NSMutableString stringWithFormat:@"Error Domain=%@ Code=%ld \"%@\"", domain, (long)code,
                                                             [self localizedDescription]];
-    if ([_userInfo count]) {
-        NSArray *keys = [[_userInfo allKeys] sortedArrayUsingSelector:@selector(compare:)];
+    if ([info count]) {
+        NSArray *keys = [[info allKeys] sortedArrayUsingSelector:@selector(compare:)];
         [s appendString:@" UserInfo={"];
         for (NSUInteger i = 0; i < [keys count]; i++)
             [s appendFormat:@"%@%@=%@", i ? @", " : @"", [keys objectAtIndex:i],
-                            [_userInfo objectForKey:[keys objectAtIndex:i]]];
+                            [info objectForKey:[keys objectAtIndex:i]]];
         [s appendString:@"}"];
     }
     return s;

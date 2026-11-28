@@ -701,6 +701,40 @@ const NSFontWeight NSFontWeightUltraLight = -0.8, NSFontWeightThin = -0.6, NSFon
 const NSFontWeight NSFontWeightRegular = 0, NSFontWeightMedium = 0.23, NSFontWeightSemibold = 0.3;
 const NSFontWeight NSFontWeightBold = 0.4, NSFontWeightHeavy = 0.56, NSFontWeightBlack = 0.62;
 
+/* Text styles: the sizes are the ones Apple's design guidelines list for macOS. */
+NSString *const NSFontTextStyleLargeTitle = @"FerryFontTextStyleLargeTitle";
+NSString *const NSFontTextStyleTitle1 = @"FerryFontTextStyleTitle1";
+NSString *const NSFontTextStyleTitle2 = @"FerryFontTextStyleTitle2";
+NSString *const NSFontTextStyleTitle3 = @"FerryFontTextStyleTitle3";
+NSString *const NSFontTextStyleHeadline = @"FerryFontTextStyleHeadline";
+NSString *const NSFontTextStyleSubheadline = @"FerryFontTextStyleSubheadline";
+NSString *const NSFontTextStyleBody = @"FerryFontTextStyleBody";
+NSString *const NSFontTextStyleCallout = @"FerryFontTextStyleCallout";
+NSString *const NSFontTextStyleFootnote = @"FerryFontTextStyleFootnote";
+NSString *const NSFontTextStyleCaption1 = @"FerryFontTextStyleCaption1";
+NSString *const NSFontTextStyleCaption2 = @"FerryFontTextStyleCaption2";
+
+CGFloat AFontTextStyleSize(NSString *style, NSFontWeight *weight)
+{
+    struct { NSString *const *name; CGFloat size; NSFontWeight weight; } table[] = {
+        { &NSFontTextStyleLargeTitle, 26, 0 }, { &NSFontTextStyleTitle1, 22, 0 },
+        { &NSFontTextStyleTitle2, 17, 0 }, { &NSFontTextStyleTitle3, 15, 0 },
+        { &NSFontTextStyleHeadline, 13, 0.4 }, { &NSFontTextStyleSubheadline, 11, 0 },
+        { &NSFontTextStyleBody, 13, 0 }, { &NSFontTextStyleCallout, 12, 0 },
+        { &NSFontTextStyleFootnote, 10, 0 }, { &NSFontTextStyleCaption1, 10, 0 },
+        { &NSFontTextStyleCaption2, 10, 0.23 },
+    };
+    for (size_t i = 0; i < sizeof table / sizeof table[0]; i++)
+        if ([style isEqualToString:*table[i].name]) {
+            if (weight)
+                *weight = table[i].weight;
+            return table[i].size;
+        }
+    if (weight)
+        *weight = 0;
+    return 13;
+}
+
 static const char *weight_word(NSFontWeight w)
 {
     return w <= -0.7 ? "UltraLight" : w <= -0.5 ? "Thin" : w <= -0.2 ? "Light" : w < 0.1 ? "Regular"
@@ -713,6 +747,14 @@ static NSFont *named(const char *name, CGFloat size)
 {
     CTFontRef f = CTFontCreateWithName((CFStringRef)@(name), size, NULL);
     return [(id)f autorelease];
+}
+
++ (NSFont *)preferredFontForTextStyle:(NSString *)style options:(NSDictionary *)options
+{
+    (void)options;
+    NSFontWeight w;
+    CGFloat size = AFontTextStyleSize(style, &w);
+    return [self systemFontOfSize:size weight:w];
 }
 
 + (NSFont *)fontWithName:(NSString *)name size:(CGFloat)size

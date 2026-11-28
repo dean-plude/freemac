@@ -12,6 +12,15 @@ extern const CFStringRef kCFErrorDomainCFNetwork;
 extern const SInt32 kCFStreamErrorDomainSSL;
 extern const SInt32 kCFStreamErrorDomainNetDB;
 
+/* ---- CFHost: a name's addresses (freemac 1.271) ---- */
+typedef struct __CFHost *CFHostRef;
+typedef enum { kCFHostAddresses = 0, kCFHostNames = 1, kCFHostReachability = 2 } CFHostInfoType;
+CFHostRef CFHostCreateWithName(CFAllocatorRef allocator, CFStringRef hostname);
+Boolean CFHostStartInfoResolution(CFHostRef theHost, CFHostInfoType info, CFStreamError *error);
+CFArrayRef CFHostGetAddressing(CFHostRef theHost, Boolean *hasBeenResolved);
+CFArrayRef CFHostGetNames(CFHostRef theHost, Boolean *hasBeenResolved);
+void CFHostCancelInfoResolution(CFHostRef theHost, CFHostInfoType info);
+
 extern const CFStringRef kCFStreamPropertyShouldCloseNativeSocket;
 extern const CFStringRef kCFStreamPropertySocketSecurityLevel;
 extern const CFStringRef kCFStreamSocketSecurityLevelNone;

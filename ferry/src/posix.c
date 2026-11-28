@@ -995,7 +995,8 @@ void ferry_crash_report_init(void)
     struct sigaction sa = {0};
     sa.sa_sigaction = crash_handler;
     sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
-    /* and SIGABRT, which abort() raises (freemac 1.NEXT) */
+    /* SIGABRT too: an uncaught exception ends in abort(), and where it was
+     * thrown is the useful part (freemac 1.271) */
     int sigs[] = {SIGSEGV, SIGBUS, SIGILL, SIGTRAP, SIGFPE, SIGABRT};
     for (unsigned i = 0; i < sizeof sigs / sizeof sigs[0]; i++)
         sigaction(sigs[i], &sa, NULL);

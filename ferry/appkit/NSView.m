@@ -855,6 +855,13 @@ static NSSize abs_size(NSSize s) { return NSMakeSize(fabs(s.width), fabs(s.heigh
     _dirtyRect = NSZeroRect;
     if (flag)
         [_window _noteViewNeedsDisplay];
+    /* in no window, but in a menu bar item's button (freemac 1.271, Stats) */
+    if (flag && !_window)
+        for (NSView *v = _superview; v; v = v->_superview)
+            if ([v respondsToSelector:@selector(_subviewNeedsDisplay)]) {
+                [(id)v _subviewNeedsDisplay];
+                break;
+            }
     /* A backing layer whose delegate displays it (displayLayer:, as Qt's
      * view does) is displayed when the view is: the layer is marked too. */
     if (flag && _layer && !_hostsLayer && [[_layer delegate] respondsToSelector:@selector(displayLayer:)])

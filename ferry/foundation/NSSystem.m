@@ -906,6 +906,17 @@ static NSDictionary *global_domain(void)
         [self save];
     }
 }
+/* Replaces the program's own settings with a whole dictionary (Stats
+ * uses it to import a settings file); another program's domain is left
+ * alone, since Ferry keeps no settings for it here. */
+- (void)setPersistentDomain:(NSDictionary *)domain forName:(NSString *)name
+{
+    if (![name isEqualToString:_domain] || ![domain isKindOfClass:[NSDictionary class]])
+        return;
+    [_values removeAllObjects];
+    [_values addEntriesFromDictionary:domain];
+    [self save];
+}
 - (BOOL)synchronize { return YES; }
 - (NSString *)_ferryDomain { return _domain; }
 

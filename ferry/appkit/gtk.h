@@ -294,6 +294,10 @@ GIcon *g_content_type_get_icon(const char *type);
 const char *const *g_themed_icon_get_names(GIcon *icon);
 gboolean g_spawn_async(const char *working_directory, char **argv, char **envp, int flags, void *child_setup,
                        void *user_data, int *child_pid, GError **error);
+gboolean g_spawn_sync(const char *working_directory, char **argv, char **envp, int flags, void *child_setup,
+                      void *user_data, char **standard_output, char **standard_error, int *wait_status,
+                      GError **error);
+gboolean g_spawn_check_wait_status(int wait_status, GError **error);
 char *g_find_program_in_path(const char *program);
 char *g_filename_to_uri(const char *filename, const char *hostname, GError **error);
 

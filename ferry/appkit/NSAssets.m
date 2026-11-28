@@ -5,18 +5,21 @@
  * Ferry's own with the files beside it (sdk/ferry-actool says what it
  * holds). +[NSImage imageNamed:], -[NSBundle imageForResource:],
  * +[NSColor colorNamed:bundle:] and NSDataAsset look here first, as a Mac
- * looks in its compiled catalogue. A Mac's own compiled catalogue
- * (Assets.car) isn't read: its format isn't published.
+ * looks in its compiled catalogue. Since 1.271 an app built on a Mac,
+ * with its compiled catalogue (Resources/Assets.car), is read too, through
+ * AAssetCar.m.
  *
  * Ferry draws in the light appearance only, so an asset's "any" (or
  * "light") variant is the one used, and a dark one only when it is the
  * only one. */
 #import "AInternal.h"
+#include "AAssetCar.h"
 
 @interface AAssetCatalog : NSObject {
 @public
     NSString *dir;
     NSDictionary *images, *colors, *data;
+    struct acar *car;    /* the Mac's compiled catalogue, if there is one */
 }
 @end
 @implementation AAssetCatalog
@@ -26,6 +29,7 @@
     [images release];
     [colors release];
     [data release];
+    acar_close(car);
     [super dealloc];
 }
 @end
@@ -56,6 +60,16 @@ static AAssetCatalog *catalog_for(NSBundle *bundle)
             v = index[@"Data"];
             c->data = [[v isKindOfClass:[NSDictionary class]] ? v : @{} retain];
         }
+        struct acar *car = acar_open([[res stringByAppendingPathComponent:@"Assets.car"] fileSystemRepresentation]);
+        if (car) {
+            if (!c) {
+                c = [[[AAssetCatalog alloc] init] autorelease];
+                c->images = [@{} retain];
+                c->colors = [@{} retain];
+                c->data = [@{} retain];
+            }
+            c->car = car;
+        }
         catalogs[res] = c ?: (id)[NSNull null];
         return c;
     }
@@ -77,6 +91,50 @@ static NSArray *light_variants(NSArray *all)
     return out;
 }
 
+/* An image from the Mac's compiled catalogue: a bitmap for each size and
+ * scale it holds, or its drawing (PDF or SVG). */
+static NSImage *car_image(struct acar *car, NSString *name)
+{
+    struct acar_bitmap b[16];
+    int n = acar_image(car, [name UTF8String], b, 16);
+    NSImage *im = [[[NSImage alloc] init] autorelease];
+    NSSize size = NSZeroSize;
+    for (int i = 0; i < n; i++) {
+        NSBitmapImageRep *rep = [[[NSBitmapImageRep alloc] initWithBitmapDataPlanes:NULL pixelsWide:b[i].width
+                                                                         pixelsHigh:b[i].height bitsPerSample:8
+                                                                    samplesPerPixel:4 hasAlpha:YES isPlanar:NO
+                                                                     colorSpaceName:NSDeviceRGBColorSpace
+                                                                        bytesPerRow:b[i].width * 4
+                                                                       bitsPerPixel:32] autorelease];
+        if (rep && [rep bitmapData]) {
+            memcpy([rep bitmapData], b[i].rgba, (size_t)b[i].width * b[i].height * 4);
+            NSSize points = NSMakeSize((CGFloat)b[i].width / b[i].scale, (CGFloat)b[i].height / b[i].scale);
+            [rep setSize:points];
+            /* the 1x size, or the first one's, is the image's own */
+            if (size.width <= 0 || b[i].scale == 1)
+                size = points;
+            [im addRepresentation:rep];
+        }
+        free(b[i].rgba);
+    }
+    if (!n) {
+        size_t length;
+        uint8_t *bytes = acar_vector(car, [name UTF8String], &length);
+        NSData *data = bytes ? [NSData dataWithBytesNoCopy:bytes length:length freeWhenDone:YES] : nil;
+        for (NSImageRep *rep in data ? [NSImageRep imageRepsWithData:data] : @[]) {
+            if (size.width <= 0)
+                size = [rep size];
+            [im addRepresentation:rep];
+        }
+    }
+    if (![[im representations] count])
+        return nil;
+    [im setSize:size];
+    if ([name hasSuffix:@"Template"])
+        [im setTemplate:YES];
+    return im;
+}
+
 NSImage *AAssetImage(NSBundle *bundle, NSString *name)
 {
     if (![name isKindOfClass:[NSString class]] || ![name length])
@@ -84,7 +142,7 @@ NSImage *AAssetImage(NSBundle *bundle, NSString *name)
     AAssetCatalog *c = catalog_for(bundle ?: [NSBundle mainBundle]);
     NSDictionary *entry = c ? c->images[name] : nil;
     if (![entry isKindOfClass:[NSDictionary class]])
-        return nil;
+        return c && c->car ? car_image(c->car, name) : nil;
     NSImage *im = [[[NSImage alloc] init] autorelease];
     NSSize size = NSZeroSize;
     for (NSDictionary *v in light_variants(entry[@"files"])) {
@@ -121,8 +179,11 @@ NSColor *AAssetColor(NSBundle *bundle, NSString *name)
     AAssetCatalog *c = catalog_for(bundle ?: [NSBundle mainBundle]);
     NSArray *variants = c ? light_variants(c->colors[name]) : nil;
     NSDictionary *v = [variants firstObject];
+    double rgba[4];
     if (!v)
-        return nil;
+        return c && c->car && acar_color(c->car, [name UTF8String], rgba)
+                   ? [NSColor colorWithSRGBRed:rgba[0] green:rgba[1] blue:rgba[2] alpha:rgba[3]]
+                   : nil;
     NSString *system = v[@"system"];
     if ([system isKindOfClass:[NSString class]]) {
         SEL sel = NSSelectorFromString(system);
@@ -160,6 +221,17 @@ NSColor *AAssetColor(NSBundle *bundle, NSString *name)
     NSData *bytes = [file isKindOfClass:[NSString class]]
                         ? [NSData dataWithContentsOfFile:[c->dir stringByAppendingPathComponent:[file lastPathComponent]]]
                         : nil;
+    if (!bytes && !v && c && c->car) {
+        /* the Mac's compiled catalogue */
+        size_t length;
+        char uti[256];
+        uint8_t *raw = acar_data(c->car, [name UTF8String], &length, uti, sizeof uti);
+        if (raw && length) {
+            bytes = [NSData dataWithBytesNoCopy:raw length:length freeWhenDone:YES];
+            v = uti[0] ? @{@"type" : @(uti)} : @{};
+        } else
+            free(raw);
+    }
     if (!bytes) {
         [self release];
         return nil;

@@ -1,0 +1,18 @@
+empty dictionary shared: yes, count 0
+mutable one new each time: yes
+error description: The operation couldn’t be completed. (Stats error 3.)
+file system: size yes, free fits
+100 C = 212.0 F
+2 GB = 2000 MB
+Hz to C: no
+de: German, FR: France
+interfaces named and typed: yes
+IOReport channels: 0
+zlib round trip: same
+LZ4 round trip: same
+LZFSE round trip: same
+LZMA round trip: same
+LZ4 block: 12 "abcdabcdabcd"
+LZVN block: 3 "PC!"
+too small: 2
+exit=0

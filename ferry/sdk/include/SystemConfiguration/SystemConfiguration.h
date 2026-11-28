@@ -99,6 +99,7 @@ extern const CFStringRef kSCEntNetIPv4, kSCEntNetIPv6, kSCEntNetDNS, kSCEntNetPr
 extern const CFStringRef kSCPropNetIPv4Addresses, kSCPropNetIPv6Addresses, kSCPropNetInterfaces,
     kSCPropInterfaceName, kSCPropNetDNSServerAddresses, kSCPropNetDNSSearchDomains, kSCPropNetDNSDomainName,
     kSCDynamicStorePropNetPrimaryInterface, kSCDynamicStorePropNetPrimaryService;
+#include <SystemConfiguration/SCNetworkConfiguration.h>
 #ifdef __cplusplus
 }
 #endif
