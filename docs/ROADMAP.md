@@ -1199,6 +1199,7 @@ Ferry 0.91.0: Zed 0.170.4, the code editor, from its official download, opens it
 | 8 | Process lists (`proc_listpids`, `proc_pidinfo`, `proc_name`) read from Linux's `/proc` | Ferry | done |
 | 9 | Zed opens, draws its editor and takes typing | Ferry / Zed | done |
 | 10 | `FERRY_METAL_TIMES=1` prints how long each Metal command buffer took | Ferry Metal | done |
+| 11 | For kitty, the terminal: a line's bounds with options, `openpty` and `login_tty`, and which Space a window is on (there is one) | Ferry Core Text / AppKit | done |
 
 ## 1.267 "FreeCAD opens" (done)
 

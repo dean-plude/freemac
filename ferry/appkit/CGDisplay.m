@@ -200,6 +200,21 @@ id<MTLDevice> CGDirectDisplayCopyCurrentMetalDevice(CGDirectDisplayID display)
  * call (Godot sets window properties through it), so there is one
  * connection, numbered 1, and nothing is sent on it. */
 int CGSMainConnectionID(void) { return 1; }
+/* Spaces, also private calls: kitty asks which Space its windows are on, to
+ * find its own window on the Space being shown. Ferry's desktop has one
+ * Space, numbered 1, which every window is on and which is always the
+ * active one (freemac 1.268). */
+uint64_t CGSGetActiveSpace(int connection) { return 1; }
+CFArrayRef CGSCopySpacesForWindows(int connection, int mask, CFArrayRef windows)
+{
+    if (!windows || !CFArrayGetCount(windows))
+        return CFArrayCreate(NULL, NULL, 0, &kCFTypeArrayCallBacks);
+    long long one = 1;
+    CFNumberRef space = CFNumberCreate(NULL, kCFNumberLongLongType, &one);
+    CFArrayRef r = CFArrayCreate(NULL, (const void **)&space, 1, &kCFTypeArrayCallBacks);
+    CFRelease(space);
+    return r;
+}
 /* A blur of what shows through a window's transparent background (Zed asks
  * for one under its translucent themes). Ferry's windows draw no blur yet,
  * so the request is accepted and the background stays as the app drew it

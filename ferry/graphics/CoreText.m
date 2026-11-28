@@ -810,6 +810,26 @@ CGRect CTLineGetImageBounds(CTLineRef line, CGContextRef context)
     return r;
 }
 
+/* A line's bounds, as CTLineGetBoundsWithOptions describes them: from the
+ * origin, down by the descent and up by the ascent, with the leading
+ * unless it's excluded; the glyphs' own bounds when asked for those
+ * (freemac 1.268, kitty). Hanging punctuation, optical bounds and language
+ * extents change nothing for the scripts Pango lays out here. */
+CGRect CTLineGetBoundsWithOptions(CTLineRef line, CTLineBoundsOptions options)
+{
+    if (!line)
+        return CGRectZero;
+    if (options & kCTLineBoundsUseGlyphPathBounds) {
+        CGRect r = CTLineGetImageBounds(line, NULL);
+        return CGRectIsNull(r) ? CGRectZero : r;
+    }
+    CGFloat ascent, descent, leading;
+    double width = CTLineGetTypographicBounds(line, &ascent, &descent, &leading);
+    if (options & kCTLineBoundsExcludeTypographicLeading)
+        leading = 0;
+    return CGRectMake(0, -descent, width, ascent + descent + leading);
+}
+
 static double x_at(GLine *line, NSUInteger i)
 {
     GLayout *l = line->layout;

@@ -3432,6 +3432,11 @@ with Core Text glyph runs. It took these:
 - **Process lists.** `proc_listpids`, `proc_pidinfo` and `proc_name` read
   Linux's `/proc`.
 
+For kitty, the terminal, which goes further on a computer with Mesa:
+`CTLineGetBoundsWithOptions`, `openpty` and `login_tty` with the Mac's
+terminal settings converted, and the private Spaces calls GLFW makes (one
+Space, which every window is on).
+
 `FERRY_METAL_TIMES=1` prints how long each Metal command buffer took.
 The tests for these found that threadgroup memory never reached a compute
 shader compiled from source; it does now.

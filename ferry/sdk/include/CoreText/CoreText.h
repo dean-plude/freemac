@@ -244,6 +244,16 @@ CTLineRef CTLineCreateTruncatedLine(CTLineRef line, double width, CTLineTruncati
 CFIndex CTLineGetGlyphCount(CTLineRef line);
 CFRange CTLineGetStringRange(CTLineRef line);
 double CTLineGetTypographicBounds(CTLineRef line, CGFloat *ascent, CGFloat *descent, CGFloat *leading);
+typedef CFOptionFlags CTLineBoundsOptions;
+enum {
+    kCTLineBoundsExcludeTypographicLeading = 1 << 0,
+    kCTLineBoundsExcludeTypographicShifts = 1 << 1,
+    kCTLineBoundsUseHangingPunctuation = 1 << 2,
+    kCTLineBoundsUseGlyphPathBounds = 1 << 3,
+    kCTLineBoundsUseOpticalBounds = 1 << 4,
+    kCTLineBoundsIncludeLanguageExtents = 1 << 5,
+};
+CGRect CTLineGetBoundsWithOptions(CTLineRef line, CTLineBoundsOptions options);
 CGRect CTLineGetImageBounds(CTLineRef line, CGContextRef context);
 double CTLineGetTrailingWhitespaceWidth(CTLineRef line);
 double CTLineGetPenOffsetForFlush(CTLineRef line, CGFloat flushFactor, double flushWidth);
