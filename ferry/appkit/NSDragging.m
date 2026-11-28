@@ -490,6 +490,17 @@ NSDraggingSession *ABeginDragSession(NSPasteboard *pb, NSArray *items, id<NSDrag
 }
 @end
 
+/* The window's older drag, as Qt's Cocoa plugin starts one: the same as a
+ * view's (freemac 1.NEXT, Shotcut). */
+@implementation NSWindow (NSDraggingSource)
+- (void)dragImage:(NSImage *)image at:(NSPoint)location offset:(NSSize)offset event:(NSEvent *)event
+       pasteboard:(NSPasteboard *)pasteboard source:(id)source slideBack:(BOOL)slideBack
+{
+    start_session(pasteboard ?: [NSPasteboard pasteboardWithName:NSPasteboardNameDrag], @[], source, YES, image,
+                  event);
+}
+@end
+
 /* ---- GTK's side ------------------------------------------------------------------------ */
 
 static NSWindow *gtk_window;       /* the window GTK's current drag is over, retained */

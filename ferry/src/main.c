@@ -220,6 +220,8 @@ int main(int argc, char **argv, char **envp)
          * (freemac 1.265). */
         char electron[PATH_MAX];
         snprintf(electron, sizeof electron, "%s/Contents/Frameworks/Electron Framework.framework", argv[i]);
+        char webengine[PATH_MAX];
+        snprintf(webengine, sizeof webengine, "%s/Contents/Frameworks/QtWebEngineCore.framework", argv[i]);
         argv[i] = program;
         if (is_dir(electron)) {
             int sandbox = 0, gpu = 0;
@@ -252,6 +254,26 @@ int main(int argc, char **argv, char **envp)
                     fprintf(stderr, "ferry: an Electron app; Ferry has no Mac app sandbox, so it runs without one%s\n",
                             gpu ? "" : ", and draws it in software");
             }
+        }
+        /* A Qt app with a web view (Qt WebEngine, Chromium inside, as in
+         * Anki): its helpers ask for the Mac app sandbox too, which Qt
+         * WebEngine's own switch turns off; its pages are drawn in software,
+         * as an Electron app's are; and Qt shows them through Metal, its
+         * first choice on a Mac, so Ferry's Metal is on for it (freemac
+         * 1.NEXT). The helpers inherit all three. FERRY_ELECTRON_GPU=1 keeps
+         * the graphics card for the pages, FERRY_METAL=0 keeps Metal off. */
+        if (is_dir(webengine)) {
+            setenv("QTWEBENGINE_DISABLE_SANDBOX", "1", 0);
+            setenv("FERRY_METAL", "1", 0);
+            const char *keep = getenv("FERRY_ELECTRON_GPU");
+            const char *flags = getenv("QTWEBENGINE_CHROMIUM_FLAGS");
+            if (!(keep && *keep && strcmp(keep, "0")) && !(flags && strstr(flags, "--disable-gpu"))) {
+                static char both[4096];
+                snprintf(both, sizeof both, "%s%s--disable-gpu", flags ? flags : "", flags && *flags ? " " : "");
+                setenv("QTWEBENGINE_CHROMIUM_FLAGS", both, 1);
+            }
+            if (ferry_verbose)
+                fprintf(stderr, "ferry: a Qt WebEngine app; it runs without the Mac app sandbox and draws its pages in software\n");
         }
     } else if (is_installable(argv[i])) {
         if (!find_installer(program, sizeof program)) {

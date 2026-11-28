@@ -568,6 +568,7 @@ GFont *GFontCreate(NSString *family, int weight, int style, CGFloat size);
 /* The family that stands for a Mac family (Helvetica, Times, Menlo...),
  * or nil for a name that isn't one. */
 NSString *GFontMacFamily(NSString *name);
+NSArray *GFontStandInFamilyNames(void);
 @interface NSWindow (FerryPrinting)
 /* the GTK window shown for this one, or NULL (a dialog's parent) */
 - (GtkWidget *)_gtkWindow;

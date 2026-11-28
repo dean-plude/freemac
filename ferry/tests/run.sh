@@ -289,6 +289,9 @@ run_one libsystem_termios "$here/libsystem_termios.c" "$here/libsystem_termios.o
 # Mac signal context, sigaltstack, the *at calls, XPC dates, /usr/bin/login
 # and terminfo (freemac 1.269)
 run_one libsystem_kitty "$here/libsystem_kitty.c" "$here/libsystem_kitty.out"
+# a Mac program started through nice, nohup or env, as Shotcut starts its
+# encoder (freemac 1.NEXT)
+run_one libsystem_wrappers "$here/libsystem_wrappers.c" "$here/libsystem_wrappers.out"
 # CommonCrypto (libSystem): digests, HMAC, PBKDF2 and random bytes, and AES
 # through this system's OpenSSL, against published test vectors.
 run_one commoncrypto_digests "$here/commoncrypto_digests.c" "$here/commoncrypto_digests.out"
@@ -1803,6 +1806,11 @@ run_one appkit_macvim "$here/appkit/macvim.m" "$here/appkit/macvim.out" -framewo
 run_one foundation_stats_calls "$here/foundation/stats_calls.m" "$here/foundation/stats_calls.out" \
     -framework Foundation -framework SystemConfiguration -lcompression
 run_one appkit_stats_calls "$here/appkit/stats_calls.m" "$here/appkit/stats_calls.out" -framework Cocoa
+# Anki's (PyQt6, Qt WebEngine) dyld shared cache lookups, status names, bundle
+# folders relative to the bundle, clean apertures, font formats, Times listed
+# and printer fonts (freemac 1.NEXT)
+run_one appkit_anki "$here/appkit/anki.m" "$here/appkit/anki.out" -framework Cocoa -framework CoreText \
+    -framework CoreMedia -framework CoreServices
 # What Qt and OBS need of IOSurface, Accelerate (vImage), Metal (no device),
 # DiskArbitration (no disks) and Network's path monitor, and a Mac's
 # __exp10 and __sinpi, and libcurl (freemac 1.232, Ferry 0.56.0)

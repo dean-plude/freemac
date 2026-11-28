@@ -275,6 +275,94 @@ static int search_path(const char *file, char *out, size_t size)
     return 0;
 }
 
+/* A Mac app may start one of its own programs through a tool of the
+ * system's that runs another program: Shotcut starts its encoder as
+ * "nice -n 3 .../melt ..." (its source, AbstractJob::start). On a Mac the
+ * tool starts the Mac program itself; here this system's nice would hand
+ * a Mach-O to the kernel, which can't run it. So for nice, nohup and env,
+ * as their man pages give their options, a Mach-O they would start gets
+ * Ferry in front of it: nice -n 3 FERRY -- .../melt ... (freemac 1.NEXT,
+ * Shotcut). The returned argv is the caller's to free, NULL when nothing
+ * changed. */
+static char wrapper_sep[] = "--";
+
+static char **wrapper_argv(const char *path, char *const argv[])
+{
+    if (!path || !argv || !argv[0])
+        return NULL;
+    const char *base = strrchr(path, '/');
+    base = base ? base + 1 : path;
+    int nice = !strcmp(base, "nice"), env = !strcmp(base, "env");
+    if (!nice && !env && strcmp(base, "nohup"))
+        return NULL;
+    int argc = 0;
+    while (argv[argc])
+        argc++;
+    int i = 1;
+    for (; i < argc; i++) {
+        const char *a = argv[i];
+        if (!strcmp(a, "--")) {
+            i++;
+            break;
+        }
+        if (env && strchr(a, '=') && a[0] != '-')
+            continue;
+        if (a[0] != '-' || !a[1])
+            break;
+        /* an option whose value is the next argument */
+        if ((nice && !strcmp(a, "-n")) || (env && (!strcmp(a, "-u") || !strcmp(a, "-C") || !strcmp(a, "-S")
+                                                    || !strcmp(a, "-P"))))
+            i++;
+    }
+    if (i >= argc)
+        return NULL;
+    char found[PATH_MAX];
+    const char *prog = argv[i];
+    if (!strchr(prog, '/')) {
+        if (!search_path(prog, found, sizeof found))
+            return NULL;
+        prog = found;
+    }
+    if (!is_mach_o(prog))
+        return NULL;
+    char self[PATH_MAX];
+    ssize_t n = readlink("/proc/self/exe", self, sizeof self - 1);
+    if (n <= 0)
+        return NULL;
+    self[n] = 0;
+    char **av = calloc((size_t)argc + 3, sizeof *av);
+    char *ferry = strdup(self), *full = strdup(prog);
+    if (!av || !ferry || !full) {
+        free(av);
+        free(ferry);
+        free(full);
+        return NULL;
+    }
+    int k = 0;
+    for (int j = 0; j < i; j++)
+        av[k++] = argv[j];
+    av[k++] = ferry;
+    av[k++] = wrapper_sep;
+    av[k++] = full;
+    for (int j = i + 1; j < argc; j++)
+        av[k++] = argv[j];
+    return av;
+}
+
+static void wrapper_argv_free(char **av)
+{
+    if (!av)
+        return;
+    int i = 0;
+    while (av[i] && av[i] != wrapper_sep)
+        i++;
+    if (av[i]) {
+        free(av[i - 1]);
+        free(av[i + 1]);
+    }
+    free(av);
+}
+
 /* ---- terminfo for this system's programs ------------------------------------------
  * A Mac's terminfo database files its entries under two hex digits, the
  * first letter's code ("78/xterm-kitty"), where this system's ncurses
@@ -470,12 +558,14 @@ static int spawn(pid_t *pid, const char *file, int search, struct mac_actions *c
         flags |= POSIX_SPAWN_SETSID;
     posix_spawnattr_setflags(&attr, flags);
     if (rc == 0) {
-        char *const *av = mac_argv ? mac_argv : argv;
+        char **wrapped = mac_argv ? NULL : wrapper_argv(path, argv);
+        char *const *av = mac_argv ? mac_argv : wrapped ? wrapped : argv;
         fflush(NULL); /* what the program printed but hasn't written yet isn't the child's */
         char **fixed = mac_argv ? NULL : terminfo_env(envp);
         char *const *ev = fixed ? fixed : envp;
         rc = search ? posix_spawnp(pid, exe, &fa, &attr, av, ev) : posix_spawn(pid, exe, &fa, &attr, av, ev);
         terminfo_env_free(fixed);
+        wrapper_argv_free(wrapped);
     }
     posix_spawn_file_actions_destroy(&fa);
     posix_spawnattr_destroy(&attr);
@@ -589,9 +679,11 @@ static int mac_execve(const char *path, char *const argv[], char *const envp[])
     }
     fflush(NULL);
     char **fixed = terminfo_env(envp);
-    int rc = execve(path, argv, fixed ? fixed : envp);
+    char **wrapped = wrapper_argv(path, argv);
+    int rc = execve(path, wrapped ? wrapped : argv, fixed ? fixed : envp);
     int e = errno;
     terminfo_env_free(fixed);
+    wrapper_argv_free(wrapped);
     errno = e;
     return rc;
 }

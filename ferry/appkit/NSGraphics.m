@@ -815,6 +815,10 @@ static NSFont *named(const char *name, CGFloat size)
 - (CGFloat)italicAngle { return CTFontGetSlantAngle(CT); }
 - (NSRect)boundingRectForFont { return CTFontGetBoundingBox(CT); }
 - (BOOL)isFixedPitch { return (CTFontGetSymbolicTraits(CT) & kCTFontTraitMonoSpace) != 0; }
+- (NSFont *)screenFont { return self; }
+- (NSFont *)printerFont { return self; }
+- (NSFontRenderingMode)renderingMode { return NSFontDefaultRenderingMode; }
+- (NSFont *)screenFontWithRenderingMode:(NSFontRenderingMode)mode { return self; }
 - (NSUInteger)numberOfGlyphs { return CTFontGetGlyphCount(CT); }
 - (NSSize)advancementForGlyph:(CGGlyph)glyph
 {

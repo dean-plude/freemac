@@ -295,6 +295,13 @@ typedef NS_ENUM(NSUInteger, NSControlSize) {
     NSControlSizeRegular = 0, NSControlSizeSmall = 1, NSControlSizeMini = 2, NSControlSizeLarge = 3,
 };
 
+typedef NS_ENUM(NSUInteger, NSFontRenderingMode) {
+    NSFontDefaultRenderingMode = 0,
+    NSFontAntialiasedRenderingMode = 1,
+    NSFontIntegerAdvancementsRenderingMode = 2,
+    NSFontAntialiasedIntegerAdvancementsRenderingMode = 3,
+};
+
 /* A glyph number as the older NSFont and NSLayoutManager calls take it. */
 typedef unsigned int NSGlyph;
 /* An NSFont is a Core Text font: a CTFontRef can be used as an NSFont and an
@@ -337,6 +344,11 @@ typedef unsigned int NSGlyph;
 - (void)getBoundingRects:(NSRect *)rects forGlyphs:(const NSGlyph *)glyphs count:(NSUInteger)count;
 - (void)set;
 - (void)setInContext:(NSGraphicsContext *)context;
+/* the screen and printer forms of a font: the font itself, as fonts draw the
+ * same everywhere (freemac 1.NEXT) */
+@property (readonly) NSFont *screenFont, *printerFont;
+@property (readonly) NSFontRenderingMode renderingMode;
+- (NSFont *)screenFontWithRenderingMode:(NSFontRenderingMode)mode;
 @end
 
 typedef NS_ENUM(NSInteger, NSTextAlignment) {
@@ -2168,6 +2180,10 @@ typedef NS_ENUM(NSInteger, NSDraggingContext) { NSDraggingContextOutsideApplicat
 @interface NSView (NSDraggingSource)
 - (NSDraggingSession *)beginDraggingSessionWithItems:(NSArray<NSDraggingItem *> *)items event:(NSEvent *)event
                                               source:(id<NSDraggingSource>)source;
+- (void)dragImage:(NSImage *)image at:(NSPoint)location offset:(NSSize)offset event:(NSEvent *)event
+       pasteboard:(NSPasteboard *)pasteboard source:(id)source slideBack:(BOOL)slideBack;
+@end
+@interface NSWindow (NSDraggingSource)
 - (void)dragImage:(NSImage *)image at:(NSPoint)location offset:(NSSize)offset event:(NSEvent *)event
        pasteboard:(NSPasteboard *)pasteboard source:(id)source slideBack:(BOOL)slideBack;
 @end

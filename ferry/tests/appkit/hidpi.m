@@ -20,6 +20,9 @@ int main(void)
                                                     backing:NSBackingStoreBuffered defer:NO];
         Probe *v = [[Probe alloc] initWithFrame:NSMakeRect(10, 10, 50, 50)];
         [[w contentView] addSubview:v];
+        /* joining the window is one change, as on a Mac (freemac 1.271); none after */
+        printf("joining the window told the view: %s\n", v.changes == 1 ? "yes" : "no");
+        v.changes = 0;
         [w makeKeyAndOrderFront:nil];
         [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.3]];
         printf("scale: screen %.0f, window %.0f\n", [[NSScreen mainScreen] backingScaleFactor], [w backingScaleFactor]);

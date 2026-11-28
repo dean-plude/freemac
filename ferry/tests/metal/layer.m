@@ -4,8 +4,10 @@
  * drawables the drawable size, a clear presented by a command buffer and
  * shown as the layer's contents on the main thread, read back with
  * cacheDisplayInRect:, drawables taken in turns from another thread, and a
- * new drawable size after a resize. A picture goes to $FERRY_TEST_SHOTS when
- * it is set. */
+ * new drawable size after a resize; and, as Qt's Cocoa plugin does it
+ * (freemac 1.NEXT, Shotcut), the layer's scale set when the view joins its
+ * window and a drawable presented from a scheduled handler. A picture goes to
+ * $FERRY_TEST_SHOTS when it is set. */
 #import <Cocoa/Cocoa.h>
 #import <Metal/Metal.h>
 #import <QuartzCore/CAMetalLayer.h>
@@ -40,8 +42,14 @@ static void spin(double seconds)
 
 @interface MetalView : NSView
 @end
+static int backingChanges;
 @implementation MetalView
 - (CALayer *)makeBackingLayer { return [CAMetalLayer layer]; }
+- (void)viewDidChangeBackingProperties
+{
+    backingChanges++;
+    self.layer.contentsScale = self.window.backingScaleFactor;
+}
 @end
 
 static id<MTLCommandQueue> queue;
@@ -86,6 +94,8 @@ int main(void)
         [w makeKeyAndOrderFront:nil];
         layer = (CAMetalLayer *)v.layer;
         check("the view's backing layer is a Metal layer", [layer isKindOfClass:[CAMetalLayer class]]);
+        check("its backing properties changed on joining the window, scale set",
+              backingChanges > 0 && layer.contentsScale == w.backingScaleFactor && layer.contentsScale > 0);
         id<MTLDevice> dev = MTLCreateSystemDefaultDevice();
         check("the layer's preferred device is the device", layer.preferredDevice == dev);
         layer.device = dev;
@@ -111,6 +121,24 @@ int main(void)
         check("20 frames from another thread", threadFrames == 20);
         rep = picture(v, NULL);
         check("its last frame shown", near_at(rep, 80, 60, 0, 128, 255));
+
+        /* presented from a scheduled handler, as Qt does with
+         * presentsWithTransaction: shown once drawn */
+        @autoreleasepool {
+            id<CAMetalDrawable> gd = [layer nextDrawable];
+            MTLRenderPassDescriptor *rp = [MTLRenderPassDescriptor renderPassDescriptor];
+            rp.colorAttachments[0].texture = gd.texture;
+            rp.colorAttachments[0].loadAction = MTLLoadActionClear;
+            rp.colorAttachments[0].clearColor = MTLClearColorMake(0, 1, 0, 1);
+            id<MTLCommandBuffer> cb = [queue commandBuffer];
+            [[cb renderCommandEncoderWithDescriptor:rp] endEncoding];
+            [cb addScheduledHandler:^(id<MTLCommandBuffer> b) { [gd present]; }];
+            [cb commit];
+            [cb waitUntilScheduled];
+        }
+        spin(0.3);
+        rep = picture(v, NULL);
+        check("presented from a scheduled handler, drawn first", near_at(rep, 80, 60, 0, 255, 0));
 
         layer.drawableSize = CGSizeMake(320, 240);
         d = [layer nextDrawable];

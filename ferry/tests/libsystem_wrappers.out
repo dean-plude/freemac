@@ -1,0 +1,10 @@
+  the Mac program ran with one, two, WRAPPED=-
+nice -n 3, spawned: exited 7
+  the Mac program ran with one, two, WRAPPED=-
+nice -n 3, exec: exited 7
+  the Mac program ran with three, -, WRAPPED=-
+nohup, exec: exited 7
+  the Mac program ran with four, -, WRAPPED=yes
+env with a variable, spawned: exited 7
+nice with a program of this system: exited 5
+exit=0

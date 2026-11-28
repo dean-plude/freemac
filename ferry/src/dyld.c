@@ -27,6 +27,7 @@
 #include <limits.h>
 #include <pthread.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -349,6 +350,28 @@ static int mac_dlopen_preflight(const char *path)
     if (!strchr(path, '/'))
         return search_leaf(path, full, sizeof full);
     return is_file(path);
+}
+
+/* _dyld_shared_cache_contains_path (macOS 11): whether a system library is
+ * in the shared cache, which on a Mac is where system libraries live instead
+ * of on disk. Ferry has no shared cache; the system libraries and
+ * frameworks it serves stand in for it (freemac 1.NEXT), so that a program
+ * that looks for, say, Foundation by path finds it: Python's ctypes does,
+ * through this call, which it calls without checking for NULL. */
+static bool mac_dyld_shared_cache_contains_path(const char *path)
+{
+    if (!path || (strncmp(path, "/System/Library/", 16) && strncmp(path, "/usr/lib/", 9)))
+        return false;
+    char full[PATH_MAX];
+    return is_libsystem(path) || ferry_twin_library(path) || ferry_find_system_framework(path, full, sizeof full);
+}
+
+/* _dyld_get_shared_cache_range: no shared cache. */
+static const void *mac_dyld_get_shared_cache_range(size_t *length)
+{
+    if (length)
+        *length = 0;
+    return NULL;
 }
 
 static int mac_dlclose(void *h)
@@ -755,6 +778,8 @@ const struct ferry_symbol ferry_dyld_symbols[] = {
     {"_dyld_get_image_name", mac_dyld_get_image_name},
     {"_dyld_register_func_for_add_image", mac_dyld_register_func_for_add_image},
     {"_dyld_is_objc_constant", mac_dyld_is_objc_constant},
+    {"_dyld_shared_cache_contains_path", mac_dyld_shared_cache_contains_path},
+    {"_dyld_get_shared_cache_range", mac_dyld_get_shared_cache_range},
     {"_dyld_register_func_for_remove_image", mac_dyld_register_func_for_remove_image},
     {"getsectiondata", mac_getsectiondata},
     {"getsectdata", mac_getsectdata},
