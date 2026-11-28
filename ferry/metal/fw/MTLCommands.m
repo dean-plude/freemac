@@ -185,6 +185,12 @@ typedef void (^ferry_cmd)(void);
 - (void)insertDebugCaptureBoundary {}
 @end
 
+/* The command buffer whose scheduled handlers are running on this thread: a
+ * drawable presented from one of them (as Qt does when its layer presents
+ * with transactions) is shown once that buffer's work is done, as on a Mac,
+ * not before it is drawn (freemac 1.NEXT, Shotcut). */
+static __thread FerryMTLCommandBuffer *scheduling_buffer;
+
 @implementation FerryMTLCommandBuffer
 - (instancetype)init
 {
@@ -293,7 +299,10 @@ typedef void (^ferry_cmd)(void);
     @autoreleasepool {
         [self ferrySetStatus:MTLCommandBufferStatusScheduled];
         _start = now();
+        FerryMTLCommandBuffer *outer = scheduling_buffer;
+        scheduling_buffer = self;
         for (MTLCommandBufferHandler h in _scheduled) h(self);
+        scheduling_buffer = outer;
         for (ferry_cmd c in _commands) {
             @autoreleasepool { c(); }
         }
@@ -1281,6 +1290,10 @@ static NSUInteger drawable_ids;
 - (void)present
 {
     if (_presentedTime) return;
+    if (scheduling_buffer) {
+        [scheduling_buffer presentDrawable:self];
+        return;
+    }
     id layer = _layer;
     BOOL opaque = [layer respondsToSelector:@selector(isOpaque)] && [(id<FerryMTLLayerOpacity>)layer isOpaque];
     CGImageRef img = image_of([_texture ferryTex], opaque);

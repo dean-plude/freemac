@@ -167,6 +167,16 @@ template<class T, int C, int R> struct matrix {
         int i = 0;
         ((columns[i++] = cols), ...);
     }
+    /* Columns given as braced lists, float3x3({1, 0, 0}, {0, 1, 0}, {0, 0, 1}),
+     * which the template above can't deduce (freemac 1.NEXT, Shotcut). */
+    template<int D = C, __ferry::enable_if_t<D == 2, int> = 0>
+    matrix(const vec<T, R> &a, const vec<T, R> &b) { columns[0] = a; columns[1] = b; }
+    template<int D = C, __ferry::enable_if_t<D == 3, int> = 0>
+    matrix(const vec<T, R> &a, const vec<T, R> &b, const vec<T, R> &c)
+    { columns[0] = a; columns[1] = b; columns[2] = c; }
+    template<int D = C, __ferry::enable_if_t<D == 4, int> = 0>
+    matrix(const vec<T, R> &a, const vec<T, R> &b, const vec<T, R> &c, const vec<T, R> &d)
+    { columns[0] = a; columns[1] = b; columns[2] = c; columns[3] = d; }
     template<class... S, __ferry::enable_if_t<sizeof...(S) == C * R && C * R != C && (... && __ferry::is_scalar<S>::value), int> = 0>
     matrix(const S &...s)
     {
@@ -274,6 +284,26 @@ __FERRY_VNAMES(bool, bool) __FERRY_VNAMES(long, long) __FERRY_VNAMES(ulong, ulon
     typedef metal::matrix<t, 4, 2> t##4x2; typedef metal::matrix<t, 4, 3> t##4x3; typedef metal::matrix<t, 4, 4> t##4x4;
 __FERRY_MNAMES(float) __FERRY_MNAMES(half)
 #undef __FERRY_MNAMES
+/* The same types under the names of <simd/vector_types.h>, which a Mac's
+ * Metal library declares too: vector_float4 and simd_float4 are float4,
+ * matrix_float4x4 and simd_float4x4 are float4x4 (freemac 1.NEXT, for
+ * Shotcut's shaders). */
+#define __FERRY_SNAMES(t) \
+    typedef t##2 vector_##t##2; typedef t##3 vector_##t##3; typedef t##4 vector_##t##4; \
+    typedef t##2 simd_##t##2; typedef t##3 simd_##t##3; typedef t##4 simd_##t##4; \
+    typedef packed_##t##2 simd_packed_##t##2; typedef packed_##t##4 simd_packed_##t##4;
+__FERRY_SNAMES(float) __FERRY_SNAMES(half) __FERRY_SNAMES(int) __FERRY_SNAMES(uint) __FERRY_SNAMES(short)
+__FERRY_SNAMES(ushort) __FERRY_SNAMES(char) __FERRY_SNAMES(uchar) __FERRY_SNAMES(long) __FERRY_SNAMES(ulong)
+#undef __FERRY_SNAMES
+#define __FERRY_SMNAMES(t) \
+    typedef t##2x2 matrix_##t##2x2; typedef t##2x3 matrix_##t##2x3; typedef t##2x4 matrix_##t##2x4; \
+    typedef t##3x2 matrix_##t##3x2; typedef t##3x3 matrix_##t##3x3; typedef t##3x4 matrix_##t##3x4; \
+    typedef t##4x2 matrix_##t##4x2; typedef t##4x3 matrix_##t##4x3; typedef t##4x4 matrix_##t##4x4; \
+    typedef t##2x2 simd_##t##2x2; typedef t##2x3 simd_##t##2x3; typedef t##2x4 simd_##t##2x4; \
+    typedef t##3x2 simd_##t##3x2; typedef t##3x3 simd_##t##3x3; typedef t##3x4 simd_##t##3x4; \
+    typedef t##4x2 simd_##t##4x2; typedef t##4x3 simd_##t##4x3; typedef t##4x4 simd_##t##4x4;
+__FERRY_SMNAMES(float) __FERRY_SMNAMES(half)
+#undef __FERRY_SMNAMES
 namespace metal {
 using ::float2; using ::float3; using ::float4; using ::half2; using ::half3; using ::half4;
 using ::int2; using ::int3; using ::int4; using ::uint2; using ::uint3; using ::uint4;

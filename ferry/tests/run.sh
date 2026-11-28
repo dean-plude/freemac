@@ -289,6 +289,9 @@ run_one libsystem_termios "$here/libsystem_termios.c" "$here/libsystem_termios.o
 # Mac signal context, sigaltstack, the *at calls, XPC dates, /usr/bin/login
 # and terminfo (freemac 1.269)
 run_one libsystem_kitty "$here/libsystem_kitty.c" "$here/libsystem_kitty.out"
+# a Mac program started through nice, nohup or env, as Shotcut starts its
+# encoder (freemac 1.NEXT)
+run_one libsystem_wrappers "$here/libsystem_wrappers.c" "$here/libsystem_wrappers.out"
 # CommonCrypto (libSystem): digests, HMAC, PBKDF2 and random bytes, and AES
 # through this system's OpenSSL, against published test vectors.
 run_one commoncrypto_digests "$here/commoncrypto_digests.c" "$here/commoncrypto_digests.out"
