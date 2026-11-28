@@ -994,6 +994,15 @@ static void add_dirty(NSRect r, NSRect *rects, int *n, int max)
 - (void)_drawLayerInContext:(CGContextRef)ctx dirty:(NSRect)dirty screen:(BOOL)screen update:(BOOL)update
 {
     BOOL updates = !_hostsLayer && [self wantsUpdateLayer];
+    /* A Metal layer's content is its drawables: on a Mac the view's
+     * drawRect: runs only when the view itself needs display, never because
+     * the layer presented a frame. winit asks for the next frame from
+     * drawRect:, so running it on every present kept Neovide drawing
+     * without end (freemac 1.NEXT). */
+    static Class metal_layer;
+    if (!metal_layer)
+        metal_layer = NSClassFromString(@"CAMetalLayer");
+    BOOL draws = !(metal_layer && !update && [_layer isKindOfClass:metal_layer]);
     layers_drawing++;
     if (updates && update && !(AGLViewCount > 0 && AGLViewTakeFrameOnly(self)))
         [self updateLayer];
@@ -1004,7 +1013,7 @@ static void add_dirty(NSRect r, NSRect *rects, int *n, int max)
       NSGraphicsContext *gc = [NSGraphicsContext graphicsContextWithCGContext:c flipped:[self isFlipped]];
       [gc _setDrawingToScreen:screen];
       [NSGraphicsContext setCurrentContext:gc];
-      if (!_hostsLayer && !updates && !NSIsEmptyRect(dirty)) {
+      if (!_hostsLayer && !updates && draws && !NSIsEmptyRect(dirty)) {
           BOOL gl = AGLViewCount > 0, skip = gl && AGLViewWillDraw(self);
           @autoreleasepool {
               if (!skip)

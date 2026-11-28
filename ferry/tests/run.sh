@@ -278,6 +278,8 @@ run_one libsystem_darktable "$here/libsystem_darktable.c" "$here/libsystem_darkt
 run_one libsystem_obs "$here/libsystem_obs.c" "$here/libsystem_obs.out"
 run_one atomics "$here/atomics.c" "$here/atomics.out"
 run_one chkstk "$here/chkstk.c" "$here/chkstk.out"
+# The unwinder on a Mac program's own frames, as LuaJIT's errors walk them (Neovim)
+run_one unwind_backtrace "$here/unwind_backtrace.c" "$here/unwind_backtrace.out"
 run_one half "$here/half.c" "$here/half.out"
 # mach_wait_until, posix_spawn, glob and fnmatch, for OBS and VLC, and
 # backtrace three calls deep in Mac code (freemac 1.233).
@@ -666,7 +668,8 @@ run_one graphics_drawing "$here/graphics/drawing.c" "$here/graphics/drawing.out"
 run_one graphics_text "$here/graphics/text.m" "$here/graphics/text.out" \
     -framework CoreText -framework CoreGraphics -framework Foundation
 # Font descriptors, traits, names, tables and the family list, as Qt's font
-# database uses them on a Mac (for OBS).
+# database uses them on a Mac (for OBS), and a font from data that isn't
+# installed (Neovide).
 run_one graphics_fontdesc "$here/graphics/fontdesc.m" "$here/graphics/fontdesc.out" -fobjc-arc \
     -framework CoreText -framework CoreGraphics -framework Foundation
 # (1.238) font descriptors, collections and font files, as VLC's subtitle text finds fonts

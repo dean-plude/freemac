@@ -1,8 +1,10 @@
 /* Core Text's font descriptors, a font's traits, names and tables, and the
- * font manager's family list, as Qt's font database uses them on a Mac. */
+ * font manager's family list, as Qt's font database uses them on a Mac; and a
+ * font from data that isn't installed (test_font.h, Neovide). */
 #import <CoreText/CoreText.h>
 #import <Foundation/Foundation.h>
 #include <stdio.h>
+#include "test_font.h"
 
 int main(void)
 {
@@ -57,8 +59,17 @@ int main(void)
         NSString *unique = (__bridge_transfer NSString *)CTFontCopyName(font, kCTFontUniqueNameKey);
         NSString *ps = (__bridge_transfer NSString *)CTFontCopyName(font, kCTFontPostScriptNameKey);
         printf("unique name %d, PostScript name %d\n", unique.length > 0, ps.length > 0);
-        NSArray *tables = (__bridge_transfer NSArray *)CTFontCopyAvailableTables(font, 0);
-        printf("tables include cmap %d\n", [tables containsObject:@((uint32_t)kCTFontTableCmap)]);
+        /* the tags are the array's values themselves, as Skia reads them */
+        CFArrayRef tables = CTFontCopyAvailableTables(font, 0);
+        int has_cmap = 0, head_tag = 0;
+        for (CFIndex i = 0; tables && i < CFArrayGetCount(tables); i++) {
+            uintptr_t tag = (uintptr_t)CFArrayGetValueAtIndex(tables, i);
+            has_cmap |= tag == kCTFontTableCmap;
+            head_tag |= tag == kCTFontTableHead;
+        }
+        if (tables)
+            CFRelease(tables);
+        printf("tables include cmap %d\n", has_cmap && head_tag);
 
         /* glyph names both ways */
         UniChar a = 'A';
@@ -133,6 +144,34 @@ int main(void)
         NSString *df = (__bridge_transfer NSString *)CTFontDescriptorCopyAttribute(
             (__bridge CTFontDescriptorRef)fromData.firstObject, kCTFontFamilyNameAttribute);
         printf("descriptors from data %d, family from its name table %d\n", (int)fromData.count, df.length > 0);
+
+        /* A font an app carries as data, that isn't installed, as Neovide
+         * loads its own (freemac 1.NEXT): the font itself, not a stand-in,
+         * its glyphs and its family listed once registered. */
+        NSArray *before = (__bridge_transfer NSArray *)CTFontManagerCopyAvailableFontFamilyNames();
+        NSData *ownData = [NSData dataWithBytes:test_font length:sizeof test_font];
+        CGDataProviderRef op = CGDataProviderCreateWithCFData((__bridge CFDataRef)ownData);
+        CGFontRef og = CGFontCreateWithDataProvider(op);
+        CGDataProviderRelease(op);
+        NSString *ops = (__bridge_transfer NSString *)CGFontCopyPostScriptName(og);
+        CTFontRef of = CTFontCreateWithGraphicsFont(og, 20, NULL, NULL);
+        NSString *ofps = (__bridge_transfer NSString *)CTFontCopyPostScriptName(of);
+        UniChar chars[3] = {'A', 'B', '~'};
+        CGGlyph glyphs[3] = {0};
+        BOOL mapped = CTFontGetGlyphsForCharacters(of, chars, glyphs, 3);
+        printf("its own font from data: %d %d, glyphs %ld, A B ~ are %d %d %d (%d)\n",
+               [ops isEqualToString:@"FerryTestGlyphs-Regular"], [ofps isEqualToString:ops],
+               (long)CTFontGetGlyphCount(of), glyphs[0], glyphs[1], glyphs[2], mapped);
+        CGSize adv;
+        CTFontGetAdvancesForGlyphs(of, kCTFontOrientationHorizontal, glyphs, &adv, 1);
+        printf("its own advance %g\n", adv.width);
+        CFErrorRef err = NULL;
+        printf("registered %d\n", CTFontManagerRegisterGraphicsFont(og, &err));
+        NSArray *after = (__bridge_transfer NSArray *)CTFontManagerCopyAvailableFontFamilyNames();
+        printf("family listed after, not before: %d %d\n", [after containsObject:@"Ferry Test Glyphs"],
+               ![before containsObject:@"Ferry Test Glyphs"]);
+        CFRelease(of);
+        CGFontRelease(og);
     }
     return 0;
 }

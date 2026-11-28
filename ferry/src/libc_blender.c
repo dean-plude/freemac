@@ -53,6 +53,7 @@
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
 
+#include "cxx.h"
 #include "ferry.h"
 
 /* ---- NXArchInfo -------------------------------------------------------- */
@@ -334,8 +335,16 @@ static int mac_strncasecmp_l(const char *a, const char *b, size_t n, void *local
 
 /* ---- the unwinder ------------------------------------------------------ */
 
+/* The unwinder Ferry describes the Mac images to (LLVM's libunwind, through
+ * the C++ runtime, cxx.c), whose contexts these calls are handed: LuaJIT's
+ * personality routine asks the CFA of the frame an error passes, and got
+ * libgcc_s's answer for an LLVM libunwind context (freemac 1.NEXT, Neovim).
+ * This system's libgcc_s only when that isn't installed. */
 static void *unwinder(const char *name)
 {
+    void *addr = ferry_unwind_lookup(name);
+    if (addr)
+        return addr;
     static void *lib;
     if (!lib && !(lib = dlopen("libgcc_s.so.1", RTLD_NOW | RTLD_GLOBAL)))
         return NULL;

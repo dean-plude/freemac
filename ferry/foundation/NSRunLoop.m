@@ -452,6 +452,23 @@ static void drain_wake(int fd)
         return YES;
     }
     NSTimeInterval t = [NSDate timeIntervalSinceReferenceDate];
+    /* On a Mac a timer fires after the loop's wait, which a due timer ends at
+     * once, so BeforeWaiting and AfterWaiting come before it fires: winit
+     * handles its queued events in BeforeWaiting, and with a timer always due
+     * (its polling timer) never heard them (freemac 1.NEXT, Neovide). */
+    BOOL anyDue = NO;
+    os_unfair_lock_lock(&_lock);
+    for (NSTimer *timer in _timers)
+        if (timer->_fire <= t) {
+            anyDue = YES;
+            break;
+        }
+    os_unfair_lock_unlock(&_lock);
+    if (anyDue) {
+        [self _tellObservers:kCFRunLoopBeforeWaiting];
+        [self _tellObservers:kCFRunLoopAfterWaiting];
+        t = [NSDate timeIntervalSinceReferenceDate];
+    }
     NSTimer *due = nil;
     NSTimeInterval next = limit;
     os_unfair_lock_lock(&_lock);
@@ -799,7 +816,13 @@ CFAbsoluteTime CFRunLoopTimerGetNextFireDate(CFRunLoopTimerRef timer) { return T
 void CFRunLoopTimerSetNextFireDate(CFRunLoopTimerRef timer, CFAbsoluteTime fireDate)
 {
     TIMER(timer)->_fire = fireDate;
-    [TIMER(timer)->_loop _wakeUp];
+    /* The loop works out how long to wait each time round, after its
+     * BeforeWaiting observers, so only another thread need wake it. winit
+     * moves its timer from BeforeWaiting every time round; waking the loop
+     * for it kept Neovide's main thread spinning (freemac 1.NEXT). */
+    NSRunLoop *loop = TIMER(timer)->_loop;
+    if (loop && loop != FRunLoopOfThread([NSThread currentThread], NO))
+        [loop _wakeUp];
 }
 CFTimeInterval CFRunLoopTimerGetInterval(CFRunLoopTimerRef timer) { return [TIMER(timer) timeInterval]; }
 Boolean CFRunLoopTimerDoesRepeat(CFRunLoopTimerRef timer) { return TIMER(timer)->_repeats; }

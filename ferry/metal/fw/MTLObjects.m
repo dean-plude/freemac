@@ -159,7 +159,12 @@ static FerryMTLDevice *device_for(const void *caller)
         const char *e = getenv("FERRY_METAL");
         if (e && *e) metal_on = strcmp(e, "0") != 0;
         else if (program_links("/Metal.framework/") || program_links("/OpenGL.framework/"))
-            metal_on = program_links("/Metal.framework/") && !program_links("/OpenGL.framework/");
+            /* one that links both draws with OpenGL, unless it links MetalKit
+             * too, which only a program drawing with Metal does: Neovide links
+             * OpenGL for its --opengl switch and stops without a Metal device
+             * (freemac 1.NEXT) */
+            metal_on = program_links("/Metal.framework/") &&
+                       (!program_links("/OpenGL.framework/") || program_links("/MetalKit.framework/"));
         else
             metal_on = -1;
         if (metal_on == 1 && mtl_verbose) mtl_log("the Ferry Software Renderer is on");

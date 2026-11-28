@@ -255,6 +255,11 @@ typedef struct _PangoFontset PangoFontset;
 PangoFontset *pango_context_load_fontset(PangoContext *context, const PangoFontDescription *desc, void *language);
 PangoFont *pango_fontset_get_font(PangoFontset *fontset, unsigned wc);
 PangoFontMap *pango_font_get_font_map(PangoFont *font);
+/* (freemac 1.NEXT) a font file a program brings, made one of this process's
+ * own fonts in fontconfig, and Pango told to look again */
+typedef struct _FcConfig FcConfig;
+int FcConfigAppFontAddFile(FcConfig *config, const unsigned char *file);
+void pango_fc_font_map_config_changed(PangoFontMap *fcfontmap);
 
 /* ---- HarfBuzz ---------------------------------------------------------------- */
 

@@ -16,4 +16,7 @@ empty loop runs: 0
 empty loop told no one: 1
 silent after: 1, early still told: 1
 released context: 1
+a polling timer leaves BeforeWaiting told: 1, polled: 1
+moving a timer from BeforeWaiting sleeps: 1
+a move from another thread wakes it: 1
 exit=0
