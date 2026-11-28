@@ -808,6 +808,12 @@ __attribute__((constructor)) static void empty_dictionary_init(void)
     return [NSArray arrayWithArray:m];
 }
 + (instancetype)setWithSet:(NSSet *)set { return [self setWithArray:[set allObjects]]; }
+/* NSSet reference: each object, in no set order, as the array's own methods. */
+- (void)makeObjectsPerformSelector:(SEL)sel { [[self allObjects] makeObjectsPerformSelector:sel]; }
+- (void)makeObjectsPerformSelector:(SEL)sel withObject:(id)arg
+{
+    [[self allObjects] makeObjectsPerformSelector:sel withObject:arg];
+}
 - (BOOL)isEqualToSet:(NSSet *)other { return [self isEqual:other]; }
 - (BOOL)intersectsSet:(NSSet *)other
 {

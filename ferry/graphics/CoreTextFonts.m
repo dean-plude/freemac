@@ -460,6 +460,11 @@ CTFontRef CTFontCreateForString(CTFontRef current, CFStringRef string, CFRange r
     hb_codepoint_t glyph;
     if (hb_font_get_nominal_glyph(font->hb, c, &glyph))
         return (CTFontRef)[font retain];
+    /* Control characters are drawn by no Mac font; fontconfig would offer one
+     * whose glyphs are boxes naming them, which hex editors show for every
+     * zero byte where a Mac shows their '.' (Hex Fiend, freemac 1.270). */
+    if (c < 0x20 || (c >= 0x7F && c < 0xA0))
+        return (CTFontRef)[font retain];
     static PangoContext *context;
     if (!context)
         context = pango_font_map_create_context(pango_font_get_font_map(font->font));

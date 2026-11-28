@@ -20,6 +20,7 @@
 #include <sched.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,6 +34,9 @@
 #include <sys/shm.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
+#include <sys/uio.h>
+#include <sys/sendfile.h>
+#include <grp.h>
 #include <sys/sysmacros.h>
 #include <sys/time.h>
 #include <sys/utsname.h>
@@ -290,6 +294,68 @@ static int mac_unlinkat(int fd, const char *path, int flags)
 
 static int mac_mkdirat(int fd, const char *path, mode_t mode) { return mkdirat(at_fd(fd), path, mode); }
 
+/* faccessat(2) and fchmodat(2) with a Mac's AT_FDCWD and flag numbers
+ * (AT_EACCESS 0x10, AT_SYMLINK_NOFOLLOW 0x20), as Go programs use them
+ * (freemac 1.269, for kitty's kitten). */
+#define MAC_AT_EACCESS 0x10
+static int mac_faccessat(int fd, const char *path, int mode, int flags)
+{
+    return faccessat(at_fd(fd), path, mode,
+                     (flags & MAC_AT_EACCESS ? AT_EACCESS : 0) | (flags & MAC_AT_SYMLINK_NOFOLLOW ? AT_SYMLINK_NOFOLLOW : 0));
+}
+
+static int mac_fchmodat(int fd, const char *path, mode_t mode, int flags)
+{
+    return fchmodat(at_fd(fd), path, mode, flags & MAC_AT_SYMLINK_NOFOLLOW ? AT_SYMLINK_NOFOLLOW : 0);
+}
+
+static int mac_chroot(const char *path) { return chroot(path); }
+static int mac_setgroups(int n, const gid_t *groups) { return setgroups((size_t)(n < 0 ? 0 : n), groups); }
+
+/* sendfile(2) as a Mac has it: sendfile(file, socket, offset, &len, hdtr,
+ * flags) sends len bytes of the file from offset (0: to the end), with
+ * optional header and trailer buffers, and says in len how much went. */
+struct mac_sf_hdtr { struct iovec *headers; int hdr_cnt; struct iovec *trailers; int trl_cnt; };
+static int mac_sendfile(int fd, int s, off_t offset, off_t *len, struct mac_sf_hdtr *hdtr, int flags)
+{
+    (void)flags;
+    off_t sent = 0;
+    if (hdtr && hdtr->headers && hdtr->hdr_cnt > 0) {
+        ssize_t n = writev(s, hdtr->headers, hdtr->hdr_cnt);
+        if (n < 0) {
+            if (len)
+                *len = 0;
+            return -1;
+        }
+        sent += n;
+    }
+    off_t want = len ? *len : 0, done = 0;
+    off_t pos = offset;
+    for (;;) {
+        size_t chunk = want ? (size_t)(want - done) : 1 << 20;
+        if (want && done >= want)
+            break;
+        ssize_t n = sendfile(s, fd, &pos, chunk);
+        if (n < 0) {
+            if (len)
+                *len = sent + done;
+            return -1;
+        }
+        if (n == 0)
+            break;
+        done += n;
+    }
+    sent += done;
+    if (hdtr && hdtr->trailers && hdtr->trl_cnt > 0) {
+        ssize_t n = writev(s, hdtr->trailers, hdtr->trl_cnt);
+        if (n > 0)
+            sent += n;
+    }
+    if (len)
+        *len = sent;
+    return 0;
+}
+
 /* Record locks: different command numbers, lock types and field order. */
 struct mac_flock { int64_t start, len; int32_t pid; int16_t type, whence; };
 #define MAC_F_GETLK 7
@@ -322,6 +388,13 @@ static int mac_fcntl(int fd, int cmd, ...)
         return fcntl(fd, F_DUPFD_CLOEXEC, arg);
     case MAC_F_FULLFSYNC:
         return fsync(fd);
+    case 48: /* F_NOCACHE: a hint to keep the file's data out of the cache */
+        if (arg)
+            posix_fadvise(fd, 0, 0, POSIX_FADV_DONTNEED);
+        return 0;
+    case 45: /* F_RDAHEAD: a hint to read ahead, or not */
+        posix_fadvise(fd, 0, 0, arg ? POSIX_FADV_SEQUENTIAL : POSIX_FADV_RANDOM);
+        return 0;
     case MAC_F_GETLK:
     case MAC_F_SETLK:
     case MAC_F_SETLKW: {
@@ -763,9 +836,35 @@ static void trampoline(int s)
     ((void (*)(int))mac_handler[s])(ferry_signal_to_mac(s));
 }
 
+/* The context a Mac signal handler gets as its third argument: a Mac's
+ * ucontext_t, whose uc_mcontext points at the x86-64 machine state, the
+ * exception state, then the 21 thread-state registers (rax rbx rcx rdx rdi
+ * rsi rbp rsp r8-r15 rip rflags cs fs gs), then the float state (the
+ * layouts of a Mac's <sys/_types/_ucontext.h> and <mach/i386/_structs.h>,
+ * as Go's runtime and other public projects also lay them out). A handler
+ * that reads the registers, or changes them to resume elsewhere as Go's
+ * goroutine preemption does, gets them, and what it changes is put back
+ * (freemac 1.269, for kitty's kitten and other Go programs). */
+struct mac_mcontext64 {
+    uint16_t trapno, cpu;
+    uint32_t err;
+    uint64_t faultvaddr;
+    uint64_t r[21];
+    uint8_t fs[524];
+};
+struct mac_ucontext {
+    int32_t onstack;
+    uint32_t sigmask;
+    struct mac_stack_t { void *sp; size_t size; int32_t flags; } stack;
+    struct mac_ucontext *link;
+    uint64_t mcsize;
+    struct mac_mcontext64 *mcontext;
+};
+static const int mac_reg_order[18] = {REG_RAX, REG_RBX, REG_RCX, REG_RDX, REG_RDI, REG_RSI, REG_RBP, REG_RSP, REG_R8,
+                                      REG_R9, REG_R10, REG_R11, REG_R12, REG_R13, REG_R14, REG_R15, REG_RIP, REG_EFL};
+
 static void trampoline_info(int s, siginfo_t *info, void *ctx)
 {
-    (void)ctx;
     struct mac_siginfo mi = {.signo = ferry_signal_to_mac(s)};
     if (info) {
         mi.code = info->si_code;
@@ -774,8 +873,32 @@ static void trampoline_info(int s, siginfo_t *info, void *ctx)
         mi.addr = info->si_addr;
         mi.err = ferry_errno_to_mac(info->si_errno);
     }
-    /* The machine context is laid out differently, so the program gets none. */
-    ((void (*)(int, struct mac_siginfo *, void *))mac_handler[s])(mi.signo, &mi, NULL);
+    ucontext_t *uc = ctx;
+    if (!uc) {
+        ((void (*)(int, struct mac_siginfo *, void *))mac_handler[s])(mi.signo, &mi, NULL);
+        return;
+    }
+    struct mac_mcontext64 mc;
+    memset(&mc, 0, offsetof(struct mac_mcontext64, fs));
+    mc.trapno = (uint16_t)uc->uc_mcontext.gregs[REG_TRAPNO];
+    mc.err = (uint32_t)uc->uc_mcontext.gregs[REG_ERR];
+    mc.faultvaddr = (uint64_t)(uintptr_t)(info ? info->si_addr : 0);
+    for (int i = 0; i < 18; i++)
+        mc.r[i] = (uint64_t)uc->uc_mcontext.gregs[mac_reg_order[i]];
+    uint64_t csgsfs = (uint64_t)uc->uc_mcontext.gregs[REG_CSGSFS];
+    mc.r[18] = csgsfs & 0xffff;
+    mc.r[19] = (csgsfs >> 32) & 0xffff;
+    mc.r[20] = (csgsfs >> 16) & 0xffff;
+    struct mac_ucontext mu = {
+        .onstack = (uc->uc_stack.ss_flags & SS_ONSTACK) != 0,
+        .sigmask = set_to_mac(&uc->uc_sigmask),
+        .stack = {uc->uc_stack.ss_sp, uc->uc_stack.ss_size, uc->uc_stack.ss_flags & SS_ONSTACK ? 1 : 0},
+        .mcsize = sizeof mc,
+        .mcontext = &mc,
+    };
+    ((void (*)(int, struct mac_siginfo *, void *))mac_handler[s])(mi.signo, &mi, &mu);
+    for (int i = 0; i < 18; i++)
+        uc->uc_mcontext.gregs[mac_reg_order[i]] = (greg_t)mc.r[i];
 }
 
 /* SIGEMT and SIGINFO have no Linux signal, so nothing ever raises them; a
@@ -1555,6 +1678,11 @@ const struct ferry_symbol ferry_posix_symbols[] = {
     {"fchown", mac_fchown},
     {"access", mac_access},
     {"unlinkat", mac_unlinkat},
+    {"faccessat", mac_faccessat},
+    {"fchmodat", mac_fchmodat},
+    {"chroot", mac_chroot},
+    {"setgroups", mac_setgroups},
+    {"sendfile", mac_sendfile},
     {"mkdirat", mac_mkdirat},
     {"fcntl", mac_fcntl},
     {"stat$INODE64", mac_stat64},

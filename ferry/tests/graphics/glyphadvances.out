@@ -1,0 +1,7 @@
+text position after: 70, 10
+first glyph drawn: yes
+second glyph 30 points on: yes
+nothing in the gap: yes
+CGContextShowGlyphs draws at the new position: yes
+font for a control character is the font itself: yes
+exit=0

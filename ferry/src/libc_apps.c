@@ -34,6 +34,7 @@
 #include <glob.h>
 #include <limits.h>
 #include <pthread.h>
+#include <pwd.h>
 #include <signal.h>
 #include <spawn.h>
 #include <stdarg.h>
@@ -45,6 +46,7 @@
 #include <time.h>
 #include <sys/ioctl.h>
 #include <sys/random.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "ferry.h"
@@ -273,6 +275,103 @@ static int search_path(const char *file, char *out, size_t size)
     return 0;
 }
 
+/* ---- terminfo for this system's programs ------------------------------------------
+ * A Mac's terminfo database files its entries under two hex digits, the
+ * first letter's code ("78/xterm-kitty"), where this system's ncurses
+ * looks under the letter itself ("x/xterm-kitty"); ncurses' own
+ * documentation describes both layouts. A terminal app that ships its
+ * entry and points TERMINFO at it (kitty does) would leave the shell it
+ * starts with an unknown terminal. So when a program of this system is
+ * started with such a TERMINFO, it gets a folder in Ferry's cache whose
+ * letters lead to the app's hex folders (freemac 1.269). The returned
+ * environment is the caller's to free, NULL when nothing changed. */
+static char **terminfo_env(char *const envp[])
+{
+    if (!envp)
+        return NULL;
+    int at = -1, n = 0;
+    for (; envp[n]; n++)
+        if (!strncmp(envp[n], "TERMINFO=", 9))
+            at = n;
+    if (at < 0)
+        return NULL;
+    const char *dir = envp[at] + 9;
+    DIR *d = opendir(dir);
+    if (!d)
+        return NULL;
+    char hex[64][3];
+    int nhex = 0, letters = 0;
+    struct dirent *e;
+    while ((e = readdir(d))) {
+        const char *m = e->d_name;
+        if (strlen(m) == 1 && m[0] != '.')
+            letters = 1;
+        else if (strlen(m) == 2 && strchr("0123456789abcdefABCDEF", m[0]) && strchr("0123456789abcdefABCDEF", m[1])
+                 && nhex < 64)
+            memcpy(hex[nhex++], m, 3);
+    }
+    closedir(d);
+    if (letters || !nhex)
+        return NULL;
+    const char *cache = getenv("XDG_CACHE_HOME"), *home = getenv("HOME");
+    unsigned long h = 5381;
+    for (const char *c = dir; *c; c++)
+        h = h * 33 + (unsigned char)*c;
+    char base[PATH_MAX], target[PATH_MAX], link[PATH_MAX + 8];
+    if (cache && *cache)
+        snprintf(base, sizeof base, "%s/ferry", cache);
+    else if (home && *home) {
+        snprintf(base, sizeof base, "%s/.cache", home);
+        mkdir(base, 0755);
+        snprintf(base, sizeof base, "%s/.cache/ferry", home);
+    } else
+        return NULL;
+    mkdir(base, 0755);
+    char compat[PATH_MAX + 32];
+    snprintf(compat, sizeof compat, "%s/terminfo-%lx", base, h);
+    mkdir(compat, 0755);
+    for (int i = 0; i < nhex; i++) {
+        unsigned code = (unsigned)strtoul(hex[i], NULL, 16);
+        if (code <= 0x20 || code >= 0x7f || code == '/')
+            continue;
+        snprintf(target, sizeof target, "%s/%s", dir, hex[i]);
+        snprintf(link, sizeof link, "%s/%c", compat, (char)code);
+        char now[PATH_MAX];
+        ssize_t r = readlink(link, now, sizeof now - 1);
+        if (r >= 0) {
+            now[r] = 0;
+            if (!strcmp(now, target))
+                continue;
+            unlink(link);
+        }
+        if (symlink(target, link) != 0 && errno != EEXIST)
+            return NULL;
+    }
+    char **env = calloc((size_t)n + 1, sizeof *env);
+    char *value = malloc(strlen(compat) + 10);
+    if (!env || !value) {
+        free(env);
+        free(value);
+        return NULL;
+    }
+    sprintf(value, "TERMINFO=%s", compat);
+    for (int i = 0; i < n; i++)
+        env[i] = i == at ? value : envp[i];
+    return env;
+}
+
+static void terminfo_env_free(char **env)
+{
+    if (!env)
+        return;
+    for (int i = 0; env[i]; i++)
+        if (!strncmp(env[i], "TERMINFO=", 9)) {
+            free(env[i]);
+            break;
+        }
+    free(env);
+}
+
 static int spawn(pid_t *pid, const char *file, int search, struct mac_actions *const *mfa,
                  struct mac_spawnattr *const *mattr, char *const argv[], char *const envp[])
 {
@@ -373,7 +472,10 @@ static int spawn(pid_t *pid, const char *file, int search, struct mac_actions *c
     if (rc == 0) {
         char *const *av = mac_argv ? mac_argv : argv;
         fflush(NULL); /* what the program printed but hasn't written yet isn't the child's */
-        rc = search ? posix_spawnp(pid, exe, &fa, &attr, av, envp) : posix_spawn(pid, exe, &fa, &attr, av, envp);
+        char **fixed = mac_argv ? NULL : terminfo_env(envp);
+        char *const *ev = fixed ? fixed : envp;
+        rc = search ? posix_spawnp(pid, exe, &fa, &attr, av, ev) : posix_spawn(pid, exe, &fa, &attr, av, ev);
+        terminfo_env_free(fixed);
     }
     posix_spawn_file_actions_destroy(&fa);
     posix_spawnattr_destroy(&attr);
@@ -393,6 +495,57 @@ static int mac_posix_spawnp(pid_t *pid, const char *file, struct mac_actions *co
     return spawn(pid, file, 1, fa, attr, argv, envp);
 }
 
+/* ---- XPC dates ------------------------------------------------------------------- */
+
+/* xpc_date_create, xpc_date_create_from_current and xpc_date_get_value,
+ * as Apple's XPC reference describes them: a date object holding
+ * nanoseconds since 1970 (freemac 1.269; kitty's kitten, a Go program,
+ * asks for the current one at start). Ferry has no other XPC objects
+ * yet; xpc_retain and xpc_release count a date's references. */
+struct xpc_date_obj { uint32_t magic; int refs; int64_t ns; };
+#define XPC_DATE_MAGIC 0x58444154u
+
+static void *mac_xpc_date_create(int64_t ns)
+{
+    struct xpc_date_obj *d = calloc(1, sizeof *d);
+    if (!d)
+        return NULL;
+    d->magic = XPC_DATE_MAGIC;
+    d->refs = 1;
+    d->ns = ns;
+    return d;
+}
+
+static void *mac_xpc_date_create_from_current(void)
+{
+    struct timespec t;
+    clock_gettime(CLOCK_REALTIME, &t);
+    return mac_xpc_date_create((int64_t)t.tv_sec * 1000000000 + t.tv_nsec);
+}
+
+static int64_t mac_xpc_date_get_value(void *o)
+{
+    struct xpc_date_obj *d = o;
+    return d && d->magic == XPC_DATE_MAGIC ? d->ns : 0;
+}
+
+static void *mac_xpc_retain(void *o)
+{
+    struct xpc_date_obj *d = o;
+    if (d && d->magic == XPC_DATE_MAGIC)
+        __atomic_add_fetch(&d->refs, 1, __ATOMIC_RELAXED);
+    return o;
+}
+
+static void mac_xpc_release(void *o)
+{
+    struct xpc_date_obj *d = o;
+    if (d && d->magic == XPC_DATE_MAGIC && __atomic_sub_fetch(&d->refs, 1, __ATOMIC_ACQ_REL) == 0) {
+        d->magic = 0;
+        free(d);
+    }
+}
+
 /* ---- exec ------------------------------------------------------------------------ */
 
 /* execve(2) and the rest of the exec family: a Mac program becomes Ferry
@@ -400,8 +553,12 @@ static int mac_posix_spawnp(pid_t *pid, const char *file, struct mac_actions *co
  * app whose bundle executable is a small launcher that execs the real
  * program (Audacity's Wrapper) carries on. Anything else is this system's
  * exec. */
+static int login_exec(char *const argv[], char *const envp[]);
+
 static int mac_execve(const char *path, char *const argv[], char *const envp[])
 {
+    if (path && !strcmp(path, "/usr/bin/login") && argv && argv[0])
+        return login_exec(argv, envp);
     if (path && strchr(path, '/') && is_mach_o(path)) {
         char self[PATH_MAX];
         ssize_t n = readlink("/proc/self/exe", self, sizeof self - 1);
@@ -431,7 +588,98 @@ static int mac_execve(const char *path, char *const argv[], char *const envp[])
         return -1;
     }
     fflush(NULL);
-    return execve(path, argv, envp);
+    char **fixed = terminfo_env(envp);
+    int rc = execve(path, argv, fixed ? fixed : envp);
+    int e = errno;
+    terminfo_env_free(fixed);
+    errno = e;
+    return rc;
+}
+
+/* /usr/bin/login, which this system's login can't stand in for (it asks
+ * for a password on a terminal): a Mac terminal app starts its shell as
+ * "login -f -l -p USER PROGRAM ARGS..." (kitty does). Done as the login(1)
+ * Mac man page describes it, for the user already running and no one else:
+ * -f skips the password, -p keeps the environment (else only TERM is kept),
+ * -l asks for the program not to be started as a login shell, -q and
+ * -h HOST change nothing here. HOME, SHELL, USER and LOGNAME are set to the
+ * user's; with no -l the home directory becomes the current one and the
+ * shell's name starts with "-". With no program it is the user's shell. */
+static int login_exec(char *const argv[], char *const envp[])
+{
+    int keep_env = 0, not_login = 0, i = 1;
+    for (; argv[i] && argv[i][0] == '-' && argv[i][1]; i++) {
+        if (!strcmp(argv[i], "--")) {
+            i++;
+            break;
+        }
+        for (const char *o = argv[i] + 1; *o; o++) {
+            if (*o == 'p')
+                keep_env = 1;
+            else if (*o == 'l')
+                not_login = 1;
+            else if (*o == 'h' && argv[i + 1]) {
+                i++;
+                break;
+            } else if (*o != 'f' && *o != 'q') {
+                errno = EINVAL;
+                return -1;
+            }
+        }
+    }
+    struct passwd *pw = getpwuid(getuid());
+    if (!pw || (argv[i] && strcmp(argv[i], pw->pw_name))) {
+        errno = EPERM;
+        return -1;
+    }
+    const char *shell = pw->pw_shell && *pw->pw_shell ? pw->pw_shell : "/bin/sh";
+    char *const *prog = argv[i] ? argv + i + 1 : argv + i;
+    size_t n = 0;
+    while (keep_env && envp && envp[n])
+        n++;
+    char **env = calloc(n + 8, sizeof *env);
+    if (!env) {
+        errno = ENOMEM;
+        return -1;
+    }
+    size_t e = 0;
+    static const char *const set[] = {"HOME=", "SHELL=", "USER=", "LOGNAME="};
+    for (size_t k = 0; k < n; k++) {
+        int skip = 0;
+        for (size_t s = 0; s < 4; s++)
+            skip |= !strncmp(envp[k], set[s], strlen(set[s]));
+        if (!skip)
+            env[e++] = envp[k];
+    }
+    if (!keep_env)
+        for (size_t k = 0; envp && envp[k]; k++)
+            if (!strncmp(envp[k], "TERM=", 5))
+                env[e++] = envp[k];
+    char home[PATH_MAX + 8], sh[PATH_MAX + 8], user[300], logname[300];
+    snprintf(home, sizeof home, "HOME=%s", pw->pw_dir);
+    snprintf(sh, sizeof sh, "SHELL=%s", shell);
+    snprintf(user, sizeof user, "USER=%s", pw->pw_name);
+    snprintf(logname, sizeof logname, "LOGNAME=%s", pw->pw_name);
+    env[e++] = home;
+    env[e++] = sh;
+    env[e++] = user;
+    env[e++] = logname;
+    if (!not_login && pw->pw_dir)
+        if (chdir(pw->pw_dir) != 0) { /* stays where it is, as login does */ }
+    int rc;
+    if (*prog) {
+        rc = mac_execve(prog[0], prog, env);
+    } else {
+        const char *base = strrchr(shell, '/') ? strrchr(shell, '/') + 1 : shell;
+        char name[PATH_MAX];
+        snprintf(name, sizeof name, "%s%s", not_login ? "" : "-", base);
+        char *av[] = {name, NULL};
+        rc = mac_execve(shell, av, env);
+    }
+    int err = errno;
+    free(env);
+    errno = err;
+    return rc;
 }
 
 static int mac_execv(const char *path, char *const argv[])
@@ -984,6 +1232,11 @@ const struct ferry_symbol ferry_libc_apps_symbols[] = {
     {"mach_wait_until", mac_mach_wait_until},
     {"posix_spawn", mac_posix_spawn},
     {"execve", mac_execve},
+    {"xpc_date_create", mac_xpc_date_create},
+    {"xpc_date_create_from_current", mac_xpc_date_create_from_current},
+    {"xpc_date_get_value", mac_xpc_date_get_value},
+    {"xpc_retain", mac_xpc_retain},
+    {"xpc_release", mac_xpc_release},
     {"execv", mac_execv},
     {"execvp", mac_execvp},
     {"execl", mac_execl},

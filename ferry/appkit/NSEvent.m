@@ -579,3 +579,61 @@ void AGlobalMonitorsDeliver(NSEvent *event)
         if (m->global && (m->mask & NSEventMaskFromType([event type])) && [monitors containsObject:m])
             ((void (^)(NSEvent *))m->block)(event);
 }
+
+/* Periodic events. Apple's NSEvent documentation: startPeriodicEventsAfterDelay:
+ * withPeriod: makes the application receive NSEventTypePeriodic events, the
+ * first after `delay` seconds and then every `period` seconds, until
+ * stopPeriodicEvents; programs read them in their own mouse-tracking loops to
+ * scroll while the button is held (Hex Fiend's text views do). A small thread
+ * keeps the time and posts each event, which postEvent:atStart: hands to the
+ * main thread. A new generation ends the thread of an earlier start. */
+#include <pthread.h>
+#include <unistd.h>
+
+static volatile long periodic_generation;
+
+struct periodic_args { long generation; double delay, period; };
+
+static void *periodic_thread(void *p)
+{
+    struct periodic_args a = *(struct periodic_args *)p;
+    free(p);
+    double wait = a.delay;
+    for (;;) {
+        if (wait > 0)
+            usleep((useconds_t)(wait * 1e6));
+        if (periodic_generation != a.generation)
+            break;
+        @autoreleasepool {
+            NSEvent *e = [NSEvent otherEventWithType:NSEventTypePeriodic location:NSZeroPoint modifierFlags:0
+                                           timestamp:[[NSProcessInfo processInfo] systemUptime] windowNumber:0
+                                             context:nil subtype:0 data1:0 data2:0];
+            [NSApp postEvent:e atStart:NO];
+        }
+        wait = a.period > 0.001 ? a.period : 0.001;
+    }
+    return NULL;
+}
+
+@implementation NSEvent (FerryPeriodic)
++ (void)startPeriodicEventsAfterDelay:(NSTimeInterval)delay withPeriod:(NSTimeInterval)period
+{
+    /* Apple raises if periodic events are already running; quietly restarting
+     * is kinder to a program that misses a stop */
+    struct periodic_args *a = malloc(sizeof *a);
+    a->generation = __atomic_add_fetch(&periodic_generation, 1, __ATOMIC_SEQ_CST);
+    a->delay = delay;
+    a->period = period;
+    pthread_t t;
+    if (pthread_create(&t, NULL, periodic_thread, a) == 0)
+        pthread_detach(t);
+    else
+        free(a);
+}
++ (void)stopPeriodicEvents
+{
+    __atomic_add_fetch(&periodic_generation, 1, __ATOMIC_SEQ_CST);
+    /* events already posted but not yet read are dropped, as on a Mac */
+    [NSApp discardEventsMatchingMask:NSEventMaskPeriodic beforeEvent:nil];
+}
+@end

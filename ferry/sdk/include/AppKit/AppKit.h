@@ -246,7 +246,7 @@ typedef NS_ENUM(NSInteger, NSColorType) {
 @property (class, readonly) NSColor * FERRY_SWIFT_NONNULL systemIndigoColor;
 @property (class, readonly) NSColor * FERRY_SWIFT_NONNULL labelColor, * FERRY_SWIFT_NONNULL secondaryLabelColor, * FERRY_SWIFT_NONNULL tertiaryLabelColor;
 @property (class, readonly) NSColor * FERRY_SWIFT_NONNULL textColor, * FERRY_SWIFT_NONNULL textBackgroundColor, * FERRY_SWIFT_NONNULL selectedTextColor;
-@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL selectedTextBackgroundColor, * FERRY_SWIFT_NONNULL placeholderTextColor;
+@property (class, readonly) NSColor * FERRY_SWIFT_NONNULL selectedTextBackgroundColor, * FERRY_SWIFT_NONNULL placeholderTextColor, * FERRY_SWIFT_NONNULL textInsertionPointColor;
 @property (class, readonly) NSColor * FERRY_SWIFT_NONNULL controlColor, * FERRY_SWIFT_NONNULL controlBackgroundColor, * FERRY_SWIFT_NONNULL controlTextColor;
 @property (class, readonly) NSColor * FERRY_SWIFT_NONNULL disabledControlTextColor, * FERRY_SWIFT_NONNULL selectedControlColor;
 @property (class, readonly) NSColor * FERRY_SWIFT_NONNULL windowBackgroundColor, * FERRY_SWIFT_NONNULL underPageBackgroundColor, * FERRY_SWIFT_NONNULL gridColor;
@@ -297,6 +297,8 @@ typedef NS_ENUM(NSUInteger, NSFontRenderingMode) {
     NSFontAntialiasedIntegerAdvancementsRenderingMode = 3,
 };
 
+/* A glyph number as the older NSFont and NSLayoutManager calls take it. */
+typedef unsigned int NSGlyph;
 /* An NSFont is a Core Text font: a CTFontRef can be used as an NSFont and an
  * NSFont as a CTFontRef, as on a Mac. */
 #ifdef FERRY_APPKIT_BUILD
@@ -328,6 +330,12 @@ typedef NS_ENUM(NSUInteger, NSFontRenderingMode) {
 @property (readonly, getter=isFixedPitch) BOOL fixedPitch;
 @property (readonly) NSUInteger numberOfGlyphs;
 - (NSSize)advancementForGlyph:(CGGlyph)glyph;
+@property (readonly) NSSize maximumAdvancement;
+@property (readonly, strong) NSCharacterSet *coveredCharacterSet;
+- (void)getAdvancements:(NSSize *)advancements forCGGlyphs:(const CGGlyph *)glyphs count:(NSUInteger)count;
+- (void)getAdvancements:(NSSize *)advancements forGlyphs:(const NSGlyph *)glyphs count:(NSUInteger)count;
+- (void)getBoundingRects:(NSRect *)rects forCGGlyphs:(const CGGlyph *)glyphs count:(NSUInteger)count;
+- (void)getBoundingRects:(NSRect *)rects forGlyphs:(const NSGlyph *)glyphs count:(NSUInteger)count;
 - (void)set;
 - (void)setInContext:(NSGraphicsContext *)context;
 /* the screen and printer forms of a font: the font itself, as fonts draw the

@@ -1,0 +1,12 @@
+envp follows argv: yes
+apple follows envp: yes
+executable_path given: yes
+handler ran: yes, with registers: yes
+alt stack: first disabled yes, then set yes
+faccessat: 0, missing: -1
+fchmodat: 640
+xpc date: 1234567890123, current after 2020: yes
+login ran the program: yes, environment kept: yes
+another user refused: yes
+terminfo entry found by letter: yes
+exit=0

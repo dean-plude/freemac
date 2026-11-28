@@ -81,8 +81,11 @@ static BOOL run_menu(NSMenu *menu, NSView *view, NSRect rect, NSInteger aligned,
     return owner->chosen != nil;
 }
 
+NSMenuItem *AEnclosingMenuItem(NSView *v);
+
 @implementation NSView (FerryContextMenu)
 + (NSMenu *)defaultMenu { return nil; }
+- (NSMenuItem *)enclosingMenuItem { return AEnclosingMenuItem(self); }
 - (NSMenu *)menuForEvent:(NSEvent *)event { return [self menu] ?: [[self class] defaultMenu]; }
 - (void)willOpenMenu:(NSMenu *)menu withEvent:(NSEvent *)event {}
 - (void)didCloseMenu:(NSMenu *)menu withEvent:(NSEvent *)event {}

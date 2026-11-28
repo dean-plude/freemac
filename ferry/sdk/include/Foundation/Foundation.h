@@ -2448,8 +2448,8 @@ typedef NS_OPTIONS(NSUInteger, NSJSONReadingOptions) {
     NSJSONReadingMutableContainers = 1 << 0,
     NSJSONReadingMutableLeaves = 1 << 1,
     NSJSONReadingFragmentsAllowed = 1 << 2,
-    NSJSONReadingJSON5Allowed = 1 << 3,            /* accepted; only plain JSON is read */
-    NSJSONReadingTopLevelDictionaryAssumed = 1 << 4, /* accepted; has no effect (it goes with JSON5) */
+    NSJSONReadingJSON5Allowed = 1 << 3,
+    NSJSONReadingTopLevelDictionaryAssumed = 1 << 4,
     NSJSONReadingAllowFragments = NSJSONReadingFragmentsAllowed,
 };
 typedef NS_OPTIONS(NSUInteger, NSJSONWritingOptions) {

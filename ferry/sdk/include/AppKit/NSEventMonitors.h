@@ -11,4 +11,6 @@
                                    handler:(NSEvent * FERRY_SWIFT_NULLABLE (^)(NSEvent * FERRY_SWIFT_NONNULL event))block;
 + (id)addGlobalMonitorForEventsMatchingMask:(NSEventMask)mask handler:(void (^)(NSEvent * FERRY_SWIFT_NONNULL event))block;
 + (void)removeMonitor:(id)eventMonitor;
++ (void)startPeriodicEventsAfterDelay:(NSTimeInterval)delay withPeriod:(NSTimeInterval)period;
++ (void)stopPeriodicEvents;
 @end

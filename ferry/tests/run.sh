@@ -51,7 +51,7 @@ run_one() {
             url_env "$top/ferry" "$exe" first > "$build/$name.got" 2> "$build/$name.err" &&
                 url_env "$top/ferry" "$exe" second >> "$build/$name.got" 2>> "$build/$name.err" ;;
         foundation_fileaccess|foundation_fsrefs|foundation_more_names|foundation_fsevents|foundation_apps_more|\
-        foundation_keycastr_calls)
+        foundation_keycastr_calls|libsystem_kitty)
             # the trash and the test's files in a home of its own
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= TMPDIR="$build/home_$name" \
@@ -285,6 +285,10 @@ run_one libsystem_media "$here/libsystem_media.c" "$here/libsystem_media.out"
 run_one libsystem_backtrace "$here/libsystem_backtrace.c" "$here/libsystem_backtrace.out"
 # a terminal's settings in a Mac's struct termios, on a pseudo-terminal (1.233)
 run_one libsystem_termios "$here/libsystem_termios.c" "$here/libsystem_termios.out"
+# what kitty and its Go helper ask of libSystem: main's argument lists, a
+# Mac signal context, sigaltstack, the *at calls, XPC dates, /usr/bin/login
+# and terminfo (freemac 1.269)
+run_one libsystem_kitty "$here/libsystem_kitty.c" "$here/libsystem_kitty.out"
 # CommonCrypto (libSystem): digests, HMAC, PBKDF2 and random bytes, and AES
 # through this system's OpenSSL, against published test vectors.
 run_one commoncrypto_digests "$here/commoncrypto_digests.c" "$here/commoncrypto_digests.out"
@@ -595,6 +599,7 @@ run_one foundation_invocation_O0 "$here/foundation/invocation.m" "$here/foundati
 # JSON reading and writing, and dates: time zones, locales and date
 # formatting (Ferry 0.14.0).
 run_one foundation_json "$here/foundation/json.m" "$here/foundation/json.out" -framework Foundation
+run_one foundation_json5 "$here/foundation/json5.m" "$here/foundation/json5.out" -framework Foundation
 run_one foundation_dates "$here/foundation/dates.m" "$here/foundation/dates.out" -framework Foundation
 # Calendars and date components, number and byte count formatters, ISO 8601
 # dates, relative dates and date components formatters (Ferry 0.15.0).
@@ -663,6 +668,10 @@ run_one graphics_fontdesc "$here/graphics/fontdesc.m" "$here/graphics/fontdesc.o
     -framework CoreText -framework CoreGraphics -framework Foundation
 # (1.238) font descriptors, collections and font files, as VLC's subtitle text finds fonts
 run_one graphics_fonts "$here/graphics/fonts.c" "$here/graphics/fonts.out" \
+    -framework CoreText -framework CoreFoundation -framework CoreGraphics
+# (1.270) glyphs drawn with advances from the text position, as Hex Fiend draws its bytes,
+# and no stand-in font for control characters
+run_one graphics_glyphadvances "$here/graphics/glyphadvances.c" "$here/graphics/glyphadvances.out" \
     -framework CoreText -framework CoreFoundation -framework CoreGraphics
 # The same, linked under ApplicationServices' Mac name, which CoreGraphics' file also serves.
 run_one graphics_appservices "$here/graphics/geometry.c" "$here/graphics/geometry.out" \
@@ -1194,6 +1203,25 @@ if python3 "$here/tools/make_pkg.py" "$inst/tiny.pkg"; then
     fi
 else
     echo "FAIL installer (make_pkg.py failed)"; fail=$((fail + 1))
+fi
+# A disk image whose app links into its own Resources with "..", which 7-Zip
+# leaves out, and a link that climbs out of the image, which stays out.
+links="$build/installer_links"
+rm -rf "$links"; mkdir -p "$links/src/Links.app/Contents/MacOS/lib/P" "$links/src/Links.app/Contents/Resources" "$links/home"
+cp "$build/hello" "$links/src/Links.app/Contents/MacOS/Links"
+printf '<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleExecutable</key><string>Links</string></dict></plist>' \
+    > "$links/src/Links.app/Contents/Info.plist"
+echo inside > "$links/src/Links.app/Contents/Resources/r.py"
+ln -s ../../../Resources/r.py "$links/src/Links.app/Contents/MacOS/lib/P/i.py"
+ln -s ../../../../../../etc/passwd "$links/src/Links.app/Contents/MacOS/out"
+(cd "$links/src" && tar cf ../Links.dmg Links.app)
+HOME="$links/home" XDG_CACHE_HOME= "$top/ferry" "$top/installer/Installer.app" --install --applications "$links/Apps" \
+    "$links/Links.dmg" > /dev/null 2>&1
+if [ "$(cat "$links/Apps/Links.app/Contents/MacOS/lib/P/i.py" 2>/dev/null)" = inside ] &&
+        [ ! -L "$links/Apps/Links.app/Contents/MacOS/out" ]; then
+    echo "ok   installer links"; pass=$((pass + 1))
+else
+    echo "FAIL installer links"; find "$links/Apps" -type l -printf '    %p -> %l\n'; fail=$((fail + 1))
 fi
 # An exception nobody catches ends the program with the Mac's message.
 if grep -q "Terminating app due to uncaught exception 'NSRangeException'" "$build/foundation_exception.err" 2>/dev/null; then
