@@ -1,0 +1,17 @@
+theme: dark null 7960953, printable 3717319, light other systemGreen
+plain JSON refuses it:
+  error 3840
+  refused
+numbers: 1 0.5 5 -16 inf -inf nan 1000
+string: [it's]
+string: [tab	here]
+string: [hex A]
+string: [line continued]
+string: [q]
+braces assumed: a 1, $b_2 two, 2 keys
+with braces anyway: x 1
+unclosed comment:
+  error 3840
+key starting with a digit:
+  error 3840
+exit=0

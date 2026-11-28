@@ -78,6 +78,7 @@ CGFloat CTFontGetDescent(CTFontRef font);
 CGFloat CTFontGetLeading(CTFontRef font);
 unsigned CTFontGetUnitsPerEm(CTFontRef font);
 CFIndex CTFontGetGlyphCount(CTFontRef font);
+CFCharacterSetRef CTFontCopyCharacterSet(CTFontRef font);
 CGRect CTFontGetBoundingBox(CTFontRef font);
 CGFloat CTFontGetUnderlinePosition(CTFontRef font);
 CGFloat CTFontGetUnderlineThickness(CTFontRef font);

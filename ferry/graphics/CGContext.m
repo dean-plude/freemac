@@ -1251,6 +1251,46 @@ void CGContextShowGlyphsAtPositions(CGContextRef c, const CGGlyph glyphs[], cons
     CFRelease(f);
 }
 
+/* Glyphs from the current text position, each one advance after the last
+ * (in text space); the text position moves on past them (Apple's CGContext
+ * documentation; Hex Fiend draws its bytes this way, freemac 1.270). */
+void CGContextShowGlyphsWithAdvances(CGContextRef c, const CGGlyph glyphs[], const CGSize advances[], size_t count)
+{
+    if (!c || !count)
+        return;
+    CGPoint *at = malloc(count * sizeof *at);
+    if (!at)
+        return;
+    CGFloat x = 0, y = 0;
+    for (size_t i = 0; i < count; i++) {
+        at[i] = CGPointMake(x, y);
+        x += advances[i].width;
+        y += advances[i].height;
+    }
+    CGContextShowGlyphsAtPositions(c, glyphs, at, count);
+    free(at);
+    CGAffineTransform *tm = &CTX->textMatrix;
+    tm->tx += tm->a * x + tm->c * y;
+    tm->ty += tm->b * x + tm->d * y;
+}
+
+/* The same with the font's own advances. */
+void CGContextShowGlyphs(CGContextRef c, const CGGlyph glyphs[], size_t count)
+{
+    if (!c || !CTX->cgFont || !count)
+        return;
+    CTFontRef f = CTFontCreateWithGraphicsFont((CGFontRef)CTX->cgFont, GSTATE(CTX)->fontSize, NULL, NULL);
+    if (!f)
+        return;
+    CGSize *adv = malloc(count * sizeof *adv);
+    if (adv) {
+        CTFontGetAdvancesForGlyphs(f, kCTFontOrientationHorizontal, glyphs, adv, (CFIndex)count);
+        CGContextShowGlyphsWithAdvances(c, glyphs, adv, count);
+        free(adv);
+    }
+    CFRelease(f);
+}
+
 /* ---- PDF contexts and pages ---------------------------------------------------------- */
 
 /* Ferry can't draw into a PDF yet, so it makes no PDF context; an app that

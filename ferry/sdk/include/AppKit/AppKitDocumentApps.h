@@ -28,6 +28,8 @@
 @end
 @interface NSView (FerryContextMenu)
 - (NSMenu *)menuForEvent:(NSEvent *)event;
+/* the menu item whose view holds this view, or nil */
+- (NSMenuItem *)enclosingMenuItem;
 - (void)willOpenMenu:(NSMenu *)menu withEvent:(NSEvent *)event;
 - (void)didCloseMenu:(NSMenu *)menu withEvent:(NSEvent *)event;
 @property (class, readonly, strong) NSMenu * FERRY_SWIFT_NONNULL defaultMenu;

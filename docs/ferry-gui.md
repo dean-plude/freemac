@@ -3396,6 +3396,22 @@ Not there yet: IINA's images from its asset catalog (some buttons are
 blank), gesture recognizers don't fire, and picture in picture's window has
 no play and pause buttons.
 
+## Hex Fiend edits bytes (freemac 1.270, Ferry 0.93.0)
+
+Hex Fiend 2.18.1, the hex editor, installs from its official disk image and opens a file in its document window: line offsets, the bytes in hex, the same bytes as text, a selection that shows in both columns, the data inspector reading the selected bytes as a number, typing new bytes in, and saving. What it needed:
+
+- **Glyphs drawn with advances.** Hex Fiend lays out every byte itself and draws each run with `CGContextShowGlyphsWithAdvances`, from the text position. Ferry now draws those, and `CGContextShowGlyphs`, and moves the text position on past them as Apple's documentation describes.
+- **The text matrix.** The text matrix isn't part of the graphics state, so nothing restored it between draws and Hex Fiend's columns drifted off the view. As on a Mac, each view now starts drawing with the identity text matrix, and `-[NSFont set]` sets the context's font, size and text matrix, flipped in a flipped view so glyphs stand upright.
+- **Font measurements.** `maximumAdvancement`, `coveredCharacterSet`, and advances and bounding boxes for lists of glyphs.
+- **Control characters.** No Mac font draws them, so Core Text no longer offers a stand-in font whose glyphs are boxes naming them. Hex Fiend then shows its own `.` for each, as on a Mac.
+- **JSON5.** `NSJSONSerialization` reads JSON5 when asked: comments, unquoted and single-quoted keys, single-quoted strings, hexadecimal numbers, `Infinity` and `NaN`, and a dictionary without its outer braces. Hex Fiend's colour themes are JSON5 files. It still says the themes need macOS 12, so they stay off for now; the editor works without them.
+- **Nib identifiers.** Hex Fiend finds the fields of its banners (the "Saving" bar) by the identifier set in Interface Builder, which compiled nibs keep under their own key. Ferry reads it.
+- Also: periodic events for scrolling while dragging, `NSColor.textInsertionPointColor`, `NSView.enclosingMenuItem`, `NSSet makeObjectsPerformSelector:`, `NSMutableArray sortUsingFunction:context:`, and the `fcntl` caching hints.
+
+Still missing: Hex Fiend's binary templates use Tcl, which Ferry doesn't provide yet.
+
+**Links in app bundles.** Some apps (Anki) carry links inside their bundle that 7-Zip leaves out when it unpacks the disk image. The Installer now reads the links from the image's listing and makes the missing ones, but only those that stay inside the app.
+
 ## kitty runs (freemac 1.269, Ferry 0.92.0)
 
 kitty 0.37, the terminal, installs from its official disk image with the Installer and runs a shell in its window, with typing and 256 colours. What it needed:

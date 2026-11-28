@@ -26,6 +26,12 @@ static void draw_rect(NSView *view, NSRect dirty)
     NSRect wasRect = drawing_rect;
     drawing_view = view;
     drawing_rect = dirty;
+    /* The text matrix isn't part of the graphics state, so nothing restores
+     * it; a Mac view starts drawing with the identity, and programs build
+     * on what they read back (Hex Fiend's byte columns, freemac 1.270). */
+    CGContextRef cg = [[NSGraphicsContext currentContext] CGContext];
+    if (cg)
+        CGContextSetTextMatrix(cg, CGAffineTransformIdentity);
     [view drawRect:dirty];
     drawing_view = was;
     drawing_rect = wasRect;
@@ -191,6 +197,10 @@ void AViewDecode(NSView *v, NSCoder *c)
     if ([tip isKindOfClass:[NSString class]])
         [v setToolTip:tip];
     NSString *ident = [c containsValueForKey:@"NSIdentifier"] ? [c decodeObjectForKey:@"NSIdentifier"] : nil;
+    /* Interface Builder keeps the identifier set in its inspector under this
+     * key in compiled nibs (Hex Fiend finds its banners' fields by it) */
+    if (!ident && [c containsValueForKey:@"NSReuseIdentifierKey"])
+        ident = [c decodeObjectForKey:@"NSReuseIdentifierKey"];
     if ([ident isKindOfClass:[NSString class]])
         [v setIdentifier:ident];
     AViewDecodeConstraints(v, c);

@@ -598,6 +598,10 @@ static void check_range(NSArray *a, NSRange r)
 }
 - (void)sortUsingSelector:(SEL)comparator { [self setArray:[self sortedArrayUsingSelector:comparator]]; }
 - (void)sortUsingComparator:(NSComparator)cmptr { [self setArray:[self sortedArrayUsingComparator:cmptr]]; }
+- (void)sortUsingFunction:(NSInteger (*)(id, id, void *))fn context:(void *)ctx
+{
+    [self setArray:[self sortedArrayUsingFunction:fn context:ctx]];
+}
 - (void)sortWithOptions:(NSSortOptions)opts usingComparator:(NSComparator)cmptr { [self sortUsingComparator:cmptr]; }
 @end
 

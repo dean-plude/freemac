@@ -168,6 +168,13 @@ static bool mac_swift_isOSVersionAtLeastOrVariant(intptr_t major, intptr_t minor
     return os.patch >= patch;
 }
 
+/* The older question without the Catalyst version, which Swift 5 compiled
+ * #available into (Hex Fiend's byte themes ask for macOS 12, freemac 1.270). */
+static bool mac_swift_isOSVersionAtLeast(intptr_t major, intptr_t minor, intptr_t patch)
+{
+    return mac_swift_isOSVersionAtLeastOrVariant(major, minor, patch, 0, 0, 0);
+}
+
 const struct ferry_symbol ferry_swift_symbols[] = {
     {"__divti3", __divti3},
     {"__modti3", __modti3},
@@ -214,5 +221,6 @@ const struct ferry_symbol ferry_swift_symbols[] = {
     {"memset_pattern16", mac_memset_pattern16},
     {"_swift_stdlib_operatingSystemVersion", mac_swift_stdlib_operatingSystemVersion},
     {"$ss042_stdlib_isOSVersionAtLeastOrVariantVersiondE0yBi1_Bw_BwBwBwBwBwtF", mac_swift_isOSVersionAtLeastOrVariant},
+    {"$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF", mac_swift_isOSVersionAtLeast},
     {NULL, NULL},
 };
