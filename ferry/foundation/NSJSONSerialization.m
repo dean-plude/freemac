@@ -8,9 +8,13 @@
  * suggests) and gives NSDictionary, NSArray, NSString, NSNumber and NSNull,
  * mutable when asked. Whole numbers that fit are kept as integers, the rest
  * as doubles. A mistake is reported as an NSError in the Cocoa domain, code
- * 3840, with the place it was found. JSON5 isn't read: with that option,
- * plain JSON still is, and TopLevelDictionaryAssumed (a JSON5 option) has
- * no effect. Writing takes the same classes and raises
+ * 3840, with the place it was found. With JSON5Allowed, JSON5 is read as
+ * its public specification (json5.org) describes: comments, unquoted and
+ * single-quoted keys, single-quoted strings, more escapes, hexadecimal
+ * numbers, Infinity and NaN, and numbers with a leading plus or a bare
+ * decimal point; TopLevelDictionaryAssumed then reads a text without its
+ * outer braces as a dictionary (freemac 1.270, Hex Fiend's byte themes are
+ * JSON5). Writing takes the same classes and raises
  * NSInvalidArgumentException for anything else, as on a Mac; doubles are
  * written in the shortest form that reads back the same. Built without
  * ARC. */
@@ -27,6 +31,7 @@ struct reader {
     NSString *why;   /* the first mistake */
     size_t at;
     int depth;
+    BOOL json5;
 };
 
 static id fail(struct reader *r, const uint8_t *at, NSString *why)
@@ -40,8 +45,34 @@ static id fail(struct reader *r, const uint8_t *at, NSString *why)
 
 static void skip_space(struct reader *r)
 {
-    while (r->p < r->end && (*r->p == ' ' || *r->p == '\t' || *r->p == '\n' || *r->p == '\r'))
-        r->p++;
+    for (;;) {
+        while (r->p < r->end && (*r->p == ' ' || *r->p == '\t' || *r->p == '\n' || *r->p == '\r'))
+            r->p++;
+        if (!r->json5 || r->p >= r->end)
+            return;
+        size_t left = (size_t)(r->end - r->p);
+        const uint8_t *q = r->p;
+        if (*q == '\v' || *q == '\f') {
+            r->p++;
+        } else if (left >= 2 && q[0] == 0xc2 && q[1] == 0xa0) {
+            r->p += 2;   /* no-break space */
+        } else if (left >= 3 && ((q[0] == 0xe2 && q[1] == 0x80 && (q[2] == 0xa8 || q[2] == 0xa9)) ||
+                                 (q[0] == 0xef && q[1] == 0xbb && q[2] == 0xbf))) {
+            r->p += 3;   /* line and paragraph separators, a byte order mark */
+        } else if (left >= 2 && q[0] == '/' && q[1] == '/') {
+            while (r->p < r->end && *r->p != '\n' && *r->p != '\r')
+                r->p++;
+        } else if (left >= 2 && q[0] == '/' && q[1] == '*') {
+            const uint8_t *e = r->p + 2;
+            while (e + 1 < r->end && !(e[0] == '*' && e[1] == '/'))
+                e++;
+            if (e + 1 >= r->end)
+                return;   /* unclosed: left for the caller to report */
+            r->p = e + 2;
+        } else {
+            return;
+        }
+    }
 }
 
 static id read_value(struct reader *r);
@@ -93,19 +124,20 @@ static int hex4(const uint8_t *p, const uint8_t *end, uint32_t *out)
     return 1;
 }
 
-/* r->p is just past the opening quote. */
+/* r->p is just past the opening quote, which (in JSON5) may be ' */
 static NSString *read_string(struct reader *r, BOOL mutable_)
 {
     const uint8_t *open = r->p - 1;
+    const uint8_t quote = *open;
     NSMutableData *buf = nil;
     const uint8_t *run = r->p;
     for (;;) {
         if (r->p >= r->end)
             return fail(r, open, @"Unterminated string");
         uint8_t c = *r->p;
-        if (c == '"')
+        if (c == quote)
             break;
-        if (c < 0x20)
+        if (c < 0x20 && !(r->json5 && c == '\t'))
             return fail(r, r->p, @"Unescaped control character");
         if (c != '\\') {
             r->p++;
@@ -126,6 +158,32 @@ static NSString *read_string(struct reader *r, BOOL mutable_)
         case 'n': put_utf8(buf, '\n'); break;
         case 'r': put_utf8(buf, '\r'); break;
         case 't': put_utf8(buf, '\t'); break;
+        case '\'':
+        case 'v': case '0': case 'x': case '\n': case '\r':
+            if (!r->json5)
+                return fail(r, esc, @"Invalid escape sequence");
+            if (r->p[-1] == '\'') {
+                put_utf8(buf, '\'');
+            } else if (r->p[-1] == 'v') {
+                put_utf8(buf, '\v');
+            } else if (r->p[-1] == '0') {
+                if (r->p < r->end && *r->p >= '0' && *r->p <= '9')
+                    return fail(r, esc, @"Invalid escape sequence");
+                put_utf8(buf, 0);
+            } else if (r->p[-1] == 'x') {
+                uint32_t hi, lo;
+                const char *digits = "0123456789abcdef";
+                if (r->end - r->p < 2 || !strchr(digits, tolower(r->p[0])) || !strchr(digits, tolower(r->p[1])) ||
+                    !r->p[0] || !r->p[1])
+                    return fail(r, esc, @"Invalid escape sequence");
+                hi = (uint32_t)(strchr(digits, tolower(r->p[0])) - digits);
+                lo = (uint32_t)(strchr(digits, tolower(r->p[1])) - digits);
+                put_utf8(buf, hi * 16 + lo);
+                r->p += 2;
+            } else if (r->p[-1] == '\r' && r->p < r->end && *r->p == '\n') {
+                r->p++;   /* a line continuation: the escaped line break is dropped */
+            }
+            break;
         case 'u': {
             uint32_t u;
             if (!hex4(r->p, r->end, &u))
@@ -145,7 +203,12 @@ static NSString *read_string(struct reader *r, BOOL mutable_)
             break;
         }
         default:
-            return fail(r, esc, @"Invalid escape sequence");
+            if (!r->json5 || r->p[-1] < 0x20 || (r->p[-1] >= '1' && r->p[-1] <= '9'))
+                return fail(r, esc, @"Invalid escape sequence");
+            /* JSON5: any other character stands for itself */
+            r->p--;
+            run = r->p;
+            continue;
         }
         run = r->p;
     }
@@ -167,8 +230,12 @@ static NSString *read_string(struct reader *r, BOOL mutable_)
     return [s autorelease];
 }
 
+static NSNumber *read_json5_number(struct reader *r);
+
 static NSNumber *read_number(struct reader *r)
 {
+    if (r->json5)
+        return read_json5_number(r);
     const uint8_t *s = r->p, *q = r->p;
     BOOL integral = YES;
     if (q < r->end && *q == '-')
@@ -234,6 +301,99 @@ static NSNumber *read_number(struct reader *r)
     return num;
 }
 
+/* JSON5's numbers: a sign of either kind, Infinity, NaN, hexadecimal, and
+ * decimals that start or end with their point */
+static NSNumber *read_json5_number(struct reader *r)
+{
+    const uint8_t *s = r->p, *q = r->p;
+    BOOL negative = NO;
+    if (q < r->end && (*q == '-' || *q == '+'))
+        negative = *q++ == '-';
+    size_t left = (size_t)(r->end - q);
+    if (left >= 8 && !memcmp(q, "Infinity", 8)) {
+        r->p = q + 8;
+        return [NSNumber numberWithDouble:negative ? -INFINITY : INFINITY];
+    }
+    if (left >= 3 && !memcmp(q, "NaN", 3)) {
+        r->p = q + 3;
+        return [NSNumber numberWithDouble:NAN];
+    }
+    if (left >= 2 && q[0] == '0' && (q[1] == 'x' || q[1] == 'X')) {
+        const uint8_t *h = q + 2;
+        unsigned long long v = 0;
+        BOOL any = NO, over = NO;
+        while (h < r->end && isxdigit(*h)) {
+            unsigned d = isdigit(*h) ? (unsigned)(*h - '0') : (unsigned)(tolower(*h) - 'a' + 10);
+            if (v > (ULLONG_MAX >> 4))
+                over = YES;
+            v = (v << 4) | d;
+            any = YES;
+            h++;
+        }
+        if (!any)
+            return fail(r, s, @"Invalid value");
+        r->p = h;
+        if (over)
+            return [NSNumber numberWithDouble:negative ? -HUGE_VAL : HUGE_VAL];
+        if (negative)
+            return v <= (unsigned long long)LLONG_MAX + 1 ? [NSNumber numberWithLongLong:(long long)(0 - v)]
+                                                          : [NSNumber numberWithDouble:-(double)v];
+        return v <= LLONG_MAX ? [NSNumber numberWithLongLong:(long long)v] : [NSNumber numberWithUnsignedLongLong:v];
+    }
+    const uint8_t *digits = q;
+    BOOL integral = YES, any = NO;
+    while (q < r->end && *q >= '0' && *q <= '9')
+        q++, any = YES;
+    if (q < r->end && *q == '.') {
+        integral = NO;
+        q++;
+        while (q < r->end && *q >= '0' && *q <= '9')
+            q++, any = YES;
+    }
+    if (!any)
+        return fail(r, s, @"Invalid value");
+    if (q < r->end && (*q == 'e' || *q == 'E')) {
+        integral = NO;
+        q++;
+        if (q < r->end && (*q == '+' || *q == '-'))
+            q++;
+        if (q >= r->end || *q < '0' || *q > '9')
+            return fail(r, s, @"Invalid number: no digits in the exponent");
+        while (q < r->end && *q >= '0' && *q <= '9')
+            q++;
+    }
+    size_t n = (size_t)(q - digits);
+    char *t = malloc(n + 2);
+    t[0] = negative ? '-' : '+';
+    memcpy(t + 1, digits, n);
+    t[n + 1] = 0;
+    r->p = q;
+    NSNumber *num = nil;
+    errno = 0;
+    if (integral) {
+        long long v = strtoll(t, NULL, 10);
+        if (!errno)
+            num = [NSNumber numberWithLongLong:v];
+    }
+    if (!num)
+        num = [NSNumber numberWithDouble:strtod(t, NULL)];
+    free(t);
+    return num;
+}
+
+/* A JSON5 key without quotes: an ECMAScript identifier name. Letters beyond
+ * ASCII are let through whole. */
+static NSString *read_identifier(struct reader *r)
+{
+    const uint8_t *s = r->p;
+    while (r->p < r->end && (isalnum(*r->p) || *r->p == '_' || *r->p == '$' || *r->p >= 0x80))
+        r->p++;
+    if (r->p == s || isdigit(*s))
+        return fail(r, s, @"No string key for value in object");
+    NSString *k = [[NSString alloc] initWithBytes:s length:(NSUInteger)(r->p - s) encoding:NSUTF8StringEncoding];
+    return k ? [k autorelease] : fail(r, s, @"Unable to convert data to string");
+}
+
 static BOOL word(struct reader *r, const char *w)
 {
     size_t n = strlen(w);
@@ -280,23 +440,31 @@ static id read_array(struct reader *r)
     }
 }
 
-static id read_object(struct reader *r)
+/* bare: the members of a top-level dictionary without its braces, read to the end */
+static id read_members(struct reader *r, BOOL bare)
 {
-    const uint8_t *open = r->p++;
+    const uint8_t *open = bare ? r->p : r->p++;
     NSMutableDictionary *d = [NSMutableDictionary dictionary];
     skip_space(r);
-    if (r->p < r->end && *r->p == '}') {
+    if (r->p < r->end && *r->p == '}' && !bare) {
         r->p++;
         return d;
     }
+    if (bare && r->p >= r->end)
+        return d;
     for (;;) {
         skip_space(r);
         if (r->p >= r->end)
             return fail(r, open, @"Unexpected end of file while parsing object");
-        if (*r->p != '"')
+        NSString *key;
+        if (*r->p == '"' || (r->json5 && *r->p == '\'')) {
+            r->p++;
+            key = read_string(r, NO);
+        } else if (r->json5) {
+            key = read_identifier(r);
+        } else {
             return fail(r, r->p, @"No string key for value in object");
-        r->p++;
-        NSString *key = read_string(r, NO);
+        }
         if (!key)
             return nil;
         skip_space(r);
@@ -309,11 +477,13 @@ static id read_object(struct reader *r)
         [d setObject:v forKey:key];
         skip_space(r);
         if (r->p >= r->end)
-            return fail(r, open, @"Unexpected end of file while parsing object");
+            return bare ? d : fail(r, open, @"Unexpected end of file while parsing object");
         if (*r->p == ',') {
             r->p++;
             skip_space(r);
-            if (r->p < r->end && *r->p == '}') {
+            if (bare && r->p >= r->end)
+                return d;
+            if (r->p < r->end && *r->p == '}' && !bare) {
                 r->p++;
                 return d;
             }
@@ -326,6 +496,8 @@ static id read_object(struct reader *r)
         return fail(r, r->p, @"Badly formed object");
     }
 }
+
+static id read_object(struct reader *r) { return read_members(r, NO); }
 
 static id read_value(struct reader *r)
 {
@@ -343,6 +515,10 @@ static id read_value(struct reader *r)
             v = [[v copy] autorelease];
         return v;
     }
+    case '\'':
+        if (!r->json5)
+            break;
+        /* fall through */
     case '"':
         r->p++;
         return read_string(r, (r->opt & NSJSONReadingMutableLeaves) != 0);
@@ -360,6 +536,8 @@ static id read_value(struct reader *r)
         break;
     default:
         if (*r->p == '-' || (*r->p >= '0' && *r->p <= '9'))
+            return read_number(r);
+        if (r->json5 && (*r->p == '+' || *r->p == '.' || *r->p == 'I' || *r->p == 'N'))
             return read_number(r);
         break;
     }
@@ -617,7 +795,16 @@ static BOOL is_container(id v) { return [v isKindOfClass:[NSArray class]] || [v 
     r.start = r.p = [text bytes];
     r.end = r.start + [text length];
     r.opt = opt;
+    r.json5 = (opt & NSJSONReadingJSON5Allowed) != 0;
     skip_space(&r);
+    if (r.json5 && (opt & NSJSONReadingTopLevelDictionaryAssumed) && (r.p >= r.end || *r.p != '{')) {
+        id d = read_members(&r, YES);
+        if (d && !(opt & NSJSONReadingMutableContainers))
+            d = [[d copy] autorelease];
+        if (!d)
+            FSetError(error, json_error(r.why ?: @"Invalid value", r.at, text));
+        return d;
+    }
     if (r.p >= r.end) {
         FSetError(error, json_error(@"Unexpected end of file during JSON parse", 0, text));
         return nil;

@@ -486,11 +486,27 @@ BOOL AValidateItem(id target, id item)
 }
 /* A view shown in place of the title (AMenuView draws it). */
 - (NSView *)view { return _view; }
+static char menu_item_of_view;   /* the item a view is shown in, for -enclosingMenuItem */
 - (void)setView:(NSView *)view
 {
+    if (_view && objc_getAssociatedObject(_view, &menu_item_of_view) == self)
+        objc_setAssociatedObject(_view, &menu_item_of_view, nil, OBJC_ASSOCIATION_ASSIGN);
     [view retain];
     [_view release];
     _view = view;
+    if (view)
+        objc_setAssociatedObject(view, &menu_item_of_view, self, OBJC_ASSOCIATION_ASSIGN);
+}
+/* NSView reference: the menu item whose view this view is, or is inside;
+ * nil for a view that isn't in a menu. */
+NSMenuItem *AEnclosingMenuItem(NSView *v)
+{
+    for (; v; v = [v superview]) {
+        NSMenuItem *item = objc_getAssociatedObject(v, &menu_item_of_view);
+        if (item)
+            return item;
+    }
+    return nil;
 }
 - (NSInteger)indentationLevel { return _indent; }
 - (void)setIndentationLevel:(NSInteger)i { _indent = i; }

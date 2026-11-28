@@ -398,6 +398,8 @@ NAMED2(textColor, 0, 0, 0, 1, 1, 1, 1, 1)
 NAMED2(textBackgroundColor, 1, 1, 1, 1, 0.12, 0.12, 0.13, 1)
 NAMED2(selectedTextColor, 0, 0, 0, 1, 1, 1, 1, 1)
 NAMED2(selectedTextBackgroundColor, 0.70, 0.83, 1.0, 1, 0.25, 0.38, 0.58, 1)
+/* the text cursor's colour, a class property since macOS 14 (Hex Fiend asks for it) */
+NAMED2(textInsertionPointColor, 0.10, 0.45, 0.91, 1, 0.16, 0.52, 1.0, 1)
 NAMED2(placeholderTextColor, 0, 0, 0, 0.3, 1, 1, 1, 0.26)
 NAMED2(controlColor, 1, 1, 1, 1, 0.36, 0.36, 0.38, 1)
 NAMED2(controlBackgroundColor, 1, 1, 1, 1, 0.12, 0.12, 0.13, 1)
@@ -778,11 +780,76 @@ static NSFont *named(const char *name, CGFloat size)
     CTFontGetAdvancesForGlyphs(CT, kCTFontOrientationHorizontal, &glyph, &s, 1);
     return s;
 }
+/* NSFont reference: advances and bounds for several glyphs at once, given
+ * as NSGlyphs (32 bits each) or CGGlyphs (16). */
+- (void)getAdvancements:(NSSize *)advancements forCGGlyphs:(const CGGlyph *)glyphs count:(NSUInteger)count
+{
+    CTFontGetAdvancesForGlyphs(CT, kCTFontOrientationHorizontal, glyphs, advancements, (CFIndex)count);
+}
+- (void)getAdvancements:(NSSize *)advancements forGlyphs:(const NSGlyph *)glyphs count:(NSUInteger)count
+{
+    for (NSUInteger i = 0; i < count; i++) {
+        CGGlyph g = (CGGlyph)glyphs[i];
+        CTFontGetAdvancesForGlyphs(CT, kCTFontOrientationHorizontal, &g, &advancements[i], 1);
+    }
+}
+- (void)getBoundingRects:(NSRect *)rects forCGGlyphs:(const CGGlyph *)glyphs count:(NSUInteger)count
+{
+    CTFontGetBoundingRectsForGlyphs(CT, kCTFontOrientationHorizontal, glyphs, rects, (CFIndex)count);
+}
+- (void)getBoundingRects:(NSRect *)rects forGlyphs:(const NSGlyph *)glyphs count:(NSUInteger)count
+{
+    for (NSUInteger i = 0; i < count; i++) {
+        CGGlyph g = (CGGlyph)glyphs[i];
+        CTFontGetBoundingRectsForGlyphs(CT, kCTFontOrientationHorizontal, &g, &rects[i], 1);
+    }
+}
+/* NSFont reference: the characters the font has glyphs for. */
+- (NSCharacterSet *)coveredCharacterSet { return [(NSCharacterSet *)CTFontCopyCharacterSet(CT) autorelease]; }
+/* NSFont reference: the largest advance of any of the font's glyphs,
+ * worked out once per font (Hex Fiend sizes its byte columns by it). */
+- (NSSize)maximumAdvancement
+{
+    static char key;
+    NSValue *kept = objc_getAssociatedObject(self, &key);
+    if (kept)
+        return [kept sizeValue];
+    NSSize most = NSZeroSize;
+    CFIndex n = CTFontGetGlyphCount(CT);
+    CGGlyph glyphs[256];
+    CGSize adv[256];
+    for (CFIndex at = 0; at < n; at += 256) {
+        CFIndex k = n - at < 256 ? n - at : 256;
+        for (CFIndex i = 0; i < k; i++)
+            glyphs[i] = (CGGlyph)(at + i);
+        CTFontGetAdvancesForGlyphs(CT, kCTFontOrientationHorizontal, glyphs, adv, k);
+        for (CFIndex i = 0; i < k; i++) {
+            if (adv[i].width > most.width)
+                most.width = adv[i].width;
+            if (adv[i].height > most.height)
+                most.height = adv[i].height;
+        }
+    }
+    objc_setAssociatedObject(self, &key, [NSValue valueWithSize:most], OBJC_ASSOCIATION_RETAIN);
+    return most;
+}
 - (void)set { [self setInContext:[NSGraphicsContext currentContext]]; }
 - (void)setInContext:(NSGraphicsContext *)context
 {
-    if (context)
+    if (context) {
+        /* the context's font too, as a Mac does: glyphs shown with
+         * CGContextShowGlyphs... then draw in it (Hex Fiend) */
+        CGFontRef g = CTFontCopyGraphicsFont(CT, NULL);
+        if (g) {
+            CGContextSetFont([context CGContext], g);
+            CGFontRelease(g);
+        }
         CGContextSetFontSize([context CGContext], [self pointSize]);
+        /* and the text matrix, which programs count on to undo their own
+         * scaling; flipped where the context is, so glyphs stand upright */
+        CGContextSetTextMatrix([context CGContext], [context isFlipped] ? CGAffineTransformMakeScale(1, -1)
+                                                                       : CGAffineTransformIdentity);
+    }
 }
 - (NSString *)description
 {

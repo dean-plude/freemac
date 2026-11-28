@@ -1183,6 +1183,23 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.270 "Hex Fiend edits bytes" (done)
+
+Ferry 0.93.0: Hex Fiend 2.18.1, the hex editor, from its official download, opens a file and shows its bytes in hex and as text, selects them, reads the selection in its data inspector, edits and saves. Hex Fiend draws its columns glyph by glyph with Core Graphics, so this release fills in that drawing and the font calls around it. Apps that ship broken links inside their bundle (Anki) now install with them.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `CGContextShowGlyphsWithAdvances` and `CGContextShowGlyphs`, which move the text position on past what they draw | Ferry Core Graphics | done |
+| 2 | Each view starts drawing with the identity text matrix, and `-[NSFont set]` sets the context's font and text matrix (flipped in a flipped view) | Ferry AppKit | done |
+| 3 | `NSFont` `maximumAdvancement`, `coveredCharacterSet`, `getAdvancements:` and `getBoundingRects:` for glyphs; `CTFontCopyCharacterSet` declared | Ferry AppKit / Core Text | done |
+| 4 | No stand-in font for control characters, so a hex editor shows its own `.` for them | Ferry Core Text | done |
+| 5 | `NSJSONSerialization` reads JSON5 (comments, unquoted keys, single quotes, hex numbers, Infinity and NaN) and a top-level dictionary without braces | Ferry Foundation | done |
+| 6 | Periodic events (`startPeriodicEventsAfterDelay:withPeriod:`), `NSColor.textInsertionPointColor`, `NSView.enclosingMenuItem` | Ferry AppKit | done |
+| 7 | A view's identifier set in Interface Builder is read from compiled nibs | Ferry AppKit | done |
+| 8 | `NSSet makeObjectsPerformSelector:`, `NSMutableArray sortUsingFunction:context:`, `fcntl` `F_NOCACHE` and `F_RDAHEAD`, Swift's older `#available` check | Ferry | done |
+| 9 | The Installer recreates links inside an app that 7-Zip leaves out, refusing any that point outside the app | Installer | done |
+| 10 | Hex Fiend opens a file, shows it, selects, edits and saves | Ferry / Hex Fiend | done |
+
 ## 1.269 "kitty runs" (done)
 
 Ferry 0.92.0: kitty 0.37, the terminal, from its official download, installs, opens its window and runs a shell that takes typing and shows colours. kitty starts its shell through `/usr/bin/login` and its helper `kitten` is a Go program, so this release adds what both need. The Installer also opens disk images packed with LZMA, which kitty's download uses.

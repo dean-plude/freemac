@@ -446,6 +446,8 @@ void CGContextSetFontSize(CGContextRef c, CGFloat size);
 /* freemac 1.266: fonts, glyphs, masks, data consumers and PDF contexts */
 void CGContextSetFont(CGContextRef c, CGFontRef font);
 void CGContextShowGlyphsAtPositions(CGContextRef c, const CGGlyph glyphs[], const CGPoint positions[], size_t count);
+void CGContextShowGlyphsWithAdvances(CGContextRef c, const CGGlyph glyphs[], const CGSize advances[], size_t count);
+void CGContextShowGlyphs(CGContextRef c, const CGGlyph glyphs[], size_t count);
 void CGContextClipToMask(CGContextRef c, CGRect rect, CGImageRef mask);
 void CGContextSetShouldSubpixelQuantizeFonts(CGContextRef c, bool should);
 void CGContextSetAllowsFontSubpixelQuantization(CGContextRef c, bool allows);

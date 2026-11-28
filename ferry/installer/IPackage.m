@@ -3,6 +3,8 @@
 #import "IPackage.h"
 #import <AppKit/AppKit.h>
 #include <dirent.h>
+#include <limits.h>
+#include <stdio.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
@@ -1500,6 +1502,105 @@ BOOL ICopyTree(NSString *from, NSString *to, NSString **error)
     return ok;
 }
 
+/* Whether a relative link at path (inside the extracted tree, '/'-separated)
+ * pointing at target stays inside the tree, read without following links. */
+static BOOL link_stays_inside(const char *path, const char *target)
+{
+    if (!*target || target[0] == '/')
+        return NO;
+    int depth = 0;
+    for (const char *p = path; *p; p++)
+        if (*p == '/')
+            depth++;
+    for (const char *t = target; *t;) {
+        const char *slash = strchr(t, '/');
+        size_t n = slash ? (size_t)(slash - t) : strlen(t);
+        if (n == 2 && t[0] == '.' && t[1] == '.') {
+            if (--depth < 0)
+                return NO;
+        } else if (n && !(n == 1 && t[0] == '.'))
+            depth++;
+        t += n + (slash ? 1 : 0);
+    }
+    return YES;
+}
+
+/* 7-Zip leaves out every symbolic link whose target climbs with "..", even
+ * one that stays inside the app (Anki's PyQt6 links into its Resources).
+ * After extracting, the links 7-Zip listed but didn't make are made here,
+ * when their target stays inside the extracted tree and the folder they go
+ * in is a real folder of it (freemac 1.270). */
+static void restore_links(NSString *archive, NSString *dir)
+{
+    int fds[2];
+    if (pipe(fds) != 0)
+        return;
+    pid_t pid = fork();
+    if (pid < 0) {
+        close(fds[0]);
+        close(fds[1]);
+        return;
+    }
+    if (pid == 0) {
+        dup2(fds[1], 1);
+        close(fds[0]);
+        close(fds[1]);
+        int null = open("/dev/null", O_WRONLY);
+        if (null >= 0)
+            dup2(null, 2);
+        const char *names[] = {"7z", "7zz", NULL};
+        for (int i = 0; names[i]; i++)
+            execlp(names[i], names[i], "l", "-slt", "-ba", [archive fileSystemRepresentation], (char *)NULL);
+        _exit(127);
+    }
+    close(fds[1]);
+    FILE *f = fdopen(fds[0], "r");
+    char root[PATH_MAX];
+    if (!f || !realpath([dir fileSystemRepresentation], root)) {
+        if (f)
+            fclose(f);
+        else
+            close(fds[0]);
+        waitpid(pid, NULL, 0);
+        return;
+    }
+    size_t rootLen = strlen(root);
+    char *line = NULL, *path = NULL;
+    size_t cap = 0;
+    while (getline(&line, &cap, f) > 0) {
+        line[strcspn(line, "\n")] = 0;
+        if (!strncmp(line, "Path = ", 7)) {
+            free(path);
+            path = strdup(line + 7);
+            continue;
+        }
+        if (strncmp(line, "Symbolic Link = ", 16) || !path || !line[16])
+            continue;
+        const char *target = line + 16;
+        if (strstr(path, "..") || path[0] == '/' || !link_stays_inside(path, target))
+            continue;
+        char where[PATH_MAX * 2], parent[PATH_MAX * 2], real[PATH_MAX];
+        snprintf(where, sizeof where, "%s/%s", root, path);
+        struct stat st;
+        if (lstat(where, &st) == 0)
+            continue;   /* 7-Zip made it, or something else is there */
+        snprintf(parent, sizeof parent, "%s", where);
+        char *cut = strrchr(parent, '/');
+        if (!cut)
+            continue;
+        *cut = 0;
+        if (!realpath(parent, real) || strncmp(real, root, rootLen) || (real[rootLen] && real[rootLen] != '/'))
+            continue;
+        if (strcmp(real, parent))
+            continue;   /* the folder is reached through a link: leave it */
+        if (symlink(target, where) != 0) {}
+    }
+    free(line);
+    free(path);
+    fclose(f);
+    waitpid(pid, NULL, 0);
+}
+
 /* Runs 7-Zip to extract an archive into dir; the exit status, or -1 when 7z can't run. */
 static int run_7z(NSString *archive, NSString *dir, BOOL (^keepWaiting)(void))
 {
@@ -1532,7 +1633,10 @@ static int run_7z(NSString *archive, NSString *dir, BOOL (^keepWaiting)(void))
             return -2;
         }
     }
-    return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+    int code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+    if (code != 127 && code != -1)
+        restore_links(archive, dir);
+    return code;
 }
 
 static void largest_file(NSString *dir, NSString **best, unsigned long long *size)

@@ -388,6 +388,13 @@ static int mac_fcntl(int fd, int cmd, ...)
         return fcntl(fd, F_DUPFD_CLOEXEC, arg);
     case MAC_F_FULLFSYNC:
         return fsync(fd);
+    case 48: /* F_NOCACHE: a hint to keep the file's data out of the cache */
+        if (arg)
+            posix_fadvise(fd, 0, 0, POSIX_FADV_DONTNEED);
+        return 0;
+    case 45: /* F_RDAHEAD: a hint to read ahead, or not */
+        posix_fadvise(fd, 0, 0, arg ? POSIX_FADV_SEQUENTIAL : POSIX_FADV_RANDOM);
+        return 0;
     case MAC_F_GETLK:
     case MAC_F_SETLK:
     case MAC_F_SETLKW: {
