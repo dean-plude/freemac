@@ -828,13 +828,21 @@ SPACE(deviceCMYKColorSpace, CGColorSpaceCreateDeviceCMYK(), @"Device CMYK")
 }
 @end
 
+NSColor *FerryColorWithComponents(NSColorSpace *space, const CGFloat *k, NSInteger count);
+
+@interface NSColor (FerryLab)
+- (NSColorSpace *)_ferryColorSpace;
+@end
+
 @implementation NSColor (FerryColorSpaces)
-- (NSColorSpace *)colorSpace { return [NSColorSpace sRGBColorSpace]; }
+- (NSColorSpace *)colorSpace { return [self _ferryColorSpace] ?: [NSColorSpace sRGBColorSpace]; }
 + (NSColor *)colorWithColorSpace:(NSColorSpace *)space components:(const CGFloat *)c count:(NSInteger)count
 {
     if (!c || count < 1)
         return nil;
     switch ([space colorSpaceModel]) {
+    case NSColorSpaceModelLAB:
+        return FerryColorWithComponents(space, c, count);
     case NSColorSpaceModelGray:
         return [NSColor colorWithWhite:c[0] alpha:count > 1 ? c[1] : 1];
     case NSColorSpaceModelCMYK:

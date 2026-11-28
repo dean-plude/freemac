@@ -21,6 +21,8 @@ const CFStringRef kCGColorSpaceITUR_709 = (CFStringRef)@"kCGColorSpaceITUR_709";
 const CFStringRef kCGColorSpaceITUR_2020 = (CFStringRef)@"kCGColorSpaceITUR_2020";
 const CFStringRef kCGColorSpaceAdobeRGB1998 = (CFStringRef)@"kCGColorSpaceAdobeRGB1998";
 const CFStringRef kCGColorSpaceExtendedDisplayP3 = (CFStringRef)@"kCGColorSpaceExtendedDisplayP3";
+/* CIE L*a*b* (freemac 1.NEXT), MacVim works out its tab bar's colours in it */
+const CFStringRef kCGColorSpaceGenericLab = (CFStringRef)@"kCGColorSpaceGenericLab";
 const CFStringRef kCGColorWhite = (CFStringRef)@"kCGColorWhite";
 const CFStringRef kCGColorBlack = (CFStringRef)@"kCGColorBlack";
 const CFStringRef kCGColorClear = (CFStringRef)@"kCGColorClear";
@@ -89,6 +91,8 @@ CGColorSpaceRef CGColorSpaceCreateDeviceCMYK(void) { return (CGColorSpaceRef)[GS
 
 static GColorSpace *named_space(NSString *name)
 {
+    if ([name isEqual:(id)kCGColorSpaceGenericLab])
+        return make_space(kCGColorSpaceModelLab, 3, name);
     if ([name isEqual:(id)kCGColorSpaceGenericGray] || [name isEqual:(id)kCGColorSpaceGenericGrayGamma2_2])
         return make_space(kCGColorSpaceModelMonochrome, 1, name);
     if ([name isEqual:(id)kCGColorSpaceGenericCMYK])
@@ -344,6 +348,54 @@ static double clamp01(double v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
 
 @end
 
+/* ---- CIE L*a*b* ---------------------------------------------------------------------- */
+
+/* Lab colours turn into sRGB and back through CIE XYZ, by the CIE's
+ * published formulas (CIE 15) and the sRGB standard's (IEC 61966-2-1)
+ * matrix and tone curve. A Lab space's own white point is taken to be
+ * sRGB's D65 white, so L* 100 with a* and b* 0 is sRGB white whichever
+ * white point the space was made with. */
+static const double d65[3] = {0.95047, 1.0, 1.08883};
+static double lab_f(double t) { return t > 216.0 / 24389 ? cbrt(t) : t * 841.0 / 108 + 4.0 / 29; }
+static double lab_finv(double t) { return t > 6.0 / 29 ? t * t * t : (t - 4.0 / 29) * 108.0 / 841; }
+static double to_linear(double c) { return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4); }
+static double from_linear(double l) { return l <= 0.0031308 ? l * 12.92 : 1.055 * pow(l, 1 / 2.4) - 0.055; }
+
+void GColorLabToSRGB(const CGFloat lab[3], CGFloat rgb[3]) __attribute__((visibility("default")));
+void GColorLabToSRGB(const CGFloat lab[3], CGFloat rgb[3])
+{
+    double fy = (lab[0] + 16) / 116, fx = fy + lab[1] / 500, fz = fy - lab[2] / 200;
+    double x = d65[0] * lab_finv(fx), y = d65[1] * lab_finv(fy), z = d65[2] * lab_finv(fz);
+    double r = 3.2404542 * x - 1.5371385 * y - 0.4985314 * z;
+    double g = -0.9692660 * x + 1.8760108 * y + 0.0415560 * z;
+    double b = 0.0556434 * x - 0.2040259 * y + 1.0572252 * z;
+    rgb[0] = clamp01(from_linear(fmax(r, 0)));
+    rgb[1] = clamp01(from_linear(fmax(g, 0)));
+    rgb[2] = clamp01(from_linear(fmax(b, 0)));
+}
+
+void GColorSRGBToLab(const CGFloat rgb[3], CGFloat lab[3]) __attribute__((visibility("default")));
+void GColorSRGBToLab(const CGFloat rgb[3], CGFloat lab[3])
+{
+    double r = to_linear(rgb[0]), g = to_linear(rgb[1]), b = to_linear(rgb[2]);
+    double x = (0.4124564 * r + 0.3575761 * g + 0.1804375 * b) / d65[0];
+    double y = (0.2126729 * r + 0.7151522 * g + 0.0721750 * b) / d65[1];
+    double z = (0.0193339 * r + 0.1191920 * g + 0.9503041 * b) / d65[2];
+    double fx = lab_f(x), fy = lab_f(y), fz = lab_f(z);
+    lab[0] = 116 * fy - 16;
+    lab[1] = 500 * (fx - fy);
+    lab[2] = 200 * (fy - fz);
+}
+
+CGColorSpaceRef CGColorSpaceCreateLab(const CGFloat *whitePoint, const CGFloat *blackPoint, const CGFloat *range)
+{
+    if (!whitePoint || whitePoint[1] != 1 || whitePoint[0] <= 0 || whitePoint[2] <= 0)
+        return NULL;
+    (void)blackPoint;
+    (void)range;
+    return (CGColorSpaceRef)make_space(kCGColorSpaceModelLab, 3, @"kCGColorSpaceGenericLab");
+}
+
 GColor *GColorNew(GColorSpace *space, const CGFloat *components)
 {
     GColor *c = [[GColor alloc] init];
@@ -360,6 +412,9 @@ GColor *GColorNew(GColorSpace *space, const CGFloat *components)
         for (int i = 0; i < 3; i++)
             c->rgba[i] = clamp01((1 - k[i]) * (1 - k[3]));
         break;
+    case kCGColorSpaceModelLab:
+        GColorLabToSRGB(k, c->rgba);
+        break;
     default:
         for (int i = 0; i < 3; i++)
             c->rgba[i] = clamp01(k[i]);
@@ -375,7 +430,7 @@ CGColorRef CGColorCreate(CGColorSpaceRef space, const CGFloat *components)
         return NULL;
     GColorSpace *s = (GColorSpace *)space;
     if (s->model != kCGColorSpaceModelRGB && s->model != kCGColorSpaceModelMonochrome &&
-        s->model != kCGColorSpaceModelCMYK)
+        s->model != kCGColorSpaceModelCMYK && s->model != kCGColorSpaceModelLab)
         return NULL;
     return (CGColorRef)GColorNew(s, components);
 }

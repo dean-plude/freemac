@@ -12,6 +12,7 @@
  * are drawn in a Cairo copy and converted after each drawing call. */
 #import "GInternal.h"
 #include <pthread.h>
+#include <objc/runtime.h>
 
 static void forget_pending(GContext *c);
 
@@ -453,6 +454,19 @@ void CGContextSetShouldSmoothFonts(CGContextRef c, bool should) {}
  * before it draws text (freemac 1.266, Obsidian). freemac smooths fonts. */
 bool CGFontRenderingGetFontSmoothingDisabled(void) { return false; }
 void CGContextSetAllowsFontSmoothing(CGContextRef c, bool allows) {}
+/* A context's font smoothing style, which programs such as MacVim set to a
+ * lighter one while they draw text and set back after (freemac 1.NEXT).
+ * freemac smooths fonts one way, so the style is kept and changes nothing. */
+static char smoothing_key;
+int CGContextGetFontSmoothingStyle(CGContextRef c)
+{
+    return c ? [objc_getAssociatedObject((id)c, &smoothing_key) intValue] : 0;
+}
+void CGContextSetFontSmoothingStyle(CGContextRef c, int style)
+{
+    if (c)
+        objc_setAssociatedObject((id)c, &smoothing_key, @(style), OBJC_ASSOCIATION_RETAIN);
+}
 void CGContextSetShouldSubpixelPositionFonts(CGContextRef c, bool should) {}
 void CGContextSetAllowsFontSubpixelPositioning(CGContextRef c, bool allows) {}
 /* Whether glyphs are drawn at whole fractions of a pixel only; Cairo places

@@ -22,6 +22,9 @@ static const NSTouchBarItemPriority NSTouchBarItemPriorityLow = -1000;
 APPKIT_EXTERN NSTouchBarItemIdentifier const NSTouchBarItemIdentifierFixedSpaceSmall;
 APPKIT_EXTERN NSTouchBarItemIdentifier const NSTouchBarItemIdentifierFixedSpaceLarge;
 APPKIT_EXTERN NSTouchBarItemIdentifier const NSTouchBarItemIdentifierFlexibleSpace;
+APPKIT_EXTERN NSTouchBarItemIdentifier const NSTouchBarItemIdentifierCharacterPicker,
+    NSTouchBarItemIdentifierCandidateList, NSTouchBarItemIdentifierTextFormat, NSTouchBarItemIdentifierTextAlignment,
+    NSTouchBarItemIdentifierTextColorPicker, NSTouchBarItemIdentifierTextList, NSTouchBarItemIdentifierTextStyle;
 APPKIT_EXTERN NSTouchBarItemIdentifier const NSTouchBarItemIdentifierOtherItemsProxy;
 
 @protocol NSTouchBarDelegate <NSObject>

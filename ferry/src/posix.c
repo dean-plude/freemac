@@ -1016,6 +1016,34 @@ void ferry_crash_report_init(void)
         sigaction(sigs[i], &sa, NULL);
 }
 
+/* A Mac stack_t (ss_size before ss_flags) and its flags. */
+struct mac_stack {
+    void *sp;
+    size_t size;
+    int flags;
+};
+#define MAC_SS_ONSTACK 0x0001
+#define MAC_SS_DISABLE 0x0004
+
+/* The alternate stack signal handlers run on (Vim sets one up). */
+static int mac_sigaltstack(const struct mac_stack *ss, struct mac_stack *old)
+{
+    stack_t in, out;
+    if (ss) {
+        in.ss_sp = ss->sp;
+        in.ss_size = ss->size;
+        in.ss_flags = ss->flags & MAC_SS_DISABLE ? SS_DISABLE : 0;
+    }
+    if (sigaltstack(ss ? &in : NULL, old ? &out : NULL) != 0)
+        return -1;
+    if (old) {
+        old->sp = out.ss_sp;
+        old->size = out.ss_size;
+        old->flags = (out.ss_flags & SS_ONSTACK ? MAC_SS_ONSTACK : 0) | (out.ss_flags & SS_DISABLE ? MAC_SS_DISABLE : 0);
+    }
+    return 0;
+}
+
 static int mac_sigaction(int mac, const struct mac_sigaction *act, struct mac_sigaction *old)
 {
     if (mac > 0 && mac < 32 && !mac_to_linux_sig[mac]) {
@@ -1217,6 +1245,26 @@ static struct mac_passwd *to_mac_passwd(struct passwd *p)
 
 static struct mac_passwd *mac_getpwuid(uid_t uid) { return to_mac_passwd(getpwuid(uid)); }
 static struct mac_passwd *mac_getpwnam(const char *name) { return to_mac_passwd(getpwnam(name)); }
+/* The user list in turn (Vim completes ~user names with it). */
+static struct mac_passwd *mac_getpwent(void) { return to_mac_passwd(getpwent()); }
+static void mac_setpwent(void) { setpwent(); }
+static void mac_endpwent(void) { endpwent(); }
+
+/* Access control lists: Linux's are another kind (and libacl isn't always
+ * there), so a file has none here; setting one isn't supported, which
+ * programs take as a file system without them, as on a Mac's FAT disk. */
+static void *mac_acl_get_file(const char *path, int type)
+{
+    errno = ENOTSUP;
+    return NULL;
+}
+static int mac_acl_set_file(const char *path, int type, void *acl)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+static int mac_acl_free(void *p) { return 0; }
+static void mac_sync(void) { sync(); }
 
 #define MAC_TIOCGWINSZ 0x40087468ul
 #define MAC_FIONREAD   0x4004667ful
@@ -1684,6 +1732,7 @@ const struct ferry_symbol ferry_posix_symbols[] = {
     {"pthread_sigmask", mac_pthread_sigmask},
     {"pthread_kill", mac_pthread_kill},
     {"sigaction", mac_sigaction},
+    {"sigaltstack", mac_sigaltstack},
     {"signal", mac_signal},
     {"kill", mac_kill},
     {"killpg", mac_killpg},
@@ -1700,6 +1749,13 @@ const struct ferry_symbol ferry_posix_symbols[] = {
     {"uname", mac_uname},
     {"getpwuid", mac_getpwuid},
     {"getpwnam", mac_getpwnam},
+    {"getpwent", mac_getpwent},
+    {"setpwent", mac_setpwent},
+    {"endpwent", mac_endpwent},
+    {"acl_get_file", mac_acl_get_file},
+    {"acl_set_file", mac_acl_set_file},
+    {"acl_free", mac_acl_free},
+    {"sync", mac_sync},
     {"ioctl", mac_ioctl},
     {"tzname", tzname},
     {"timezone", &timezone},

@@ -309,6 +309,7 @@ BOOL AValidateItem(id target, id item)
     NSImage *_image;
     NSView *_view;
     BOOL _noAutoLocalize, _noAutoMirror;
+    BOOL _alternate;
 }
 - (BOOL)allowsAutomaticKeyEquivalentLocalization { return !_noAutoLocalize; }
 - (void)setAllowsAutomaticKeyEquivalentLocalization:(BOOL)on { _noAutoLocalize = !on; }
@@ -396,9 +397,24 @@ BOOL AValidateItem(id target, id item)
     c->_target = _target;
     c->_mask = _mask;
     c->_tag = _tag;
+    c->_indent = _indent;
     c->_state = _state;
     c->_enabled = _enabled;
+    c->_hidden = _hidden;
     c->_separator = _separator;
+    c->_alternate = _alternate;
+    c->_noAutoLocalize = _noAutoLocalize;
+    c->_noAutoMirror = _noAutoMirror;
+    c->_tip = [_tip copy];
+    c->_represented = [_represented retain];
+    c->_image = [_image retain];
+    /* a copied item has a copy of the submenu, as on a Mac: MacVim copies its
+     * whole menu before it hands it to NSApp (freemac 1.NEXT) */
+    if (_submenu) {
+        NSMenu *sub = [_submenu copy];
+        [c setSubmenu:sub];
+        [sub release];
+    }
     return c;
 }
 - (NSString *)description { return [NSString stringWithFormat:@"<NSMenuItem: %p %@>", self, _title]; }
@@ -440,6 +456,13 @@ BOOL AValidateItem(id target, id item)
     [m setSupermenu:_menu];
 }
 - (BOOL)hasSubmenu { return _submenu != nil; }
+/* On a Mac an alternate item stands in for the item before it while the
+ * user holds the extra modifier keys of its key equivalent. freemac's menu
+ * bar has no such switch, so an alternate is left out of the menus it
+ * shows (it would look like a copy of the item before it) and keeps its
+ * key equivalent, which still works from the keyboard. */
+- (BOOL)isAlternate { return _alternate; }
+- (void)setAlternate:(BOOL)alternate { _alternate = alternate; }
 - (NSMenu *)menu { return _menu; }
 - (void)_setMenu:(NSMenu *)menu
 {
@@ -537,6 +560,9 @@ BOOL AValidateItem(id target, id item)
 - (id)copyWithZone:(NSZone *)zone
 {
     NSMenu *m = [[NSMenu alloc] initWithTitle:_title];
+    m->_autoenables = _autoenables;
+    m->_noChangeMessages = _noChangeMessages;
+    m->_delegate = _delegate;
     for (NSMenuItem *i in _items) {
         NSMenuItem *c = [i copy];
         [m addItem:c];

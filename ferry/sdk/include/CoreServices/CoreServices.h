@@ -73,6 +73,8 @@ __FERRY_END
 #include <CoreServices/IconsCore.h>
 /* key codes into characters (freemac 1.230) */
 #include <CoreServices/UnicodeUtilities.h>
+/* text encodings and their converter, and a locale's name in parts (freemac 1.NEXT, Vim) */
+#include <CoreServices/TextEncodingConverter.h>
 /* On a Mac CoreServices brings in the POSIX calls (usleep and the like),
  * and Cocoa programs rely on it; its file calls bring in open and its
  * flags (freemac 1.223, Ferry 0.47.0). */

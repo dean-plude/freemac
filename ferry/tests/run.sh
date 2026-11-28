@@ -1765,6 +1765,13 @@ run_one libsystem_older "$here/libsystem_older.c" "$here/libsystem_older.out" -l
 run_one foundation_older "$here/foundation/older.m" "$here/foundation/older.out" -framework Foundation \
     -framework CoreServices
 run_one appkit_older "$here/appkit/older.m" "$here/appkit/older.out" -framework Cocoa -framework WebKit
+# NSConnection between two programs, as MacVim's app and its Vim processes
+# talk (freemac 1.NEXT): results, out arguments, structs, exceptions, oneway
+# messages, objects by reference and a call back while a call is under way.
+run_one foundation_connection "$here/foundation/connection.m" "$here/foundation/connection.out" -framework Foundation
+# MacVim's glyph runs, Lab colours, copied menus with their submenus and key
+# equivalents, and typed keys reaching insertText:replacementRange: (freemac 1.NEXT)
+run_one appkit_macvim "$here/appkit/macvim.m" "$here/appkit/macvim.out" -framework Cocoa -framework CoreText
 # What Qt and OBS need of IOSurface, Accelerate (vImage), Metal (no device),
 # DiskArbitration (no disks) and Network's path monitor, and a Mac's
 # __exp10 and __sinpi, and libcurl (freemac 1.232, Ferry 0.56.0)

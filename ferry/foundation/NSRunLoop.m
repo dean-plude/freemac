@@ -836,7 +836,22 @@ void CFRunLoopAddCommonMode(CFRunLoopRef rl, CFRunLoopMode mode) {}
 - (BOOL)isValid { return !_invalid; }
 @end
 
-@implementation NSMachPort
+@implementation NSMachPort {
+    uint32_t _number;
+}
++ (NSPort *)portWithMachPort:(uint32_t)machPort { return [[[self alloc] initWithMachPort:machPort] autorelease]; }
+- (instancetype)initWithMachPort:(uint32_t)machPort
+{
+    if ((self = [super init]))
+        _number = machPort;
+    return self;
+}
+- (instancetype)init
+{
+    static _Atomic uint32_t next = 0x1003;
+    return [self initWithMachPort:next++];
+}
+- (uint32_t)machPort { return _number; }
 @end
 
 /* ---- NSTimer ------------------------------------------------------------------------- */

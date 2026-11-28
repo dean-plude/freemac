@@ -11,6 +11,15 @@ NSTouchBarItemIdentifier const NSTouchBarItemIdentifierFixedSpaceSmall = @"NSTou
 NSTouchBarItemIdentifier const NSTouchBarItemIdentifierFixedSpaceLarge = @"NSTouchBarItemIdentifierFixedSpaceLarge";
 NSTouchBarItemIdentifier const NSTouchBarItemIdentifierFlexibleSpace = @"NSTouchBarItemIdentifierFlexibleSpace";
 NSTouchBarItemIdentifier const NSTouchBarItemIdentifierOtherItemsProxy = @"NSTouchBarItemIdentifierOtherItemsProxy";
+/* the standard items' identifiers (freemac 1.NEXT; MacVim puts the emoji
+ * and symbol picker in its bar) */
+NSTouchBarItemIdentifier const NSTouchBarItemIdentifierCharacterPicker = @"NSTouchBarItemIdentifierCharacterPicker";
+NSTouchBarItemIdentifier const NSTouchBarItemIdentifierCandidateList = @"NSTouchBarItemIdentifierCandidateList";
+NSTouchBarItemIdentifier const NSTouchBarItemIdentifierTextFormat = @"NSTouchBarItemIdentifierTextFormat";
+NSTouchBarItemIdentifier const NSTouchBarItemIdentifierTextAlignment = @"NSTouchBarItemIdentifierTextAlignment";
+NSTouchBarItemIdentifier const NSTouchBarItemIdentifierTextColorPicker = @"NSTouchBarItemIdentifierTextColorPicker";
+NSTouchBarItemIdentifier const NSTouchBarItemIdentifierTextList = @"NSTouchBarItemIdentifierTextList";
+NSTouchBarItemIdentifier const NSTouchBarItemIdentifierTextStyle = @"NSTouchBarItemIdentifierTextStyle";
 
 static BOOL customize_item_enabled;
 

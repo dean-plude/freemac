@@ -75,7 +75,7 @@ static BOOL topline_has(NSMenuItem *item, BOOL app_menu_item)
 
 static BOOL shown(NSMenuItem *item, BOOL app_menu_item)
 {
-    return ![item isHidden] && ![item view] && !topline_has(item, app_menu_item);
+    return ![item isHidden] && ![item isAlternate] && ![item view] && !topline_has(item, app_menu_item);
 }
 
 /* GTK reads an underscore in a label as the key that picks it. */
