@@ -2177,6 +2177,10 @@ typedef NS_ENUM(NSInteger, NSDraggingContext) { NSDraggingContextOutsideApplicat
 - (void)dragImage:(NSImage *)image at:(NSPoint)location offset:(NSSize)offset event:(NSEvent *)event
        pasteboard:(NSPasteboard *)pasteboard source:(id)source slideBack:(BOOL)slideBack;
 @end
+@interface NSWindow (NSDraggingSource)
+- (void)dragImage:(NSImage *)image at:(NSPoint)location offset:(NSSize)offset event:(NSEvent *)event
+       pasteboard:(NSPasteboard *)pasteboard source:(id)source slideBack:(BOOL)slideBack;
+@end
 
 /* ---- Open and Save panels (M7) -------------------------------------------------------
  * This system's file chooser. With no display, a panel answers Cancel,

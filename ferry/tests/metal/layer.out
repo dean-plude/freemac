@@ -1,4 +1,5 @@
 the view's backing layer is a Metal layer: yes
+its backing properties changed on joining the window, scale set: yes
 the layer's preferred device is the device: yes
 BGRA8 by default: yes
 a drawable the drawable size: yes
@@ -6,5 +7,6 @@ presented as the layer's contents: yes
 orange in the view: yes
 20 frames from another thread: yes
 its last frame shown: yes
+presented from a scheduled handler, drawn first: yes
 resized: drawables 320 by 240: yes
 exit=0

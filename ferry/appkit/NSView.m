@@ -587,12 +587,18 @@ static int layers_drawing;   /* changes made while a view draws its layer don't 
         return;
     [self viewWillMoveToWindow:window];
     ATrackingViewMoving(self, _window, window);
+    CGFloat oldScale = _window ? [_window backingScaleFactor] : 0;
     _window = window;
     if ([_draggedTypes count])
         [window _enableDrops];
     for (NSView *v in _subviews)
         [v _setWindow:window];
     [self viewDidMoveToWindow];
+    /* Joining a window (or one of another scale) changes the view's backing
+     * properties, as on a Mac: Qt sets its layer's contentsScale there, and
+     * set it to 0 while the view had no window (freemac 1.NEXT, Shotcut). */
+    if (window && [window backingScaleFactor] != oldScale)
+        [self viewDidChangeBackingProperties];
     if (window)
         [self setNeedsDisplay:YES];
 }

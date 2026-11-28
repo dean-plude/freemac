@@ -184,11 +184,19 @@ enum class compare_func { none = FERRY_CMP_NONE, never = FERRY_CMP_NEVER, less =
                           greater_equal = FERRY_CMP_GREATER_EQUAL, equal = FERRY_CMP_EQUAL,
                           not_equal = FERRY_CMP_NOT_EQUAL, always = FERRY_CMP_ALWAYS };
 enum class border_color { transparent_black = 0, opaque_black = 1, opaque_white = 2 };
-struct s_address { address a; constexpr s_address(address x) : a(x) {} };
-struct t_address { address a; constexpr t_address(address x) : a(x) {} };
-struct r_address { address a; constexpr r_address(address x) : a(x) {} };
-struct mag_filter { filter f; constexpr mag_filter(filter x) : f(x) {} };
-struct min_filter { filter f; constexpr min_filter(filter x) : f(x) {} };
+/* One coordinate's address mode and one direction's filter, as the MSL
+ * specification declares them: enumerations of their own, so a shader can
+ * write mag_filter::linear (freemac 1.NEXT, Shotcut). */
+#define __FERRY_ADDRESS_NAMES \
+    { clamp_to_edge = FERRY_ADDR_CLAMP_TO_EDGE, mirrored_clamp_to_edge = FERRY_ADDR_MIRROR_CLAMP_TO_EDGE, \
+      repeat = FERRY_ADDR_REPEAT, mirrored_repeat = FERRY_ADDR_MIRRORED_REPEAT, \
+      clamp_to_zero = FERRY_ADDR_CLAMP_TO_ZERO, clamp_to_border = FERRY_ADDR_CLAMP_TO_BORDER }
+enum class s_address __FERRY_ADDRESS_NAMES;
+enum class t_address __FERRY_ADDRESS_NAMES;
+enum class r_address __FERRY_ADDRESS_NAMES;
+#undef __FERRY_ADDRESS_NAMES
+enum class mag_filter { nearest = 0, linear = 1, bicubic = 1 };
+enum class min_filter { nearest = 0, linear = 1, bicubic = 1 };
 struct max_anisotropy { int n; constexpr max_anisotropy(int x) : n(x) {} };
 struct lod_clamp { float lo, hi; constexpr lod_clamp(float a, float b) : lo(a), hi(b) {} };
 
@@ -198,12 +206,12 @@ struct sampler {
     template<class... A> constexpr sampler(A... a) : sampler() { (__set(a), ...); }
     constexpr void __set(coord c) { d.normalized = (unsigned char)c; }
     constexpr void __set(address a) { d.s_address = d.t_address = d.r_address = (unsigned char)a; }
-    constexpr void __set(s_address a) { d.s_address = (unsigned char)a.a; }
-    constexpr void __set(t_address a) { d.t_address = (unsigned char)a.a; }
-    constexpr void __set(r_address a) { d.r_address = (unsigned char)a.a; }
+    constexpr void __set(s_address a) { d.s_address = (unsigned char)a; }
+    constexpr void __set(t_address a) { d.t_address = (unsigned char)a; }
+    constexpr void __set(r_address a) { d.r_address = (unsigned char)a; }
     constexpr void __set(filter f) { d.mag_filter = d.min_filter = (unsigned char)f; }
-    constexpr void __set(mag_filter f) { d.mag_filter = (unsigned char)f.f; }
-    constexpr void __set(min_filter f) { d.min_filter = (unsigned char)f.f; }
+    constexpr void __set(mag_filter f) { d.mag_filter = (unsigned char)f; }
+    constexpr void __set(min_filter f) { d.min_filter = (unsigned char)f; }
     constexpr void __set(mip_filter f) { d.mip_filter = (unsigned char)f; }
     constexpr void __set(compare_func f) { d.compare = (unsigned char)f; }
     constexpr void __set(border_color b) { d.border = (unsigned char)b; }

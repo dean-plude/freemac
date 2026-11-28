@@ -41,4 +41,7 @@ assert [b['index'] for b in f['fs_main']['buffers']] == [2], f['fs_main']['buffe
 " "$tmp/blender.json"
 # SPIRV-Cross-style shader code (MoltenVK, as Godot uses) builds
 "$here/../ferry-mslc" build "$here/spirv-cross-style.metal" -o "$tmp/spirv.dylib"
+# Qt-style shader code (Shotcut) builds: simd type names, braced matrix
+# columns, a sampler set one coordinate and one direction at a time
+"$here/../ferry-mslc" build "$here/qt-style.metal" -o "$tmp/qt.dylib"
 echo "ferry-mslc: all tests passed"
