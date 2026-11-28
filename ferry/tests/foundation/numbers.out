@@ -213,4 +213,6 @@ byte counts
   zero, numeric: 0 bytes
   not adaptive: 1.23 MB, 2 KB
   zero-padded: 2.0 MB, 3.00 GB
+shared small numbers: yes
+after extra releases: 5
 exit=0

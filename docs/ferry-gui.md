@@ -3396,6 +3396,18 @@ Not there yet: IINA's images from its asset catalog (some buttons are
 blank), gesture recognizers don't fire, and picture in picture's window has
 no play and pause buttons.
 
+## kitty runs (freemac 1.269, Ferry 0.92.0)
+
+kitty 0.37, the terminal, installs from its official disk image with the Installer and runs a shell in its window, with typing and 256 colours. What it needed:
+
+- **Disk images packed with LZMA.** kitty's `.dmg` keeps its blocks in LZMA chunks (UDIF chunk type `0x80000008`). The Installer reads the image's `koly` trailer and block tables, unpacks each chunk (zlib, bzip2 or LZMA) into a plain disk image and opens that.
+- **`/usr/bin/login`.** kitty starts its shell as `login -f -l -p USER SHELL`. Linux's `login` refuses that, so Ferry runs it itself: only for the current user, setting `HOME`, `SHELL`, `USER` and `LOGNAME`, then running the program named or the user's shell as a login shell.
+- **Go programs.** kitty's helper `kitten` is written in Go. Go's runtime finds the environment and the apple strings by walking on past the end of `argv`, so Ferry now lays them out one after another, as a Mac does, with `executable_path=` first among the apple strings.
+- **Signal contexts.** Go's and kitty's signal handlers read and change the interrupted registers. A handler installed with `SA_SIGINFO` now gets a Mac `ucontext_t` whose `uc_mcontext` holds the Mac's register layout, and any change is put back when the handler returns. `sigaltstack` takes the Mac's `stack_t`.
+- **terminfo.** kitty ships its terminal description in a Mac-style terminfo folder, named by hex digit (`78/xterm-kitty`). When such a folder reaches a program of this system through `TERMINFO`, Ferry gives it a folder of letters in `~/.cache/ferry` that leads to the same files, so bash knows the terminal.
+- **Over-released numbers.** On a Mac, small `NSNumber`s are tagged pointers that never get freed, and kitty releases one more time than it retains. Ferry's small numbers are now shared and live for good.
+- Also: XPC dates, `faccessat`, `fchmodat`, `sendfile`, `NSWindow`'s miniwindow title, and events posted from another thread.
+
 ## Zed edits code (freemac 1.268, Ferry 0.91.0)
 
 Zed 0.170.4, the code editor, from its official download, opens its editor

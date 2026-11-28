@@ -1183,6 +1183,23 @@ The menu bar's Bluetooth menu, as on a Mac.
 | 4 | Bluetooth Settings… opens Dials > Bluetooth, as a click did before; a computer with no Bluetooth still shows no symbol | bluetooth_menu.py, status.py | done |
 | 5 | Guide topic, README row and screenshots | Guide, Docs | done |
 
+## 1.269 "kitty runs" (done)
+
+Ferry 0.92.0: kitty 0.37, the terminal, from its official download, installs, opens its window and runs a shell that takes typing and shows colours. kitty starts its shell through `/usr/bin/login` and its helper `kitten` is a Go program, so this release adds what both need. The Installer also opens disk images packed with LZMA, which kitty's download uses.
+
+| # | Item | Component | Status |
+| --- | --- | --- | --- |
+| 1 | `/usr/bin/login` started by a Mac program runs the user's shell or the program it names, for the current user only | Ferry | done |
+| 2 | A program's arguments, environment and apple strings lie one after another, with `executable_path` first, as Go's runtime expects | Ferry | done |
+| 3 | A signal handler gets a Mac `ucontext` with its machine registers, and changes to them take effect; `sigaltstack` in a Mac's layout | Ferry | done |
+| 4 | `faccessat`, `fchmodat`, `chroot`, `setgroups` and a Mac's `sendfile` with headers and trailers | Ferry | done |
+| 5 | XPC dates (`xpc_date_create`, `xpc_date_create_from_current`, `xpc_date_get_value`) | Ferry | done |
+| 6 | A Mac app's terminfo folders, named by hex digit, reach this system's programs through a folder of letters in Ferry's cache | Ferry | done |
+| 7 | Small numbers are shared and never freed, like a Mac's tagged numbers, so an extra release of one is harmless | Ferry Foundation | done |
+| 8 | `NSWindow` miniwindow titles; events posted from another thread reach the main thread | Ferry AppKit | done |
+| 9 | The Installer opens disk images with LZMA, bzip2 or zlib chunks | Installer | done |
+| 10 | kitty installs from its official disk image, opens and runs a working shell | Ferry / kitty | done |
+
 ## 1.268 "Zed edits code" (done)
 
 Ferry 0.91.0: Zed 0.170.4, the code editor, from its official download, opens its editor and takes typing. Zed draws its whole window with its own Metal shaders, which ship precompiled for Apple's GPUs; Ferry now rebuilds them for the PC's processor. Ferry's software Metal is about twice as fast, so a keystroke shows in about a tenth of a second and an idle Zed uses no processor time.

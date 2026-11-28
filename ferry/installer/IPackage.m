@@ -63,6 +63,8 @@ void lzma_end(lzma_stream *strm);
 #define LZMA_RUN 0
 #define LZMA_FINISH 3
 #define LZMA_CONCATENATED 0x08
+int lzma_auto_decoder(lzma_stream *strm, uint64_t memlimit, uint32_t flags);
+int BZ2_bzBuffToBuffDecompress(char *dest, unsigned *destLen, char *source, unsigned sourceLen, int small, int verbosity);
 
 /* ---- XML --------------------------------------------------------------------------------- */
 
@@ -1549,6 +1551,184 @@ static void largest_file(NSString *dir, NSString **best, unsigned long long *siz
     }
 }
 
+/* ---- disk images packed with LZMA ------------------------------------------------------
+ * A disk image (UDIF) keeps its disk in chunks, each stored as is, as zeros,
+ * or compressed: zlib (0x80000005), bzip2 (0x80000006), LZFSE (0x80000007)
+ * or LZMA (0x80000008, "ULMO"). The chunk tables ("mish" blocks) are in the
+ * XML property list the "koly" trailer points at (the layout as Jonathan
+ * Levin's public write-up of the format gives it). 7-Zip reads most images
+ * but not LZMA chunks, which kitty's uses (freemac 1.269), so such an image
+ * is first written out as a plain disk image, which 7-Zip then opens. */
+static uint32_t be32(const uint8_t *p) { return (uint32_t)p[0] << 24 | (uint32_t)p[1] << 16 | (uint32_t)p[2] << 8 | p[3]; }
+
+#define UDIF_ZERO 0x00000000u
+#define UDIF_RAW 0x00000001u
+#define UDIF_IGNORE 0x00000002u
+#define UDIF_ZLIB 0x80000005u
+#define UDIF_BZIP2 0x80000006u
+#define UDIF_LZMA 0x80000008u
+#define UDIF_COMMENT 0x7ffffffeu
+#define UDIF_END 0xffffffffu
+
+/* The image's chunk tables, or nil when it isn't a disk image. */
+static NSArray *udif_tables(int fd, uint64_t *dataFork)
+{
+    struct stat st;
+    uint8_t k[512];
+    if (fstat(fd, &st) != 0 || st.st_size < 512 || pread(fd, k, 512, st.st_size - 512) != 512 || memcmp(k, "koly", 4))
+        return nil;
+    *dataFork = be64(k + 0x18);
+    uint64_t xo = be64(k + 0xd8), xl = be64(k + 0xe0);
+    if (!xl || xl > (64u << 20) || xo + xl > (uint64_t)st.st_size)
+        return nil;
+    NSMutableData *xml = [NSMutableData dataWithLength:(NSUInteger)xl];
+    if (pread(fd, [xml mutableBytes], (size_t)xl, (off_t)xo) != (ssize_t)xl)
+        return nil;
+    id plist = [NSPropertyListSerialization propertyListWithData:xml options:0 format:NULL error:NULL];
+    id blkx = [plist isKindOfClass:[NSDictionary class]] ? plist[@"resource-fork"][@"blkx"] : nil;
+    return [blkx isKindOfClass:[NSArray class]] ? blkx : nil;
+}
+
+static BOOL udif_has_lzma(NSString *dmg)
+{
+    int fd = open([dmg fileSystemRepresentation], O_RDONLY);
+    if (fd < 0)
+        return NO;
+    uint64_t dataFork = 0;
+    BOOL found = NO;
+    for (NSDictionary *b in udif_tables(fd, &dataFork)) {
+        NSData *d = [b isKindOfClass:[NSDictionary class]] ? b[@"Data"] : nil;
+        if (![d isKindOfClass:[NSData class]] || [d length] < 204)
+            continue;
+        const uint8_t *m = [d bytes];
+        uint32_t n = be32(m + 200);
+        for (uint32_t i = 0; i < n && 204 + 40 * (size_t)(i + 1) <= [d length] && !found; i++)
+            found = be32(m + 204 + 40 * i) == UDIF_LZMA;
+    }
+    close(fd);
+    return found;
+}
+
+static BOOL write_all(int fd, const void *p, size_t n, off_t at)
+{
+    while (n) {
+        ssize_t w = pwrite(fd, p, n, at);
+        if (w <= 0)
+            return NO;
+        p = (const uint8_t *)p + w;
+        n -= (size_t)w;
+        at += w;
+    }
+    return YES;
+}
+
+static BOOL udif_unpack_chunk(uint32_t type, NSData *in, uint8_t *out, size_t outLen)
+{
+    if (type == UDIF_ZLIB) {
+        z_stream z;
+        memset(&z, 0, sizeof z);
+        if (inflateInit2_(&z, 15, zlibVersion(), (int)sizeof z) != Z_OK)
+            return NO;
+        z.next_in = [in bytes];
+        z.avail_in = (unsigned)[in length];
+        z.next_out = out;
+        z.avail_out = (unsigned)outLen;
+        int r = inflate(&z, Z_NO_FLUSH);
+        inflateEnd(&z);
+        return r == Z_STREAM_END || (r == Z_OK && z.avail_out == 0);
+    }
+    if (type == UDIF_BZIP2) {
+        unsigned len = (unsigned)outLen;
+        return BZ2_bzBuffToBuffDecompress((char *)out, &len, (char *)[in bytes], (unsigned)[in length], 0, 0) == 0;
+    }
+    if (type == UDIF_LZMA) {
+        lzma_stream l;
+        memset(&l, 0, sizeof l);
+        if (lzma_auto_decoder(&l, UINT64_MAX, LZMA_CONCATENATED) != LZMA_OK)
+            return NO;
+        l.next_in = [in bytes];
+        l.avail_in = [in length];
+        l.next_out = out;
+        l.avail_out = outLen;
+        int r = lzma_code(&l, LZMA_FINISH);
+        lzma_end(&l);
+        return r == LZMA_STREAM_END || (r == LZMA_OK && l.avail_out == 0);
+    }
+    return NO;
+}
+
+/* Writes the image's disk to raw; NO when a chunk can't be read. */
+static BOOL udif_to_raw(NSString *dmg, NSString *raw, BOOL (^keepWaiting)(void))
+{
+    int fd = open([dmg fileSystemRepresentation], O_RDONLY);
+    if (fd < 0)
+        return NO;
+    int out = open([raw fileSystemRepresentation], O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (out < 0) {
+        close(fd);
+        return NO;
+    }
+    uint64_t dataFork = 0;
+    BOOL ok = YES;
+    NSArray *tables = udif_tables(fd, &dataFork);
+    if (!tables)
+        ok = NO;
+    uint64_t end = 0;
+    for (NSDictionary *b in tables) {
+        NSData *d = [b isKindOfClass:[NSDictionary class]] ? b[@"Data"] : nil;
+        if (!ok)
+            break;
+        if (![d isKindOfClass:[NSData class]] || [d length] < 204 || memcmp([d bytes], "mish", 4))
+            continue;
+        const uint8_t *m = [d bytes];
+        uint64_t first = be64(m + 8), dataStart = be64(m + 24);
+        uint32_t n = be32(m + 200);
+        for (uint32_t i = 0; i < n && ok; i++) {
+            if (204 + 40 * (size_t)(i + 1) > [d length]) {
+                ok = NO;
+                break;
+            }
+            const uint8_t *c = m + 204 + 40 * i;
+            uint32_t type = be32(c);
+            uint64_t sector = first + be64(c + 8), count = be64(c + 16), off = be64(c + 24), len = be64(c + 32);
+            if (type == UDIF_END || type == UDIF_COMMENT)
+                continue;
+            if (count > (1u << 24) || len > (512u << 20)) {
+                ok = NO;
+                break;
+            }
+            if (sector + count > end)
+                end = sector + count;
+            if (type == UDIF_ZERO || type == UDIF_IGNORE)
+                continue;   /* the file's holes read as zeros */
+            if (keepWaiting && !keepWaiting()) {
+                ok = NO;
+                break;
+            }
+            NSMutableData *in = [NSMutableData dataWithLength:(NSUInteger)len];
+            if (pread(fd, [in mutableBytes], (size_t)len, (off_t)(dataFork + dataStart + off)) != (ssize_t)len) {
+                ok = NO;
+                break;
+            }
+            size_t outLen = (size_t)count * 512;
+            if (type == UDIF_RAW) {
+                ok = write_all(out, [in bytes], len < outLen ? (size_t)len : outLen, (off_t)(sector * 512));
+                continue;
+            }
+            uint8_t *buf = calloc(1, outLen ? outLen : 1);
+            ok = buf && udif_unpack_chunk(type, in, buf, outLen) && write_all(out, buf, outLen, (off_t)(sector * 512));
+            free(buf);
+        }
+    }
+    if (ok && ftruncate(out, (off_t)(end * 512)) != 0)
+        ok = NO;
+    close(out);
+    close(fd);
+    if (!ok)
+        unlink([raw fileSystemRepresentation]);
+    return ok;
+}
+
 NSString *IOpenDiskImage(NSString *dmg, NSString **error, BOOL (^keepWaiting)(void))
 {
     const char *cache = getenv("XDG_CACHE_HOME");
@@ -1558,7 +1738,28 @@ NSString *IOpenDiskImage(NSString *dmg, NSString **error, BOOL (^keepWaiting)(vo
         stringByAppendingPathComponent:[NSString stringWithFormat:@"image-%d-%d", (int)getpid(), ++serial]];
     IRemoveTree(dir);
     [[NSFileManager defaultManager] createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:NULL];
-    int r = run_7z(dmg, dir, keepWaiting);
+    NSString *rawImage = nil;
+    if (udif_has_lzma(dmg)) {
+        rawImage = [dir stringByAppendingPathComponent:@"image.raw"];
+        if (!udif_to_raw(dmg, rawImage, keepWaiting)) {
+            IRemoveTree(dir);
+            if (error)
+                *error = @"This disk image couldn't be unpacked (a part of it is damaged, or packed in a way Ferry doesn't read).";
+            return nil;
+        }
+        /* the plain disk opens as its partitions, read as below */
+        NSString *parts = [dir stringByAppendingPathComponent:@"disk"];
+        [[NSFileManager defaultManager] createDirectoryAtPath:parts withIntermediateDirectories:YES attributes:nil error:NULL];
+        int pr = run_7z(rawImage, parts, keepWaiting);
+        unlink([rawImage fileSystemRepresentation]);
+        if (pr == 127 || pr == -1) {
+            IRemoveTree(dir);
+            if (error)
+                *error = @"Opening disk images needs 7-Zip (the 7z command, in the 7zip or p7zip-full package), which isn't installed.";
+            return nil;
+        }
+    }
+    int r = rawImage ? 0 : run_7z(dmg, dir, keepWaiting);
     if (r == 127 || r == -1) {
         IRemoveTree(dir);
         if (error)

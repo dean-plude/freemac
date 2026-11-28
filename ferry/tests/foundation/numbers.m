@@ -339,6 +339,15 @@ int main(void)
         [bc setZeroPadsFractionDigits:YES];
         printf("  zero-padded: %s, %s\n", [[bc stringFromByteCount:2000000] UTF8String],
                [[bc stringFromByteCount:3000000000LL] UTF8String]);
+
+        /* Small numbers are shared and live for good, like a Mac's tagged
+         * numbers, so an app's extra release of one (kitty's) does no harm
+         * (freemac 1.269). */
+        NSNumber *five = [NSNumber numberWithInt:5];
+        printf("shared small numbers: %s\n", five == [NSNumber numberWithInt:5] ? "yes" : "no");
+        [five release];
+        [five release];
+        printf("after extra releases: %d\n", [[NSNumber numberWithInt:5] intValue]);
     }
     return 0;
 }
