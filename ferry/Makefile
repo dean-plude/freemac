@@ -402,7 +402,7 @@ $(APPKIT): $(APPKIT_OBJ) $(GRAPHICS) $(QUARTZCORE) $(OPENGL) $(COREVIDEO) $(IOSU
 $(INSTALLER): $(INSTALLER_SRC) installer/IPackage.h installer/Info.plist $(APPKIT) $(TWIN_TBD)
 	@mkdir -p $(INSTALLER_APP)/Contents/MacOS
 	cp installer/Info.plist $(INSTALLER_APP)/Contents/Info.plist
-	sdk/ferry-cc $(OBJCFLAGS) -fblocks -o $@ $(INSTALLER_SRC) -framework Cocoa -lz -llzma
+	sdk/ferry-cc $(OBJCFLAGS) -fblocks -o $@ $(INSTALLER_SRC) -framework Cocoa -lz -llzma -lbz2
 
 coredata/build/%.o: coredata/%.m $(COREDATA_HEADERS) sdk/ferry-cc
 	@mkdir -p coredata/build

@@ -51,7 +51,7 @@ run_one() {
             url_env "$top/ferry" "$exe" first > "$build/$name.got" 2> "$build/$name.err" &&
                 url_env "$top/ferry" "$exe" second >> "$build/$name.got" 2>> "$build/$name.err" ;;
         foundation_fileaccess|foundation_fsrefs|foundation_more_names|foundation_fsevents|foundation_apps_more|\
-        foundation_keycastr_calls)
+        foundation_keycastr_calls|libsystem_kitty)
             # the trash and the test's files in a home of its own
             rm -rf "$build/home_$name"; mkdir -p "$build/home_$name"
             HOME="$build/home_$name" XDG_CONFIG_HOME= XDG_DATA_HOME= TMPDIR="$build/home_$name" \
@@ -285,6 +285,10 @@ run_one libsystem_media "$here/libsystem_media.c" "$here/libsystem_media.out"
 run_one libsystem_backtrace "$here/libsystem_backtrace.c" "$here/libsystem_backtrace.out"
 # a terminal's settings in a Mac's struct termios, on a pseudo-terminal (1.233)
 run_one libsystem_termios "$here/libsystem_termios.c" "$here/libsystem_termios.out"
+# what kitty and its Go helper ask of libSystem: main's argument lists, a
+# Mac signal context, sigaltstack, the *at calls, XPC dates, /usr/bin/login
+# and terminfo (freemac 1.269)
+run_one libsystem_kitty "$here/libsystem_kitty.c" "$here/libsystem_kitty.out"
 # CommonCrypto (libSystem): digests, HMAC, PBKDF2 and random bytes, and AES
 # through this system's OpenSSL, against published test vectors.
 run_one commoncrypto_digests "$here/commoncrypto_digests.c" "$here/commoncrypto_digests.out"

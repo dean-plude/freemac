@@ -1109,8 +1109,15 @@ static struct image *load_library(struct image *loader, const char *install_name
                     return NULL;
             if (nwarned < 32)
                 snprintf(warned[nwarned++], sizeof warned[0], "%s", name);
-            fprintf(stderr, "ferry: %s uses %s, which Ferry doesn't provide yet; carrying on without it\n",
-                    short_name(loader->path), name);
+            /* A /usr/lib library is mentioned only with -v from freemac 1.269:
+             * Go programs link libresolv, and a terminal app's helper (kitty's
+             * kitten) printed this into the terminal's window. A call into the
+             * library still names itself when it stops. */
+            if (!strncmp(install_name, "/usr/lib/", 9))
+                note("%s uses %s, which Ferry doesn't provide yet; carrying on without it", short_name(loader->path), name);
+            else
+                fprintf(stderr, "ferry: %s uses %s, which Ferry doesn't provide yet; carrying on without it\n",
+                        short_name(loader->path), name);
             return NULL;
         }
         die("%s needs %s, which Ferry doesn't provide yet", loader->path, install_name);
@@ -1580,7 +1587,7 @@ static __attribute__((noreturn)) void start_unixthread(uint64_t pc, int argc, ch
     int nenv = 0;
     while (envp && envp[nenv])
         nenv++;
-    size_t words = 1 + (size_t)argc + 1 + (size_t)nenv + 1 + 2;
+    size_t words = 1 + (size_t)argc + 1 + (size_t)nenv + 1 + 2 + 1;
     size_t size = 1 << 20; /* the start routine's own stack, then main's */
     uint8_t *stack = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (stack == MAP_FAILED)
@@ -1594,13 +1601,37 @@ static __attribute__((noreturn)) void start_unixthread(uint64_t pc, int argc, ch
     for (int i = 0; i < nenv; i++)
         *w++ = (uint64_t)envp[i];
     *w++ = 0;
-    *w++ = 0; /* no apple strings */
+    *w++ = (uint64_t)envp[nenv + 1]; /* the apple strings, as ferry_run made them */
+    *w++ = 0;
     note("jumping to the start routine at %p", (void *)pc);
     ferry_jump_to_start(pc, sp);
 }
 
 int ferry_run(const char *path, int argc, char **argv, char **envp)
 {
+    /* As a Mac starts a program, main's argv, envp and apple lists lie one
+     * after the other in memory, each ending in NULL, the apple list holding
+     * "executable_path=..." (Mac OS X ABI Mach-O File Format Reference,
+     * the program start; the Mac's main(argc, argv, envp, apple)). Go's
+     * runtime counts on it: it reads the environment and the apple strings
+     * past the end of argv (freemac 1.269, for kitty's kitten). */
+    int nenv = 0;
+    while (envp && envp[nenv])
+        nenv++;
+    char **vec = calloc((size_t)argc + 1 + (size_t)nenv + 1 + 2, sizeof *vec);
+    if (!vec)
+        die("out of memory");
+    char *exe_path = NULL;
+    if (asprintf(&exe_path, "executable_path=%s", path) < 0)
+        die("out of memory");
+    for (int i = 0; i < argc; i++)
+        vec[i] = argv[i];
+    for (int i = 0; i < nenv; i++)
+        vec[argc + 1 + i] = envp[i];
+    argv = vec;
+    envp = vec + argc + 1;
+    char **apple = envp + nenv + 1;
+    apple[0] = exe_path;
     start_argc = argc;
     start_argv = argv;
     start_envp = envp;
@@ -1611,7 +1642,6 @@ int ferry_run(const char *path, int argc, char **argv, char **envp)
                         "(FERRY_VERBOSE=1 lists them)\n", short_name(path), missing_classes,
                 missing_classes == 1 ? "" : "es", missing_classes == 1 ? "it is" : "they are");
     mac_main entry = (mac_main)(image_base(im) + im->entryoff);
-    char *apple[] = {NULL};
     ferry_program_started(path, argc, argv);
     initialize_image(im, argc, argv, envp, apple);
     if (im->unixthread)

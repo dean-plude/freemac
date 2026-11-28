@@ -45,6 +45,7 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     NSRect _frame;
     NSWindowStyleMask _style;
     NSString *_title;
+    NSString *_miniwindowTitle;
     NSView *_contentView;
     id _delegate;
     NSInteger _number;
@@ -236,6 +237,7 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
     [_toolbarView _setWindow:nil];
     [_toolbarView release];
     [_title release];
+    [_miniwindowTitle release];
     [_background release];
     [_autosaveName release];
     [_sheet release];
@@ -266,6 +268,15 @@ NSArray *AAllWindows(void) { return all_windows ?: @[]; }
 /* ---- properties ------------------------------------------------------------------ */
 
 - (NSString *)title { return _title; }
+/* the title under the window's picture in the Dock while it's minimized:
+ * the window's title unless set (Apple's NSWindow reference) */
+- (NSString *)miniwindowTitle { return _miniwindowTitle ?: _title; }
+- (void)setMiniwindowTitle:(NSString *)title
+{
+    NSString *old = _miniwindowTitle;
+    _miniwindowTitle = [title copy];
+    [old release];
+}
 /* The thick bottom or top border of textured windows: kept, but drawn as
  * part of the window's ordinary background. */
 - (void)setContentBorderThickness:(CGFloat)thickness forEdge:(NSRectEdge)edge

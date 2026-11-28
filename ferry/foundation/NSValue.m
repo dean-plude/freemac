@@ -3,6 +3,7 @@
  * was made from (its objCType) and compares by value, as on a Mac. The two
  * booleans are shared objects, which CoreFoundation also hands out as
  * kCFBooleanTrue and kCFBooleanFalse. */
+#include <pthread.h>
 #import "FInternal.h"
 
 @interface FValue : NSValue {
@@ -22,6 +23,7 @@
 @interface FNumber : NSNumber {
 @public
     char _type; /* an @encode letter: c C s S i I q Q f d, or B for the booleans */
+    char _shared; /* one of the shared integer numbers below: kept for good */
     union {
         long long i;
         unsigned long long u;
@@ -285,8 +287,54 @@ static FNumber *make(char type)
     return n;
 }
 
+/* On a Mac an integer NSNumber that fits in a pointer's spare bits is a
+ * "tagged pointer": no memory is allocated for it, and retain and release
+ * do nothing (Apple's Objective-C runtime notes on tagged pointers, and its
+ * NSNumber documentation that equal small numbers may be the same object).
+ * Programs come to rely on that: kitty releases the number
+ * numberWithUnsignedInt: gave it, which on a Mac does nothing and here
+ * freed it twice. So integer numbers the factory methods make are shared
+ * and kept for good, one per type and value, as many as the table holds
+ * (freemac 1.269). */
+#define SHARED_NUMBERS 4096
+static struct { char type; long long v; FNumber *n; } shared_numbers[SHARED_NUMBERS];
+static int shared_count;
+static pthread_mutex_t shared_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static NSNumber *shared_number(char type, long long v)
+{
+    unsigned h = (unsigned)(((unsigned long long)v * 0x9e3779b97f4a7c15ull) >> 52) ^ (unsigned char)type;
+    FNumber *found = nil;
+    pthread_mutex_lock(&shared_lock);
+    for (unsigned i = 0; i < SHARED_NUMBERS; i++) {
+        unsigned k = (h + i) % SHARED_NUMBERS;
+        if (!shared_numbers[k].n) {
+            if (shared_count < SHARED_NUMBERS * 3 / 4) {
+                FNumber *n = make(type);
+                n->_v.i = v;
+                n->_shared = 1;
+                shared_numbers[k].type = type;
+                shared_numbers[k].v = v;
+                shared_numbers[k].n = n;
+                shared_count++;
+                found = n;
+            }
+            break;
+        }
+        if (shared_numbers[k].type == type && shared_numbers[k].v == v) {
+            found = shared_numbers[k].n;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&shared_lock);
+    return found;
+}
+
 static NSNumber *signed_number(char type, long long v)
 {
+    NSNumber *shared = shared_number(type, v);
+    if (shared)
+        return shared;
     FNumber *n = make(type);
     n->_v.i = v;
     return [n autorelease];
@@ -298,6 +346,9 @@ static NSNumber *unsigned_number(char type, unsigned long long v)
      * signed type; only the very largest stay unsigned ("Q"). */
     if (type == 'Q' && v <= (unsigned long long)LLONG_MAX)
         type = 'q';
+    NSNumber *shared = type != 'Q' ? shared_number(type, (long long)v) : nil;
+    if (shared)
+        return shared;
     FNumber *n = make(type);
     n->_v.u = v;
     return [n autorelease];
@@ -400,16 +451,23 @@ static NSString *format_double(double d, BOOL single)
 @implementation FNumber
 - (id)retain
 {
-    if (self == yes_number || self == no_number)
+    if (self == yes_number || self == no_number || _shared)
         return self;
     return [super retain];
 }
 - (oneway void)release
 {
-    if (self == yes_number || self == no_number)
+    if (self == yes_number || self == no_number || _shared)
         return;
     [super release];
 }
+- (id)autorelease
+{
+    if (_shared)
+        return self;
+    return [super autorelease];
+}
+- (NSUInteger)retainCount { return _shared ? NSUIntegerMax : [super retainCount]; }
 - (long long)longLongValue { return as_ll(self); }
 - (unsigned long long)unsignedLongLongValue { return is_float(self) ? (unsigned long long)_v.d : _v.u; }
 - (double)doubleValue { return as_double(self); }

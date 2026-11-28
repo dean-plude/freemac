@@ -1457,6 +1457,19 @@ static BOOL wanted(NSEvent *e, NSEventMask mask) { return (mask & NSEventMaskFro
 {
     if (!event)
         return;
+    /* Apple's documentation allows posting from any thread, and programs
+     * wake their main loop this way (GLFW, in kitty, posts an empty
+     * application-defined event when its other threads have work for it).
+     * The queue belongs to the main thread, so the event is handed there,
+     * which also wakes the main run loop out of its wait (freemac 1.268). */
+    if (![NSThread isMainThread]) {
+        [event retain];
+        [[NSRunLoop mainRunLoop] performBlock:^{
+          [self postEvent:event atStart:atStart];
+          [event release];
+        }];
+        return;
+    }
     if (!queue)
         queue = [[NSMutableArray alloc] init];
     if (atStart)
