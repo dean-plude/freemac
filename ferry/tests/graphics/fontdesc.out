@@ -16,4 +16,8 @@ graphics font upem 1, cmap 1
 font from graphics font 1, size 20
 font from data drawn 1 at 13 pt
 descriptors from data 1, family from its name table 1
+its own font from data: 1 1, glyphs 4, A B ~ are 1 2 3 (1)
+its own advance 14
+registered 1
+family listed after, not before: 1 1
 exit=0

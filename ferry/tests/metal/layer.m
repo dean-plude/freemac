@@ -6,8 +6,10 @@
  * cacheDisplayInRect:, drawables taken in turns from another thread, and a
  * new drawable size after a resize; and, as Qt's Cocoa plugin does it
  * (freemac 1.NEXT, Shotcut), the layer's scale set when the view joins its
- * window and a drawable presented from a scheduled handler. A picture goes to
- * $FERRY_TEST_SHOTS when it is set. */
+ * window and a drawable presented from a scheduled handler; the view's
+ * drawRect: run when it needs display, not for each frame presented
+ * (freemac 1.NEXT, Neovide). A picture goes to $FERRY_TEST_SHOTS when it is
+ * set. */
 #import <Cocoa/Cocoa.h>
 #import <Metal/Metal.h>
 #import <QuartzCore/CAMetalLayer.h>
@@ -42,8 +44,9 @@ static void spin(double seconds)
 
 @interface MetalView : NSView
 @end
-static int backingChanges;
+static int backingChanges, draws;
 @implementation MetalView
+- (void)drawRect:(NSRect)r { (void)r; draws++; }
 - (CALayer *)makeBackingLayer { return [CAMetalLayer layer]; }
 - (void)viewDidChangeBackingProperties
 {
@@ -114,11 +117,22 @@ int main(void)
         NSBitmapImageRep *rep = picture(v, "metal_layer");
         check("orange in the view", near_at(rep, 80, 60, 255, 128, 0));
 
+        [w display];
+        int drawsBefore = draws;
         pthread_t t;
         pthread_create(&t, NULL, render_thread, NULL);
         pthread_join(t, NULL);
         spin(0.3);
         check("20 frames from another thread", threadFrames == 20);
+        /* winit asks for its next frame from drawRect:, so the window drawn
+         * again for a frame presented mustn't run it, as on a Mac; the
+         * view's own setNeedsDisplay: does */
+        [w display];
+        check("drawRect: not run for the frames presented", draws == drawsBefore);
+        drawsBefore = draws;
+        [v setNeedsDisplay:YES];
+        [v displayIfNeeded];
+        check("drawRect: run when the view needs display", draws > drawsBefore);
         rep = picture(v, NULL);
         check("its last frame shown", near_at(rep, 80, 60, 0, 128, 255));
 

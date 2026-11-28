@@ -46,7 +46,8 @@ command buffer took.
 A program gets a Metal device when it links Metal.framework and not
 OpenGL.framework: a program that links both (such as OBS Studio, VLC or a
 Qt app) gets no device, so it keeps drawing with OpenGL, which is faster
-here. In a program that links neither, such as Python, the library asking for
+here, unless it links MetalKit.framework too, as Neovide does: only a program
+that draws with Metal links that. In a program that links neither, such as Python, the library asking for
 the device decides the same way: Blender's `bpy` module links Metal and not
 OpenGL, so it gets one, and its Workbench and EEVEE engines render with it,
 EEVEE's shadows included.

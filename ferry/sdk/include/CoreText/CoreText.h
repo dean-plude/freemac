@@ -198,6 +198,11 @@ CFArrayRef CTFontManagerCreateFontDescriptorsFromURL(CFURLRef fileURL);
 CTFontDescriptorRef CTFontManagerCreateFontDescriptorFromData(CFDataRef data);
 CFArrayRef CTFontManagerCreateFontDescriptorsFromData(CFDataRef data);
 void CTFontManagerEnableFontDescriptors(CFArrayRef descriptors, bool enable);
+bool CTFontManagerRegisterFontsForURL(CFURLRef fontURL, CTFontManagerScope scope, CFErrorRef *error);
+bool CTFontManagerRegisterFontsForURLs(CFArrayRef fontURLs, CTFontManagerScope scope, CFArrayRef *errors);
+bool CTFontManagerUnregisterFontsForURL(CFURLRef fontURL, CTFontManagerScope scope, CFErrorRef *error);
+bool CTFontManagerRegisterGraphicsFont(CGFontRef font, CFErrorRef *error);
+bool CTFontManagerUnregisterGraphicsFont(CGFontRef font, CFErrorRef *error);
 
 /* ---- string attributes --------------------------------------------------------- */
 

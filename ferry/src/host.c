@@ -41,13 +41,15 @@ struct group {
 static const char *const drawing_libraries[] = {
     "libcairo.so.2",     "libpangocairo-1.0.so.0", "libpango-1.0.so.0",
     "libgobject-2.0.so.0", "libglib-2.0.so.0",     "libharfbuzz.so.0",
+    /* fonts a program brings, made known to fontconfig (freemac 1.NEXT) */
+    "libpangoft2-1.0.so.0", "libfontconfig.so.1",
 };
 static const char *const window_libraries[] = {"libgtk-3.so.0", "libgdk-3.so.0"};
 static const char *const image_libraries[] = {"libgdk_pixbuf-2.0.so.0"};
 static const char *const pdf_libraries[] = {"libpoppler-glib.so.8"};
 static const char *const gio_libraries[] = {"libgio-2.0.so.0"};
 static const char *const jpeg2000_libraries[] = {"libopenjp2.so.7"};
-static struct group drawing = {"drawing", drawing_libraries, 6, {0}, 0, 0};
+static struct group drawing = {"drawing", drawing_libraries, 8, {0}, 0, 0};
 static struct group windows = {"windows", window_libraries, 2, {0}, 0, 0};
 static struct group images = {"reading image files", image_libraries, 1, {0}, 0, 1};
 static struct group pdf = {"reading PDF files", pdf_libraries, 1, {0}, 0, 1};

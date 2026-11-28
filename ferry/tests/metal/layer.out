@@ -6,6 +6,8 @@ a drawable the drawable size: yes
 presented as the layer's contents: yes
 orange in the view: yes
 20 frames from another thread: yes
+drawRect: not run for the frames presented: yes
+drawRect: run when the view needs display: yes
 its last frame shown: yes
 presented from a scheduled handler, drawn first: yes
 resized: drawables 320 by 240: yes

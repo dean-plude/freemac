@@ -2,7 +2,9 @@
  * Ferry test (freemac 1.230): CFRunLoopObserver, as KeyboardShortcuts and
  * other Swift Mac code use it: observers told as a run starts and ends,
  * before timers and sources and around the wait, in their order; a one-shot
- * observer; a context's retain and release; invalidating and removing. */
+ * observer; a context's retain and release; invalidating and removing;
+ * winit's polling timer and its timer moved from BeforeWaiting (Neovide,
+ * freemac 1.NEXT). */
 #import <Foundation/Foundation.h>
 #include <stdio.h>
 
@@ -95,6 +97,58 @@ int main(void)
         CFRelease(oneShot);
         CFRelease(all);
         printf("released context: %d\n", released);
+
+        /* winit's way: a repeating timer with a tiny interval that is always
+         * due while it polls, and a BeforeWaiting observer that handles its
+         * queued events; the observer must still be told while the timer is
+         * due, as on a Mac, where the due timer ends the loop's wait. */
+        __block int polls = 0, befores = 0;
+        CFRunLoopTimerRef poll = CFRunLoopTimerCreateWithHandler(NULL, CFAbsoluteTimeGetCurrent(), 0.0000001, 0, 0,
+            ^(CFRunLoopTimerRef tm) { (void)tm; polls++; });
+        CFRunLoopObserverRef waiting = CFRunLoopObserverCreateWithHandler(NULL, kCFRunLoopBeforeWaiting, true, 0,
+            ^(CFRunLoopObserverRef o, CFRunLoopActivity a) {
+                (void)o; (void)a;
+                if (++befores == 5)   /* its queue is empty: it stops polling */
+                    CFRunLoopTimerSetNextFireDate(poll, CFAbsoluteTimeGetCurrent() + 1e9);
+            });
+        CFRunLoopAddTimer(rl, poll, kCFRunLoopDefaultMode);
+        CFRunLoopAddObserver(rl, waiting, kCFRunLoopDefaultMode);
+        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.2, false);
+        printf("a polling timer leaves BeforeWaiting told: %d, polled: %d\n", befores >= 5, polls > 0);
+        CFRunLoopRemoveObserver(rl, waiting, kCFRunLoopDefaultMode);
+        CFRelease(waiting);
+
+        /* An observer that moves a timer each time round, as winit does for
+         * its next frame, doesn't wake the loop by it: the loop sleeps until
+         * the timer instead of going round again at once. */
+        __block int rounds = 0;
+        CFRunLoopObserverRef mover = CFRunLoopObserverCreateWithHandler(NULL, kCFRunLoopBeforeWaiting, true, 0,
+            ^(CFRunLoopObserverRef o, CFRunLoopActivity a) {
+                (void)o; (void)a;
+                rounds++;
+                CFRunLoopTimerSetNextFireDate(poll, CFAbsoluteTimeGetCurrent() + 0.05);
+            });
+        CFRunLoopAddObserver(rl, mover, kCFRunLoopDefaultMode);
+        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.2, false);
+        printf("moving a timer from BeforeWaiting sleeps: %d\n", rounds > 0 && rounds < 20);
+        /* another thread's move still wakes it */
+        CFRunLoopRemoveObserver(rl, mover, kCFRunLoopDefaultMode);
+        CFRelease(mover);
+        CFRunLoopTimerInvalidate(poll);
+        CFRelease(poll);
+        __block int woke = 0;
+        CFRunLoopTimerRef later = CFRunLoopTimerCreateWithHandler(NULL, CFAbsoluteTimeGetCurrent() + 1e9, 0, 0, 0,
+            ^(CFRunLoopTimerRef tm) { (void)tm; woke++; CFRunLoopStop(rl); });
+        CFRunLoopAddTimer(rl, later, kCFRunLoopDefaultMode);
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC),
+                       dispatch_get_global_queue(0, 0), ^{
+                           CFRunLoopTimerSetNextFireDate(later, CFAbsoluteTimeGetCurrent());
+                       });
+        CFAbsoluteTime start = CFAbsoluteTimeGetCurrent();
+        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 2, false);
+        printf("a move from another thread wakes it: %d\n", woke == 1 && CFAbsoluteTimeGetCurrent() - start < 1);
+        CFRunLoopTimerInvalidate(later);
+        CFRelease(later);
     }
     return 0;
 }

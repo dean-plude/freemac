@@ -18,6 +18,8 @@
  * drawn at their default variation, so no font reports variation axes.
  */
 #import "GInternal.h"
+#include <pthread.h>
+#include <unistd.h>
 
 /* ---- the keys ----------------------------------------------------------------------- */
 
@@ -294,10 +296,15 @@ static BOOL generic_family(NSString *name)
     return [names containsObject:[name lowercaseString]];
 }
 
-/* Pango's families by their lower-case names. */
+/* Pango's families by their lower-case names, read again once a program's
+ * own font is added (all_families is then nil). */
+static NSDictionary *all_families;
+static pthread_mutex_t families_lock = PTHREAD_MUTEX_INITIALIZER;
 static NSDictionary *families(void)
 {
-    static NSDictionary *all;
+    pthread_mutex_lock(&families_lock);
+    NSDictionary *all = [[all_families retain] autorelease];
+    pthread_mutex_unlock(&families_lock);
     if (all)
         return all;
     NSMutableDictionary *d = [NSMutableDictionary dictionary];
@@ -310,7 +317,11 @@ static NSDictionary *families(void)
             d[[@(name) lowercaseString]] = [NSValue valueWithPointer:list[i]];
     }
     g_free(list);
-    all = [d copy];
+    all = [[d copy] autorelease];
+    pthread_mutex_lock(&families_lock);
+    if (!all_families)
+        all_families = [all retain];
+    pthread_mutex_unlock(&families_lock);
     return all;
 }
 
@@ -634,10 +645,13 @@ CFArrayRef CTFontCopyAvailableTables(CTFontRef font, CTFontTableOptions options)
     uint32_t tags[256];
     unsigned count = 256;
     hb_face_get_table_tags(face, 0, &count, tags);
-    NSMutableArray *out = [[NSMutableArray alloc] initWithCapacity:count];
+    /* The tags themselves are the array's values, not numbers, as a Mac's are:
+     * Skia and Chromium read each one back as (uintptr_t)CFArrayGetValueAtIndex,
+     * and Neovide drew its text in other letters (freemac 1.NEXT). */
+    const void *values[256];
     for (unsigned i = 0; i < count; i++)
-        [out addObject:@(tags[i])];
-    return (CFArrayRef)out;
+        values[i] = (const void *)(uintptr_t)tags[i];
+    return CFArrayCreate(NULL, values, (CFIndex)count, NULL);
 }
 
 CFArrayRef CTFontCopyVariationAxes(CTFontRef font)
@@ -770,10 +784,95 @@ static NSDictionary *file_face_attrs(hb_face_t *face)
     };
 }
 
+/* ---- fonts a program brings ---------------------------------------------------------------- */
+
+/* A Mac makes a font from a file or from data in memory without installing
+ * it; Ferry's fonts are Pango's, which finds fonts through fontconfig, so the
+ * file is made one of this process's own fonts there, and Pango and the
+ * family list here look again. Neovide draws with a font it carries in
+ * memory, and drew its glyphs from an installed font instead (freemac
+ * 1.NEXT). */
+static BOOL register_font_file(NSString *path)
+{
+    static NSMutableSet *done;
+    static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+    if (!path.length)
+        return NO;
+    pthread_mutex_lock(&lock);
+    if (!done)
+        done = [[NSMutableSet alloc] init];
+    BOOL ok = [done containsObject:path];
+    if (!ok && FcConfigAppFontAddFile(NULL, (const unsigned char *)path.fileSystemRepresentation)) {
+        [done addObject:path];
+        pango_fc_font_map_config_changed(pango_cairo_font_map_get_default());
+        pthread_mutex_lock(&families_lock);
+        [all_families release];
+        all_families = nil;
+        pthread_mutex_unlock(&families_lock);
+        ok = YES;
+    }
+    pthread_mutex_unlock(&lock);
+    return ok;
+}
+
+/* Font data in memory, kept in a file named by its contents, so each is added once. */
+static BOOL register_font_data(NSData *data)
+{
+    if (!data.length)
+        return NO;
+    uint64_t h = 1469598103934665603ULL; /* FNV-1a */
+    const unsigned char *b = data.bytes;
+    for (NSUInteger i = 0; i < data.length; i++)
+        h = (h ^ b[i]) * 1099511628211ULL;
+    NSString *dir = [NSTemporaryDirectory() stringByAppendingPathComponent:
+                                                [NSString stringWithFormat:@"ferry-fonts-%u", (unsigned)getuid()]];
+    [[NSFileManager defaultManager] createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:NULL];
+    NSString *path = [dir stringByAppendingPathComponent:
+                              [NSString stringWithFormat:@"%016llx-%lu.font", (unsigned long long)h,
+                                                         (unsigned long)data.length]];
+    NSData *there = [NSData dataWithContentsOfFile:path];
+    if (![there isEqualToData:data] && ![data writeToFile:path atomically:YES])
+        return NO;
+    return register_font_file(path);
+}
+
+bool CTFontManagerRegisterFontsForURL(CFURLRef fontURL, CTFontManagerScope scope, CFErrorRef *error)
+{
+    (void)scope;
+    if (error)
+        *error = NULL;
+    NSString *path = [(NSURL *)fontURL path];
+    return path && [[NSFileManager defaultManager] fileExistsAtPath:path] && register_font_file(path);
+}
+
+bool CTFontManagerRegisterFontsForURLs(CFArrayRef fontURLs, CTFontManagerScope scope, CFArrayRef *errors)
+{
+    if (errors)
+        *errors = NULL;
+    bool all = true;
+    for (NSURL *url in (NSArray *)fontURLs)
+        all &= CTFontManagerRegisterFontsForURL((CFURLRef)url, scope, NULL);
+    return all;
+}
+
+/* Fontconfig can't take a process's font back while it runs; it is simply kept. */
+bool CTFontManagerUnregisterFontsForURL(CFURLRef fontURL, CTFontManagerScope scope, CFErrorRef *error)
+{
+    (void)fontURL;
+    (void)scope;
+    if (error)
+        *error = NULL;
+    return true;
+}
+
 static NSArray *descriptors_from_data(NSData *data, NSURL *url)
 {
     if (!data.length)
         return nil;
+    if (url)
+        register_font_file(url.path);
+    else
+        register_font_data(data);
     hb_blob_t *blob = hb_blob_create(data.bytes, (unsigned)data.length, HB_MEMORY_MODE_READONLY, NULL, NULL);
     unsigned n = hb_face_count(blob);
     NSMutableArray *out = [NSMutableArray array];
@@ -822,6 +921,7 @@ void CTFontManagerEnableFontDescriptors(CFArrayRef descriptors, bool enable)
     hb_face_t *face;
     GFont *font;       /* the Core Text font it came from, if it did */
     NSDictionary *attrs;
+    NSData *data;      /* the file's data, when it came from data */
 }
 @end
 
@@ -834,6 +934,7 @@ void CTFontManagerEnableFontDescriptors(CFArrayRef descriptors, bool enable)
         hb_blob_destroy(blob);
     [font release];
     [attrs release];
+    [data release];
     [super dealloc];
 }
 @end
@@ -853,7 +954,24 @@ CGFontRef CGFontCreateWithDataProvider(CGDataProviderRef provider)
         [g release];
         return NULL;
     }
+    g->data = [data retain];
+    register_font_data(data); /* so a Core Text font made from it is this font */
     return (CGFontRef)g;
+}
+
+/* Registering a graphics font: its data is this process's font from then on. */
+bool CTFontManagerRegisterGraphicsFont(CGFontRef cgfont, CFErrorRef *error)
+{
+    if (error)
+        *error = NULL;
+    return cgfont && (CGF->data ? register_font_data(CGF->data) : CGF->font != nil);
+}
+bool CTFontManagerUnregisterGraphicsFont(CGFontRef cgfont, CFErrorRef *error)
+{
+    (void)cgfont;
+    if (error)
+        *error = NULL;
+    return true;
 }
 
 CGFontRef CTFontCopyGraphicsFont(CTFontRef font, CTFontDescriptorRef *attributes)
