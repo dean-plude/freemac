@@ -356,29 +356,6 @@ static int mac_sendfile(int fd, int s, off_t offset, off_t *len, struct mac_sf_h
     return 0;
 }
 
-/* sigaltstack(2): a Mac's stack_t puts the size before the flags, and its
- * SS_DISABLE is 4 (SS_ONSTACK is 1 on both). */
-struct mac_stack { void *sp; size_t size; int flags; };
-#define MAC_SS_ONSTACK 1
-#define MAC_SS_DISABLE 4
-static int mac_sigaltstack(const struct mac_stack *ss, struct mac_stack *old)
-{
-    stack_t in, out;
-    if (ss) {
-        in.ss_sp = ss->sp;
-        in.ss_size = ss->size;
-        in.ss_flags = ss->flags & MAC_SS_DISABLE ? SS_DISABLE : 0;
-    }
-    if (sigaltstack(ss ? &in : NULL, old ? &out : NULL) < 0)
-        return -1;
-    if (old) {
-        old->sp = out.ss_sp;
-        old->size = out.ss_size;
-        old->flags = (out.ss_flags & SS_DISABLE ? MAC_SS_DISABLE : 0) | (out.ss_flags & SS_ONSTACK ? MAC_SS_ONSTACK : 0);
-    }
-    return 0;
-}
-
 /* Record locks: different command numbers, lock types and field order. */
 struct mac_flock { int64_t start, len; int32_t pid; int16_t type, whence; };
 #define MAC_F_GETLK 7
@@ -1698,7 +1675,6 @@ const struct ferry_symbol ferry_posix_symbols[] = {
     {"chroot", mac_chroot},
     {"setgroups", mac_setgroups},
     {"sendfile", mac_sendfile},
-    {"sigaltstack", mac_sigaltstack},
     {"mkdirat", mac_mkdirat},
     {"fcntl", mac_fcntl},
     {"stat$INODE64", mac_stat64},
