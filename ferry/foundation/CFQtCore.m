@@ -322,13 +322,14 @@ CFArrayRef CFBundleGetAllBundles(void)
     return (CFArrayRef)last;
 }
 
+CFURLRef FerryBundleRelativeURL(CFBundleRef bundle, NSURL *folder);
 CFURLRef CFBundleCopyPrivateFrameworksURL(CFBundleRef bundle)
 {
-    return bundle ? (CFURLRef)[[OBJ(bundle) privateFrameworksURL] retain] : NULL;
+    return bundle ? FerryBundleRelativeURL(bundle, [OBJ(bundle) privateFrameworksURL]) : NULL;
 }
 CFURLRef CFBundleCopySharedFrameworksURL(CFBundleRef bundle)
 {
-    return bundle ? (CFURLRef)[[OBJ(bundle) sharedFrameworksURL] retain] : NULL;
+    return bundle ? FerryBundleRelativeURL(bundle, [OBJ(bundle) sharedFrameworksURL]) : NULL;
 }
 
 static UInt32 four_cc(id s)

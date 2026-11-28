@@ -113,6 +113,7 @@ OSStatus CMVideoFormatDescriptionGetHEVCParameterSetAtIndex(CMFormatDescriptionR
 CGSize CMVideoFormatDescriptionGetPresentationDimensions(CMVideoFormatDescriptionRef videoDesc,
                                                          Boolean usePixelAspectRatio, Boolean useCleanAperture);
 Boolean CMVideoFormatDescriptionMatchesImageBuffer(CMVideoFormatDescriptionRef desc, CVImageBufferRef imageBuffer);
+CGRect CMVideoFormatDescriptionGetCleanAperture(CMVideoFormatDescriptionRef videoDesc, Boolean originIsAtTopLeft);
 #define CMVideoFormatDescriptionGetCodecType(desc) CMFormatDescriptionGetMediaSubType(desc)
 
 /* audio */

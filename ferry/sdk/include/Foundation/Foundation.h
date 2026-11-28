@@ -1804,6 +1804,8 @@ typedef NS_OPTIONS(NSUInteger, NSDateComponentsFormatterZeroFormattingBehavior) 
 @property (readonly, copy) NSURL *absoluteURL;
 @property (readonly, copy) NSURL *baseURL;
 @property (readonly, copy) NSString *relativeString;
+/* the path as written, not resolved against the base URL (freemac 1.NEXT) */
+@property (readonly, copy) NSString *relativePath;
 @property (readonly, copy) NSString *user;
 @property (readonly, copy) NSString *password;
 @property (readonly) BOOL hasDirectoryPath;

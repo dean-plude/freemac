@@ -666,6 +666,25 @@ CGSize CMVideoFormatDescriptionGetPresentationDimensions(CMVideoFormatDescriptio
     }
     return s;
 }
+/* The clean aperture as a rectangle in the encoded picture (freemac 1.NEXT,
+ * for Qt Multimedia): the CleanAperture extension's size, centred in the
+ * picture and moved by its offsets, which are from the picture's centre;
+ * the whole picture when there's no extension. Qt asks with the origin at
+ * the top left, where a positive vertical offset is downwards. */
+CGRect CMVideoFormatDescriptionGetCleanAperture(CMVideoFormatDescriptionRef d, Boolean originIsAtTopLeft)
+{
+    if (!is_format(d))
+        return CGRectZero;
+    double W = FD(d)->_dimensions.width, H = FD(d)->_dimensions.height;
+    NSDictionary *ap = FD(d)->_extensions[(id)kCMFormatDescriptionExtension_CleanAperture];
+    if (![ap isKindOfClass:[NSDictionary class]])
+        return CGRectMake(0, 0, W, H);
+    double w = [ap[@"Width"] respondsToSelector:@selector(doubleValue)] ? [ap[@"Width"] doubleValue] : W;
+    double h = [ap[@"Height"] respondsToSelector:@selector(doubleValue)] ? [ap[@"Height"] doubleValue] : H;
+    double dx = [ap[@"HorizontalOffset"] respondsToSelector:@selector(doubleValue)] ? [ap[@"HorizontalOffset"] doubleValue] : 0;
+    double dy = [ap[@"VerticalOffset"] respondsToSelector:@selector(doubleValue)] ? [ap[@"VerticalOffset"] doubleValue] : 0;
+    return CGRectMake((W - w) / 2 + dx, (H - h) / 2 + (originIsAtTopLeft ? dy : -dy), w, h);
+}
 Boolean CMVideoFormatDescriptionMatchesImageBuffer(CMVideoFormatDescriptionRef d, CVImageBufferRef b)
 {
     if (!is_format(d) || !b)

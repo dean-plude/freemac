@@ -216,6 +216,7 @@ __attribute__((visibility("hidden"))) GFont *GFontLoad(NSString *family, int wei
 __attribute__((visibility("hidden"))) NSString *GFontStyleName(GFont *f);
 /* the family that stands for a Mac family (Helvetica, Menlo...), or nil */
 NSString *GFontMacFamily(NSString *name);
+NSArray *GFontStandInFamilyNames(void);
 
 @interface GParagraphStyle : NSObject <NSCopying> {
 @public

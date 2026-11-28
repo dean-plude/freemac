@@ -32,6 +32,7 @@ const CFStringRef kCTFontSizeAttribute = (CFStringRef)@"NSFontSizeAttribute";
 const CFStringRef kCTFontMatrixAttribute = (CFStringRef)@"NSFontMatrixAttribute";
 const CFStringRef kCTFontCascadeListAttribute = (CFStringRef)@"NSCTFontCascadeListAttribute";
 const CFStringRef kCTFontCharacterSetAttribute = (CFStringRef)@"NSCTFontCharacterSetAttribute";
+const CFStringRef kCTFontFormatAttribute = (CFStringRef)@"NSCTFontFormatAttribute";
 const CFStringRef kCTFontLanguagesAttribute = (CFStringRef)@"NSCTFontLanguagesAttribute";
 const CFStringRef kCTFontFixedAdvanceAttribute = (CFStringRef)@"NSCTFontFixedAdvanceAttribute";
 const CFStringRef kCTFontFeatureSettingsAttribute = (CFStringRef)@"NSCTFontFeatureSettingsAttribute";
@@ -709,11 +710,17 @@ CFArrayRef CTFontCopyDefaultCascadeListForLanguages(CTFontRef font, CFArrayRef l
 
 /* ---- the font manager ---------------------------------------------------------------------- */
 
+/* The installed families, and the Mac families that stand-ins answer for,
+ * as the available fonts list them: Chromium looks a CSS family up in this
+ * list, and draws nothing when its last resort, Times, isn't there. */
 CFArrayRef CTFontManagerCopyAvailableFontFamilyNames(void)
 {
     NSMutableArray *names = [NSMutableArray array];
     for (NSValue *v in families().allValues)
         [names addObject:family_name(v.pointerValue)];
+    for (NSString *mac in GFontStandInFamilyNames())
+        if (!family_named(mac))
+            [names addObject:mac];
     return (CFArrayRef)[[names sortedArrayUsingSelector:@selector(localizedCaseInsensitiveCompare:)] copy];
 }
 

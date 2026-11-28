@@ -1102,8 +1102,7 @@ CFDictionaryRef ProcessInformationCopyDictionary(const ProcessSerialNumber *psn,
 /* No other application can be launched or ended this way here. */
 OSErr LaunchApplication(LaunchPBPtr params) { return procNotFound; }
 OSErr KillProcess(const ProcessSerialNumber *psn) { return procNotFound; }
-const char *GetMacOSStatusCommentString(OSStatus err) { return ""; }
-const char *GetMacOSStatusErrorString(OSStatus err) { return ""; }
+/* GetMacOSStatusErrorString and its comment are Core Services', in FSRefs.m (freemac 1.NEXT). */
 
 /* ---- Accessibility: the user's say ------------------------------------------------ */
 

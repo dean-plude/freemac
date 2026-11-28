@@ -200,20 +200,41 @@ static NSFont *make_font(NSString *family, int weight, int style, CGFloat size)
 
 /* ---- what is installed ---- */
 
+/* The Mac families that installed stand-ins answer for (Times where only
+ * DejaVu Serif is installed), which the available fonts list too: Chromium
+ * finds its last resort font, Times, in this list (freemac 1.NEXT). */
+static NSString *stand_in_family(NSString *family)
+{
+    if (!family || installed_name(family))
+        return nil;
+    for (NSString *mac in GFontStandInFamilyNames())
+        if ([mac caseInsensitiveCompare:family] == NSOrderedSame)
+            return mac;
+    return nil;
+}
+
 - (NSArray *)availableFontFamilies
 {
-    return [[installed_families() allKeys] sortedArrayUsingSelector:@selector(localizedCaseInsensitiveCompare:)];
+    NSMutableArray *names = [NSMutableArray arrayWithArray:[installed_families() allKeys]];
+    for (NSString *mac in GFontStandInFamilyNames())
+        if (!installed_name(mac))
+            [names addObject:mac];
+    return [names sortedArrayUsingSelector:@selector(localizedCaseInsensitiveCompare:)];
 }
 
 - (NSArray *)availableMembersOfFontFamily:(NSString *)family
 {
-    NSString *name = installed_name(family);
-    if (!name)
+    NSString *name = installed_name(family), *listed = name;
+    if (!name && (listed = stand_in_family(family)))
+        name = resolved_family(listed); /* a Mac family's members are its stand-in's, under the Mac name */
+    if (!name || !listed)
         return nil;
-    NSArray *cached = [_members objectForKey:name];
+    NSArray *cached = [_members objectForKey:listed];
     if (cached)
         return cached;
     PangoFontFamily *pf = [[installed_families() objectForKey:name] pointerValue];
+    if (!pf)
+        return nil;
     PangoFontFace **faces = NULL;
     int count = 0;
     pango_font_family_list_faces(pf, &faces, &count);
@@ -227,7 +248,7 @@ static NSFont *make_font(NSString *family, int weight, int style, CGFloat size)
         int weight = pango_font_description_get_weight(d), style = pango_font_description_get_style(d);
         pango_font_description_free(d);
         const char *face = pango_font_face_get_face_name(faces[i]);
-        NSString *ps = ps_name(name, weight, style);
+        NSString *ps = ps_name(listed, weight, style);
         if ([seen containsObject:ps])
             continue;
         [seen addObject:ps];
@@ -245,7 +266,7 @@ static NSFont *make_font(NSString *family, int weight, int style, CGFloat size)
       NSUInteger ia = [a[3] unsignedIntegerValue] & NSItalicFontMask, ib = [b[3] unsignedIntegerValue] & NSItalicFontMask;
       return ia == ib ? NSOrderedSame : ia < ib ? NSOrderedAscending : NSOrderedDescending;
     }];
-    [_members setObject:members forKey:name];
+    [_members setObject:members forKey:listed];
     return members;
 }
 

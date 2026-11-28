@@ -928,9 +928,12 @@ CFURLRef CFURLCreateFromFileSystemRepresentation(CFAllocatorRef alloc, const UIn
 CFURLRef CFURLCopyAbsoluteURL(CFURLRef u) { return (CFURLRef)[[OBJ(u) absoluteURL] retain]; }
 CFStringRef CFURLGetString(CFURLRef u) { return (CFStringRef)[OBJ(u) relativeString]; }
 CFURLRef CFURLGetBaseURL(CFURLRef u) { return (CFURLRef)[OBJ(u) baseURL]; }
+/* A relative URL gives its relative path, not resolved against its base,
+ * as on a Mac (freemac 1.NEXT): a bundle's resources directory URL is
+ * relative to the bundle, and Qt WebEngine joins the two paths itself. */
 CFStringRef CFURLCopyFileSystemPath(CFURLRef u, CFURLPathStyle style)
 {
-    NSString *p = [OBJ(u) path];
+    NSString *p = [OBJ(u) relativePath];
     if (style == kCFURLWindowsPathStyle)
         p = [p stringByReplacingOccurrencesOfString:@"/" withString:@"\\"];
     else if (style == kCFURLHFSPathStyle && [p hasPrefix:@"/"]) {
@@ -948,7 +951,7 @@ CFStringRef CFURLCopyFileSystemPath(CFURLRef u, CFURLPathStyle style)
 }
 Boolean CFURLGetFileSystemRepresentation(CFURLRef u, Boolean resolveAgainstBase, UInt8 *buffer, CFIndex max)
 {
-    NSString *p = resolveAgainstBase ? [[OBJ(u) absoluteURL] path] : [OBJ(u) path];
+    NSString *p = resolveAgainstBase ? [[OBJ(u) absoluteURL] path] : [OBJ(u) relativePath];
     return p && CFStringGetFileSystemRepresentation((CFStringRef)p, (char *)buffer, max);
 }
 CFStringRef CFURLCopyScheme(CFURLRef u) { return (CFStringRef)[[OBJ(u) scheme] copy]; }

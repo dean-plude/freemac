@@ -57,6 +57,10 @@ enum { coreFoundationUnknownErr = -4960 };
 typedef void *SRefCon;
 typedef void *URefCon;
 OSErr Gestalt(OSType selector, SInt32 *response);
+/* A result code's name and a few words on it, as CarbonCore's Debugging.h
+ * gives them (freemac 1.NEXT); "" for a code Ferry doesn't know. */
+const char *GetMacOSStatusErrorString(OSStatus err);
+const char *GetMacOSStatusCommentString(OSStatus err);
 __FERRY_END
 #include <CoreServices/LSSharedFileList.h>
 /* File references and the trash (freemac 1.221, Ferry 0.45.0). */

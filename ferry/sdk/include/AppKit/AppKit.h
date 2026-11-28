@@ -290,6 +290,13 @@ typedef NS_ENUM(NSUInteger, NSControlSize) {
     NSControlSizeRegular = 0, NSControlSizeSmall = 1, NSControlSizeMini = 2, NSControlSizeLarge = 3,
 };
 
+typedef NS_ENUM(NSUInteger, NSFontRenderingMode) {
+    NSFontDefaultRenderingMode = 0,
+    NSFontAntialiasedRenderingMode = 1,
+    NSFontIntegerAdvancementsRenderingMode = 2,
+    NSFontAntialiasedIntegerAdvancementsRenderingMode = 3,
+};
+
 /* An NSFont is a Core Text font: a CTFontRef can be used as an NSFont and an
  * NSFont as a CTFontRef, as on a Mac. */
 #ifdef FERRY_APPKIT_BUILD
@@ -323,6 +330,11 @@ typedef NS_ENUM(NSUInteger, NSControlSize) {
 - (NSSize)advancementForGlyph:(CGGlyph)glyph;
 - (void)set;
 - (void)setInContext:(NSGraphicsContext *)context;
+/* the screen and printer forms of a font: the font itself, as fonts draw the
+ * same everywhere (freemac 1.NEXT) */
+@property (readonly) NSFont *screenFont, *printerFont;
+@property (readonly) NSFontRenderingMode renderingMode;
+- (NSFont *)screenFontWithRenderingMode:(NSFontRenderingMode)mode;
 @end
 
 typedef NS_ENUM(NSInteger, NSTextAlignment) {

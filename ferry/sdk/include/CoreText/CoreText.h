@@ -108,6 +108,17 @@ extern const CFStringRef kCTFontSizeAttribute;
 extern const CFStringRef kCTFontMatrixAttribute;
 extern const CFStringRef kCTFontCascadeListAttribute;
 extern const CFStringRef kCTFontCharacterSetAttribute;
+/* a font's file format, a CFNumber of CTFontFormat (freemac 1.NEXT) */
+extern const CFStringRef kCTFontFormatAttribute;
+typedef uint32_t CTFontFormat;
+enum {
+    kCTFontFormatUnrecognized = 0,
+    kCTFontFormatOpenTypePostScript = 1,
+    kCTFontFormatOpenTypeTrueType = 2,
+    kCTFontFormatTrueType = 3,
+    kCTFontFormatPostScript = 4,
+    kCTFontFormatBitmap = 5,
+};
 extern const CFStringRef kCTFontLanguagesAttribute;
 extern const CFStringRef kCTFontFixedAdvanceAttribute;
 extern const CFStringRef kCTFontFeatureSettingsAttribute;

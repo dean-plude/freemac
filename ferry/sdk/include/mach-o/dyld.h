@@ -14,5 +14,10 @@ const char *_dyld_get_image_name(uint32_t image_index);
 void _dyld_register_func_for_add_image(void (*func)(const struct mach_header *mh, intptr_t vmaddr_slide));
 void _dyld_register_func_for_remove_image(void (*func)(const struct mach_header *mh, intptr_t vmaddr_slide));
 int _NSGetExecutablePath(char *buf, uint32_t *bufsize);
+/* whether a library is in the shared cache (macOS 11): Ferry's system
+ * libraries and frameworks answer that they are, as they have no file of
+ * their own at their Mac paths; no cache to map (freemac 1.NEXT) */
+_Bool _dyld_shared_cache_contains_path(const char *path);
+const void *_dyld_get_shared_cache_range(size_t *length);
 __FERRY_END
 #endif
