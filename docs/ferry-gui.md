@@ -3396,6 +3396,20 @@ Not there yet: IINA's images from its asset catalog (some buttons are
 blank), gesture recognizers don't fire, and picture in picture's window has
 no play and pause buttons.
 
+## Stats in the menu bar (freemac 1.271, Ferry 0.94.0)
+
+Stats 3.1.1, the menu bar system monitor, installs from its official disk image and starts in under a second. Its items show CPU use, memory, disk use and network speeds in the menu bar and update every second; clicking one opens its panel. What it needed:
+
+- **One empty dictionary.** Swift's runtime asks for an empty `NSDictionary` once and keeps it for every error it bridges, without taking a reference. On a Mac that dictionary is a single object that is never freed. Ferry's was an ordinary one, freed after the first error, so the next error's description crashed. `+[NSDictionary dictionary]` now hands out one shared empty dictionary.
+- **Swift fields after the superclass's.** When an Objective-C superclass is bigger in Ferry than on a Mac, Ferry moves the subclass's fields along. A Swift subclass also keeps its own record of where its fields start; Ferry now keeps that record in step, so Swift and Objective-C agree where every field is (Stats' disk panel read its strings from the wrong place).
+- **Status items with views.** Stats draws its readings as views inside the status item's button. Ferry now draws those views into the item's picture and redraws when one changes. The button also has a window, placed under the item in the menu bar, which apps use to place their panels.
+- **Occlusion state.** A Mac's window server sets bit 13 of every window's occlusion state; Stats opens its panel when that state is exactly 8192, a panel that isn't on screen. Ferry now reports it the same way.
+- **Compressed data and asset catalogues.** libcompression's buffer calls for LZFSE, LZVN, LZ4, zlib and LZMA, written from public descriptions of the formats; and a reader for compiled asset catalogues (`Assets.car`), so `+[NSImage imageNamed:]`, `+[NSColor colorNamed:]` and `NSDataAsset` find an app's own images and colours.
+- **What a monitor reads.** A disk's size and free space, DiskArbitration's disk descriptions, the network interfaces and services through SystemConfiguration, CFHost name lookups, IOReport (no channels, as on most Intel Macs), the sensors list, and the login session.
+- Also: units and measurements, the names of languages and regions, the background activity scheduler, Dispatch sources as Swift sees them, and Swift calls for Calendar and timers.
+
+Not there yet: some network details (interface name, local address) show Unknown; Bluetooth, Wi-Fi details and location need frameworks Ferry doesn't have; Stats' widgets use WidgetKit.
+
 ## Hex Fiend edits bytes (freemac 1.270, Ferry 0.93.0)
 
 Hex Fiend 2.18.1, the hex editor, installs from its official disk image and opens a file in its document window: line offsets, the bytes in hex, the same bytes as text, a selection that shows in both columns, the data inspector reading the selected bytes as a number, typing new bytes in, and saving. What it needed:

@@ -286,6 +286,11 @@ typedef CGFloat NSFontWeight;
 APPKIT_EXTERN const NSFontWeight NSFontWeightUltraLight, NSFontWeightThin, NSFontWeightLight;
 APPKIT_EXTERN const NSFontWeight NSFontWeightRegular, NSFontWeightMedium, NSFontWeightSemibold;
 APPKIT_EXTERN const NSFontWeight NSFontWeightBold, NSFontWeightHeavy, NSFontWeightBlack;
+typedef NSString *NSFontTextStyle;
+APPKIT_EXTERN NSFontTextStyle const NSFontTextStyleLargeTitle, NSFontTextStyleTitle1, NSFontTextStyleTitle2;
+APPKIT_EXTERN NSFontTextStyle const NSFontTextStyleTitle3, NSFontTextStyleHeadline, NSFontTextStyleSubheadline;
+APPKIT_EXTERN NSFontTextStyle const NSFontTextStyleBody, NSFontTextStyleCallout, NSFontTextStyleFootnote;
+APPKIT_EXTERN NSFontTextStyle const NSFontTextStyleCaption1, NSFontTextStyleCaption2;
 typedef NS_ENUM(NSUInteger, NSControlSize) {
     NSControlSizeRegular = 0, NSControlSizeSmall = 1, NSControlSizeMini = 2, NSControlSizeLarge = 3,
 };
@@ -303,6 +308,7 @@ typedef unsigned int NSGlyph;
 + (NSFont *)systemFontOfSize:(CGFloat)size;
 + (NSFont *)systemFontOfSize:(CGFloat)size weight:(NSFontWeight)weight;
 + (NSFont *)boldSystemFontOfSize:(CGFloat)size;
++ (NSFont *)preferredFontForTextStyle:(NSFontTextStyle)style options:(NSDictionary *)options;
 + (NSFont *)monospacedSystemFontOfSize:(CGFloat)size weight:(NSFontWeight)weight;
 + (NSFont *)monospacedDigitSystemFontOfSize:(CGFloat)size weight:(NSFontWeight)weight;
 + (NSFont *)userFontOfSize:(CGFloat)size;
@@ -4784,6 +4790,8 @@ APPKIT_EXTERN NSNotificationName const NSWindowDidUpdateNotification;
 /* ---- what the Godot engine calls besides (AppKitGodot.m), (freemac Godot work) */
 #import <AppKit/AppKitGodot.h>
 #import <AppKit/AppKitZed.h>
+/* ---- what Stats calls besides (AppKitStats.m), (freemac 1.271) */
+#import <AppKit/AppKitStats.h>
 
 /* ---- OpenGL: NSOpenGLPixelFormat, NSOpenGLContext, NSOpenGLView (NSOpenGL.m)
  * (freemac 1.235, Ferry 0.59.0) */

@@ -121,6 +121,14 @@ public class DispatchWorkItem {
         dispatch_group_enter(done)
     }
 
+    /// The older initializer, with no quality of service.
+    public init(flags: DispatchWorkItemFlags = [], block: @escaping @convention(block) () -> Void) {
+        work = { block() }
+        self.flags = flags
+        pthread_mutex_init(&lock, nil)
+        dispatch_group_enter(done)
+    }
+
     deinit {
         if !started { dispatch_group_leave(done) }
         pthread_mutex_destroy(&lock)

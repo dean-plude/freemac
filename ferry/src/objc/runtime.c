@@ -292,6 +292,20 @@ static void add_to_class_table(Class cls)
 
 static void realize_class(Class cls);
 
+/* A Swift class's own metadata keeps its instance size as well, in the word
+ * after the class's Objective-C part, and Swift's runtime starts a Swift
+ * subclass's layout from it. When the ivars move, keep it as big as the
+ * class now is, or a subclass laid out later puts its fields on top of
+ * this class's (freemac 1.271, Stats' disk panel). */
+static void swift_instance_size(Class cls, uint32_t size)
+{
+    if (!(cls->bits & 2))
+        return;
+    uint32_t *p = (uint32_t *)((uint8_t *)cls + 0x30);
+    if (*p && *p < size)
+        *p = size;
+}
+
 static void realize_compiled(Class cls)
 {
     const struct c_class_ro *ro = (const void *)(cls->bits & ~(uintptr_t)7);
@@ -361,8 +375,11 @@ static void realize_compiled(Class cls)
             v->size = iv->size;
         }
     }
-    if (!(rt->flags & RT_META))
+    if (!(rt->flags & RT_META)) {
+        if (diff)
+            swift_instance_size(cls, rt->instance_size);
         add_to_class_table(cls);
+    }
 }
 
 static void realize_class(Class cls)
@@ -800,23 +817,52 @@ Class objc_getClass(const char *name)
 
 /* A Swift class that derives from an Objective-C one, realized when its
  * image loaded, has its metadata filled in later by Swift's runtime, which
- * writes the ivar offsets it worked out from the superclass's compiled
- * size into the same offset variables realizing had moved. As Apple's
- * runtime does when Swift then hands it the class, move them again. */
+ * writes the ivar offsets it worked out, from where its description says
+ * the class starts, into the offset variables realizing had moved. As
+ * Apple's runtime does when Swift then hands it the class, move them again
+ * if the superclass is really bigger than that, and take the class's size
+ * from what Swift's runtime worked out (freemac 1.271: Stats' disk panel,
+ * whose offsets were all still 0 when its image loaded). */
 static void reslide_ivars(Class cls)
 {
     struct fclass_rt *rt = class_rt(cls);
-    if (!rt->slide || (rt->flags & RT_META))
+    if (rt->flags & RT_META)
         return;
-    for (uint32_t i = 0; i < rt->nivars; i++) {
-        struct fivar *v = &rt->ivars[i];
-        if (v->offset != &v->own_offset && *v->offset + rt->slide == v->placed) {
-            if (ferry_verbose)
-                fprintf(stderr, "ferry: moving %s's ivar %s again, by %u bytes\n", rt->name,
-                        v->name ? v->name : "?", rt->slide);
-            *v->offset = v->placed;
+    const struct c_class_ro *ro = (const void *)(cls->bits & ~(uintptr_t)7);
+    uint32_t start = ro->instance_start, size = ro->instance_size;
+    uint32_t super_size = cls->superclass ? class_rt(cls->superclass)->instance_size : 0;
+    const struct c_ivar_list *il = ro->ivars;
+    uint32_t diff = 0;
+    if (il && start < super_size) {
+        uint32_t max_align = 1, lowest = UINT32_MAX;
+        for (uint32_t i = 0; i < il->count; i++) {
+            const struct c_ivar *iv = (const void *)((const uint8_t *)(il + 1) + i * il->entsize);
+            if ((1u << iv->align_log2) > max_align && iv->align_log2 < 16)
+                max_align = 1u << iv->align_log2;
+            if (iv->offset && iv->size && *iv->offset < lowest)
+                lowest = (uint32_t)*iv->offset;
         }
+        diff = super_size - start;
+        diff = (diff + max_align - 1) & ~(max_align - 1);
+        /* offsets already past the superclass were moved before */
+        if (lowest != UINT32_MAX && lowest < super_size) {
+            for (uint32_t i = 0; i < il->count; i++) {
+                const struct c_ivar *iv = (const void *)((const uint8_t *)(il + 1) + i * il->entsize);
+                if (iv->offset) {
+                    *iv->offset += diff;
+                    if (ferry_verbose)
+                        fprintf(stderr, "ferry: moving %s's ivar %s again, by %u bytes\n", rt->name,
+                                iv->name ? iv->name : "?", diff);
+                }
+            }
+        }
+        size += diff;
     }
+    for (uint32_t i = 0; i < rt->nivars; i++)
+        rt->ivars[i].placed = *rt->ivars[i].offset;
+    if (size > rt->instance_size)
+        rt->instance_size = size;
+    swift_instance_size(cls, rt->instance_size);
 }
 
 /* For swift.c: a class whose description Swift's runtime filled in while

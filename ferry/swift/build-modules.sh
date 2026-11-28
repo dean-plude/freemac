@@ -97,6 +97,7 @@ if [ -d "$o/AppKit" ] && [ -n "$(ls "$o/AppKit")" ]; then
     module AppKit "-lswiftCore -lswiftObjectiveC -lswiftFoundation -framework AppKit" "$o"/AppKit/*.swift
 fi
 module os "-lswiftCore -lswiftFoundation -framework Foundation" "$o"/os/*.swift
+module IOKit "-lswiftCore -framework IOKit" "$o"/IOKit/*.swift
 if [ -d "$here/Combine" ]; then
     module Combine "-lswiftCore -lswiftObjectiveC -lswiftDispatch -lswiftFoundation -lswiftDarwin -framework Foundation" "$here"/Combine/*.swift
 fi

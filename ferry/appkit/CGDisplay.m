@@ -224,3 +224,20 @@ int CGSSetWindowBackgroundBlurRadius(int connection, long window, int radius)
     (void)connection, (void)window, (void)radius;
     return 0;
 }
+
+/* ---- the login session (freemac 1.271, Stats) ------------------------------------------- *
+ * The user's session at the screen: their name and user ID, that it is on
+ * the console, and that the login is finished. A screen locker's state
+ * isn't read here, so the session is never reported locked. */
+CFDictionaryRef CGSessionCopyCurrentDictionary(void)
+{
+    NSString *name = NSUserName() ?: @"";
+    NSDictionary *d = @{
+        @"kCGSSessionUserNameKey" : name,
+        @"kCGSSessionUserIDKey" : @((unsigned)getuid()),
+        @"kCGSSessionOnConsoleKey" : @YES,
+        @"kCGSessionLoginDoneKey" : @YES,
+        @"kCGSSessionLoginwindowSafeLogin" : @NO,
+    };
+    return (CFDictionaryRef)[d copy];
+}

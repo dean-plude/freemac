@@ -913,11 +913,15 @@ static NSString *gmt_offset(NSInteger secs)
 
 - (NSString *)displayNameForKey:(NSLocaleKey)key value:(id)value
 {
-    if ([key isEqualToString:NSLocaleIdentifier] || [key isEqualToString:NSLocaleLanguageCode]) {
-        NSString *lang = [[NSLocale componentsFromLocaleIdentifier:value] objectForKey:NSLocaleLanguageCode];
-        if ([lang isEqualToString:@"en"])
-            return @"English";
-    }
+    /* the names are in FoundationStats.m */
+    if ([key isEqualToString:NSLocaleIdentifier])
+        return [self localizedStringForLocaleIdentifier:value];
+    if ([key isEqualToString:NSLocaleLanguageCode])
+        return [self localizedStringForLanguageCode:value];
+    if ([key isEqualToString:NSLocaleCountryCode])
+        return [self localizedStringForCountryCode:value];
+    if ([key isEqualToString:NSLocaleCalendar] && [value isKindOfClass:[NSString class]])
+        return [self localizedStringForCalendarIdentifier:value];
     return nil;
 }
 

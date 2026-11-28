@@ -29,6 +29,7 @@ typedef enum {
 extern const CFStringRef kCGColorSpaceSRGB;
 extern const CFStringRef kCGColorSpaceGenericRGB;
 extern const CFStringRef kCGColorSpaceGenericGray;
+extern const CFStringRef kCGColorSpaceExtendedGray, kCGColorSpaceLinearGray;
 extern const CFStringRef kCGColorSpaceGenericGrayGamma2_2;
 extern const CFStringRef kCGColorSpaceLinearSRGB;
 extern const CFStringRef kCGColorSpaceExtendedSRGB;

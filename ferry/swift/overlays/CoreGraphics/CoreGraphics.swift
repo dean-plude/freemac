@@ -137,3 +137,79 @@ extension CGColor {
     public static var white: CGColor { CGColorGetConstantColor(kCGColorWhite)!.takeUnretainedValue() }
     public static var clear: CGColor { CGColorGetConstantColor(kCGColorClear)!.takeUnretainedValue() }
 }
+
+// ---- freemac 1.271 (Stats)
+
+// The geometry types encode as a Mac encodes them: a point as [x, y], a
+// size as [width, height], a vector as [dx, dy] and a rectangle as its
+// origin then its size.
+extension CGPoint: Codable {
+    public init(from decoder: Decoder) throws {
+        var c = try decoder.unkeyedContainer()
+        let x = try c.decode(CGFloat.self), y = try c.decode(CGFloat.self)
+        self.init(x: x, y: y)
+    }
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.unkeyedContainer()
+        try c.encode(x)
+        try c.encode(y)
+    }
+}
+
+extension CGSize: Codable {
+    public init(from decoder: Decoder) throws {
+        var c = try decoder.unkeyedContainer()
+        let w = try c.decode(CGFloat.self), h = try c.decode(CGFloat.self)
+        self.init(width: w, height: h)
+    }
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.unkeyedContainer()
+        try c.encode(width)
+        try c.encode(height)
+    }
+}
+
+extension CGVector: Codable {
+    public init(from decoder: Decoder) throws {
+        var c = try decoder.unkeyedContainer()
+        let dx = try c.decode(CGFloat.self), dy = try c.decode(CGFloat.self)
+        self.init(dx: dx, dy: dy)
+    }
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.unkeyedContainer()
+        try c.encode(dx)
+        try c.encode(dy)
+    }
+}
+
+extension CGRect: Codable {
+    public init(from decoder: Decoder) throws {
+        var c = try decoder.unkeyedContainer()
+        let o = try c.decode(CGPoint.self), s = try c.decode(CGSize.self)
+        self.init(origin: o, size: s)
+    }
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.unkeyedContainer()
+        try c.encode(origin)
+        try c.encode(size)
+    }
+}
+
+extension CGContext {
+    /// An arc around a centre, from one angle to another (in radians).
+    public func addArc(center: CGPoint, radius: CGFloat, startAngle: CGFloat, endAngle: CGFloat,
+                       clockwise: Bool) {
+        CGContextAddArc(self, center.x, center.y, radius, startAngle, endAngle, clockwise ? 1 : 0)
+    }
+    public func addArc(tangent1End: CGPoint, tangent2End: CGPoint, radius: CGFloat) {
+        CGContextAddArcToPoint(self, tangent1End.x, tangent1End.y, tangent2End.x, tangent2End.y, radius)
+    }
+    public func addLines(between points: [CGPoint]) {
+        guard let first = points.first else { return }
+        CGContextMoveToPoint(self, first.x, first.y)
+        for p in points.dropFirst() { CGContextAddLineToPoint(self, p.x, p.y) }
+    }
+    public func addRects(_ rects: [CGRect]) {
+        for r in rects { CGContextAddRect(self, r) }
+    }
+}

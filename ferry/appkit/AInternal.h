@@ -164,6 +164,7 @@ void AWindowDidClose(NSWindow *window);
 - (void)_drawInContext:(CGContextRef)ctx dirty:(NSRect)dirty screen:(BOOL)screen;
 - (BOOL)_collectDirty:(NSRect *)rects count:(int *)n max:(int)max;
 - (void)_drawContentInContext:(CGContextRef)ctx dirty:(NSRect)dirty screen:(BOOL)screen;
+- (void)_subviewNeedsDisplay;           /* NSStatusBarButton: a view inside it wants drawing */
 - (BOOL)_needsDisplayAnywhere;
 @end
 

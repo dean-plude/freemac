@@ -468,6 +468,15 @@ static int looks_like_string_constant(const char *raw)
         if (len > e && !strcmp(n + len - e, ends[i]))
             return 1;
     }
+    /* a family of names with the kind as its middle word:
+     * NSAppearanceNameAccessibilityHighContrastVibrantDark, NSPasteboardTypeURL (1.271) */
+    static const char *const middles[] = {"Name", "Type", "Key", NULL};
+    for (int i = 0; middles[i]; i++) {
+        size_t e = strlen(middles[i]);
+        for (const char *m = strstr(n + upper, middles[i]); m; m = strstr(m + 1, middles[i]))
+            if (m[e] >= 'A' && m[e] <= 'Z' && m[-1] >= 'a' && m[-1] <= 'z')
+                return 1;
+    }
     return 0;
 }
 
@@ -943,6 +952,9 @@ static const struct { const char *name, *served_by; } framework_aliases[] = {
     {"IOKit", "Foundation"},             /* the registry and power assertions, foundation/IOKit.m */
     {"ForceFeedback", "Foundation"},     /* no force feedback devices, foundation/IOKit.m (Godot) */
     {"UniformTypeIdentifiers", "Foundation"}, /* UTType, foundation/UTTypes.m (freemac 1.225) */
+    /* /usr/lib/libIOReport.dylib: a PC's power and frequency report, with
+     * no channels, as on an Intel Mac, foundation/IOReport.m (1.271, Stats) */
+    {"libIOReport.dylib", "Foundation"},
     /* OpenGL.framework/Libraries/libGL.dylib and libGLU.dylib: the same GL
      * calls as the framework, which ANGLE (Chromium, Electron) opens by
      * that path (freemac 1.266) */
@@ -1089,6 +1101,12 @@ static struct image *load_library(struct image *loader, const char *install_name
             found = find_framework(base + 1, path, sizeof path);
         else if (!strncmp(install_name, "/usr/lib/swift/", 15))
             found = ferry_find_swift_library(install_name, path, sizeof path);   /* swiftsupport.c */
+        else if (base)  /* a plain library one of Ferry's frameworks serves (libIOReport.dylib) */
+            for (int i = 0; framework_aliases[i].name; i++)
+                if (!strcmp(base + 1, framework_aliases[i].name)) {
+                    found = find_framework(base + 1, path, sizeof path);
+                    break;
+                }
     } else {
         found = expand_path(loader, install_name, path, sizeof path) && file_exists(path);
         if (!found)     /* an app that expects its own copy of Swift's libraries */

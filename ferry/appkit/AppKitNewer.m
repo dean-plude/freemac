@@ -120,6 +120,18 @@ static double ferry_screen_hz(NSScreen *screen)
     c->_scale = scale;
     return c;
 }
++ (instancetype)configurationWithTextStyle:(NSString *)style scale:(NSImageSymbolScale)scale
+{
+    extern CGFloat AFontTextStyleSize(NSString *, NSFontWeight *);
+    NSFontWeight w;
+    CGFloat size = AFontTextStyleSize(style, &w);
+    NSImageSymbolConfiguration *c = [self configurationWithPointSize:size weight:w scale:scale];
+    return c;
+}
++ (instancetype)configurationWithTextStyle:(NSString *)style
+{
+    return [self configurationWithTextStyle:style scale:0];
+}
 + (instancetype)configurationWithScale:(NSImageSymbolScale)scale
 {
     NSImageSymbolConfiguration *c = [[[self alloc] init] autorelease];

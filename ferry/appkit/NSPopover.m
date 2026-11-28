@@ -443,7 +443,9 @@ static const CGFloat arrow_length = 9, arrow_half = 9, corner = 9, margin = 4;
 
 - (void)showRelativeToRect:(NSRect)rect ofView:(NSView *)view preferredEdge:(NSRectEdge)edge
 {
-    if (view && ![view window] && [view isKindOfClass:[NSStatusBarButton class]] && _content) {
+    /* a status item's button, whose window is only where the item sits in
+     * the menu bar (freemac 1.271) */
+    if (view && ![view superview] && [view isKindOfClass:[NSStatusBarButton class]] && _content) {
         [self _showUnderStatusItem:(NSStatusBarButton *)view];
         return;
     }

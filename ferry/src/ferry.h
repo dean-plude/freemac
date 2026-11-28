@@ -191,6 +191,9 @@ extern const struct ferry_symbol ferry_copyfile_symbols[]; /* copyfile.c: copyfi
 /* swiftsupport.c: Swift's libraries, and the libSystem calls its runtime makes */
 extern const struct ferry_symbol ferry_swift_symbols[];
 extern const struct ferry_symbol ferry_libc_vlc_symbols[]; /* libc_vlc.c: Mach semaphores (VLC) */
+extern const struct ferry_symbol ferry_compression_symbols[]; /* compression.c: libcompression */
+size_t ferry_compression_decode(uint8_t *dst, size_t cap, const uint8_t *src, size_t n, int algorithm);
+size_t ferry_lzvn_decode(uint8_t *dst, size_t cap, const uint8_t *src, size_t n);
 int ferry_find_swift_library(const char *install_name, char *out, size_t size);
 struct stat;
 /* posix.c: this system's stat as a Mac's 144-byte, 64-bit-inode struct stat */

@@ -1796,6 +1796,13 @@ run_one foundation_connection "$here/foundation/connection.m" "$here/foundation/
 # MacVim's glyph runs, Lab colours, copied menus with their submenus and key
 # equivalents, and typed keys reaching insertText:replacementRange: (freemac 1.NEXT)
 run_one appkit_macvim "$here/appkit/macvim.m" "$here/appkit/macvim.out" -framework Cocoa -framework CoreText
+# What Stats, the menu bar system monitor, needs (freemac 1.271): one shared
+# empty dictionary, file system sizes, measurements, language names, network
+# interfaces, IOReport with no channels and libcompression; then a status
+# item button's window and the occlusion state its panel checks.
+run_one foundation_stats_calls "$here/foundation/stats_calls.m" "$here/foundation/stats_calls.out" \
+    -framework Foundation -framework SystemConfiguration -lcompression
+run_one appkit_stats_calls "$here/appkit/stats_calls.m" "$here/appkit/stats_calls.out" -framework Cocoa
 # What Qt and OBS need of IOSurface, Accelerate (vImage), Metal (no device),
 # DiskArbitration (no disks) and Network's path monitor, and a Mac's
 # __exp10 and __sinpi, and libcurl (freemac 1.232, Ferry 0.56.0)
