@@ -2703,6 +2703,10 @@ FOUNDATION_EXPORT NSRunLoopMode const NSRunLoopCommonModes;
 @property (readonly, getter=isValid) BOOL valid;
 @end
 @interface NSMachPort : NSPort
++ (NSPort *)portWithMachPort:(uint32_t)machPort;
+- (instancetype)initWithMachPort:(uint32_t)machPort;
+/* a number of its own, which tells ports apart (there are no Mach ports) */
+@property (readonly) uint32_t machPort;
 @end
 
 @interface NSTimer : NSObject

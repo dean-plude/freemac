@@ -1,0 +1,25 @@
+registered: 1
+same name again: 0
+child: found the name: 1
+child: root is a proxy: 1, its connection: 1
+child: hello there
+child: the server noted: welcome
+child: connected, answer 42
+child: 7/2: 1 3 (no error)
+child: 1/0: 0 division by zero
+child: range 4 40
+child: caught TestException: failed on purpose
+child: secret refused
+child: list a b 3
+child: my object came back as itself: 1
+child: a string came back equal: 1
+child: unknown name: nil
+the client is a proxy: 1
+its pid came: 1
+pinged it back while connecting: 42
+posted: <7879>,5,done
+the other program exited 0
+its connection died: 1, valid 0
+a call after it went: NSInvalidSendPortException
+after invalidate: found 0
+exit=0

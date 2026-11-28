@@ -170,6 +170,12 @@ NSString *const NSCustomColorSpace = @"NSCustomColorSpace";
     NSString *_name;
     NSColor * (^_provider)(NSAppearance *);
     NSColor *_made[2];
+    /* A colour made in, or turned into, a Lab space (freemac 1.NEXT) keeps
+     * its components there as well as in sRGB: MacVim works out its tab
+     * bar's colours from their lightness. */
+    NSColorSpace *_space;
+    CGFloat _k[4];
+    NSInteger _nk;
 }
 
 static CGFloat clamp01(CGFloat v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
@@ -183,6 +189,25 @@ static NSColor *make_color(CGFloat r, CGFloat g, CGFloat b, CGFloat a, BOOL gray
     c->_c[3] = clamp01(a);
     c->_gray = gray;
     return [c autorelease];
+}
+
+void GColorLabToSRGB(const CGFloat lab[3], CGFloat rgb[3]);
+void GColorSRGBToLab(const CGFloat rgb[3], CGFloat lab[3]);
+
+/* A colour in a Lab space, from its L*, a*, b* and alpha (AppKit's
+ * colorWithColorSpace:components:count: and colorUsingColorSpace:). */
+NSColor *FerryColorWithComponents(NSColorSpace *space, const CGFloat *k, NSInteger count)
+{
+    if ([space colorSpaceModel] != NSColorSpaceModelLAB || count < 3)
+        return nil;
+    CGFloat rgb[3];
+    GColorLabToSRGB(k, rgb);
+    NSColor *c = make_color(rgb[0], rgb[1], rgb[2], count > 3 ? k[3] : 1, NO);
+    c->_space = [space retain];
+    c->_nk = 4;
+    memcpy(c->_k, k, 3 * sizeof *k);
+    c->_k[3] = count > 3 ? k[3] : 1;
+    return c;
 }
 
 static NSColor *make_dynamic(NSString *name, const CGFloat light[4], const CGFloat dark[4])
@@ -423,6 +448,7 @@ NAMED(findHighlightColor, 1, 0.9, 0, 1)
 {
     CGColorRelease(_cg);
     CGColorRelease(_cg_dark);
+    [_space release];
     [_name release];
     [_provider release];
     [_made[0] release];
@@ -474,7 +500,7 @@ NAMED(findHighlightColor, 1, 0.9, 0, 1)
     const CGFloat *c = comps(self);
     return _gray ? c[0] : 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
 }
-- (NSInteger)numberOfComponents { return _gray ? 2 : 4; }
+- (NSInteger)numberOfComponents { return _space ? _nk : _gray ? 2 : 4; }
 - (void)getRed:(CGFloat *)r green:(CGFloat *)g blue:(CGFloat *)b alpha:(CGFloat *)a
 {
     const CGFloat *c = comps(self);
@@ -577,7 +603,38 @@ NAMED(findHighlightColor, 1, 0.9, 0, 1)
         return nil;
     return resolved(self);
 }
-- (NSColor *)colorUsingColorSpace:(id)space { return resolved(self); }
+- (NSColor *)colorUsingColorSpace:(id)space
+{
+    if ([space respondsToSelector:@selector(colorSpaceModel)] && [space colorSpaceModel] == NSColorSpaceModelLAB) {
+        if ([_space isEqual:space])
+            return self;
+        if ([self patternImage])
+            return nil;
+        const CGFloat *v = comps(self);
+        CGFloat k[4] = {0, 0, 0, v[3]};
+        GColorSRGBToLab(v, k);
+        return FerryColorWithComponents(space, k, 4);
+    }
+    return resolved(self);
+}
+/* The space a colour keeps its own components in, when that isn't sRGB. */
+- (NSColorSpace *)_ferryColorSpace { return _space; }
+- (void)getComponents:(CGFloat *)components
+{
+    if (!components)
+        return;
+    if (_space) {
+        memcpy(components, _k, _nk * sizeof *components);
+        return;
+    }
+    const CGFloat *c = comps(self);
+    if (_gray) {
+        components[0] = c[0];
+        components[1] = c[3];
+    } else {
+        memcpy(components, c, 4 * sizeof *components);
+    }
+}
 /* Ferry's colours are kept as components, a system colour as two sets of
  * them, which makes it a catalog colour; one made from a pattern image is
  * a pattern. */

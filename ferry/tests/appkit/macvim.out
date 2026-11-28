@@ -1,0 +1,25 @@
+runs: 1, the same array again: 1
+glyphs: 5, string range 0 5, status 0
+  glyph 0 from character 0
+  glyph 1 from character 1
+  glyph 2 from character 2
+  glyph 3 from character 3
+  glyph 4 from character 4
+glyphs found 1, advances 1, positions follow the advances 1, both l's alike 1
+pointers: 1
+bounds: width 1, ascent 1, descent 1
+its font: 1, size 13
+drawn: 1
+lab space: model 3, components 3
+a Lab colour made: 1
+NSColorSpace model is Lab: 1
+as sRGB: 1 1 1
+kept its Lab components: 1, count 4
+white in Lab: 1 1 1
+the copy has its submenu: 1, a copy of it: 1, items 2
+copied item: key n, tip Opens a window, target kept 1, alternate 0 1
+its supermenu: 1
+Command-N in the copy: 1, sent 1
+typed: insert a nowhere
+typed: insertNewline:
+exit=0

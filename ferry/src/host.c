@@ -129,6 +129,12 @@ static const struct twin {
     /* ICU's C calls (regular expressions, collation, breaking), which
      * Linux builds name with the version, as uregex_open_74 */
     {"/usr/lib/libicucore.A.dylib", "icu"},
+    /* ncurses (Vim's terminal calls, MacVim): the termcap calls and their
+     * data (BC, PC, UP, ospeed) have the same types on both; this system's
+     * libncurses, or the terminal-info library it is built on */
+    {"/usr/lib/libncurses.5.4.dylib", "ncurses"},
+    {"/usr/lib/libncurses.dylib", "ncurses"},
+    {"/usr/lib/libcurses.dylib", "ncurses"},
     /* PC/SC smart cards (KeePassXC): pcsc-lite, through src/pcsc.c, whose
      * calls widen the Mac's 32-bit numbers; opened when a context is made */
     {"/System/Library/Frameworks/PCSC.framework/Versions/A/PCSC", "pcsc"},
@@ -159,7 +165,8 @@ static const char *const takes_a_file[] = {
     "xmlACatalogDump", "xmlLsOneNode", "xmlShell", "xmlPrintURI", "xmlMemDisplay", "xmlMemShow",
     "xmlDebugDumpString", "ppdOpen", "xmlDebugDumpAttr", "xmlDebugDumpAttrList", "xmlDebugDumpOneNode", "xmlDebugDumpNode",
     "xmlDebugDumpNodeList", "xmlDebugDumpDocumentHead", "xmlDebugDumpDocument", "xmlDebugDumpDTD",
-    "xmlDebugDumpEntities", "xmlDebugCheckDocument", "xmlRegexpPrint", "xmlNanoHTTPSave", NULL,
+    "xmlDebugDumpEntities", "xmlDebugCheckDocument", "xmlRegexpPrint", "xmlNanoHTTPSave", "newterm", "putwin",
+    "getwin", NULL,
 };
 
 int ferry_twin_library(const char *install_name)
@@ -171,10 +178,19 @@ int ferry_twin_library(const char *install_name)
             if (!twin_linked[i]) {
                 twin_linked[i] = 1;
                 int icu = !strcmp(twins[i].linux_name, "icu");
-                twin_handles[i] = icu ? open_icu() : dlopen(twins[i].linux_name, RTLD_NOW | RTLD_LOCAL);
+                int curses = !strcmp(twins[i].linux_name, "ncurses");
+                if (icu)
+                    twin_handles[i] = open_icu();
+                else if (curses) {
+                    twin_handles[i] = dlopen("libncurses.so.6", RTLD_NOW | RTLD_LOCAL);
+                    if (!twin_handles[i])
+                        twin_handles[i] = dlopen("libtinfo.so.6", RTLD_NOW | RTLD_LOCAL);
+                } else
+                    twin_handles[i] = dlopen(twins[i].linux_name, RTLD_NOW | RTLD_LOCAL);
                 if (!twin_handles[i])
                     fprintf(stderr, "ferry: this program uses %s, but %s isn't installed\n",
-                            strrchr(twins[i].mac, '/') + 1, icu ? "ICU (libicu)" : twins[i].linux_name);
+                            strrchr(twins[i].mac, '/') + 1,
+                            icu ? "ICU (libicu)" : curses ? "ncurses (libncurses6)" : twins[i].linux_name);
             }
             return 1;
         }

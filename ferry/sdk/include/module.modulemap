@@ -271,6 +271,7 @@ module CoreServices [system] {
     header "CoreServices/IconsCore.h"
     header "CoreServices/LSSharedFileList.h"
     header "CoreServices/LaunchServices.h"
+    header "CoreServices/TextEncodingConverter.h"
     header "CoreServices/UTCoreTypes.h"
     header "CoreServices/UTType.h"
     header "CoreServices/UnicodeUtilities.h"

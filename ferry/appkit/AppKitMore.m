@@ -43,6 +43,9 @@ NSImageName const NSImageNameAdvanced = @"NSAdvanced";
 NSImageName const NSImageNameEveryone = @"NSEveryone";
 NSImageName const NSImageNameUser = @"NSUser";
 NSImageName const NSImageNameUserGroup = @"NSUserGroup";
+/* the colour and font panels' toolbar images (freemac 1.NEXT, MacVim) */
+NSImageName const NSImageNameColorPanel = @"NSColorPanel";
+NSImageName const NSImageNameFontPanel = @"NSFontPanel";
 
 /* macOS 14's, the release Ferry answers as (FERRY_MACOS_VERSION) */
 const double NSAppKitVersionNumber = 2487;
